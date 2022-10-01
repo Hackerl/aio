@@ -40,10 +40,10 @@ namespace aio::ev {
     private:
         void onClose(const zero::async::promise::Reason& reason);
 
-    public:
-        void onBufferRead(bufferevent *bev);
-        void onBufferWrite(bufferevent *bev);
-        void onBufferEvent(bufferevent *bev, short what);
+    private:
+        void onBufferRead();
+        void onBufferWrite();
+        void onBufferEvent(short what);
 
     protected:
         bufferevent *mBev;

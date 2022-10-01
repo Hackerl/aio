@@ -4,6 +4,7 @@
 #include <openssl/err.h>
 #include <aio/ev/timer.h>
 #include <aio/http/request.h>
+#include <aio/ev/event.h>
 
 int main(int argc, char **argv) {
     INIT_CONSOLE_LOG(zero::INFO);
@@ -47,18 +48,18 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    {
-        std::make_shared<aio::ev::Timer>(aio::Context{base, dnsBase, ctx})->setTimeout(std::chrono::seconds(10))->then([]() {
-            LOG_INFO("ok");
-        });
+    aio::Context context = {base, dnsBase, ctx};
 
-        std::make_shared<aio::ev::Timer>(aio::Context{base, dnsBase, ctx})->setInterval(std::chrono::seconds(5), []() {
-            LOG_INFO("ok");
-            return true;
-        });
-    }
+    std::make_shared<aio::ev::Timer>(context)->setTimeout(std::chrono::seconds(10))->then([]() {
+        LOG_INFO("ok");
+    });
 
-    std::array<std::shared_ptr<aio::ev::IBuffer>, 2> buffers = aio::ev::pipe({base, dnsBase, ctx});
+    std::make_shared<aio::ev::Timer>(context)->setInterval(std::chrono::seconds(5), []() {
+        LOG_INFO("ok");
+        return true;
+    });
+
+    std::array<std::shared_ptr<aio::ev::IBuffer>, 2> buffers = aio::ev::pipe(context);
 
     std::string message = "hello";
 
@@ -80,9 +81,9 @@ int main(int argc, char **argv) {
         buffers[1]->close();
     });
 
-    aio::http::Request request({base, dnsBase, ctx});
+    auto request = std::make_shared<aio::http::Request>(context);
 
-    request.get(cmdline.get<std::string>("url"))->then([](const std::shared_ptr<aio::http::IResponse> &response) {
+    request->get(cmdline.get<std::string>("url"))->then([](const std::shared_ptr<aio::http::IResponse> &response) {
         LOG_INFO("status code: %ld", response->statusCode());
         return response->string();
     })->then([](const std::string &content) {

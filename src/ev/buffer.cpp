@@ -10,15 +10,15 @@ enum PromiseType {
 aio::ev::Buffer::Buffer(bufferevent *bev) : mBev(bev) {
     struct stub {
         static void onRead(bufferevent *bev, void *ctx) {
-            static_cast<Buffer *>(ctx)->onBufferRead(bev);
+            static_cast<Buffer *>(ctx)->onBufferRead();
         }
 
         static void onWrite(bufferevent *bev, void *ctx) {
-            static_cast<Buffer *>(ctx)->onBufferWrite(bev);
+            static_cast<Buffer *>(ctx)->onBufferWrite();
         }
 
         static void onEvent(bufferevent *bev, short what, void *ctx) {
-            static_cast<Buffer *>(ctx)->onBufferEvent(bev, what);
+            static_cast<Buffer *>(ctx)->onBufferEvent(what);
         }
     };
 
@@ -182,23 +182,23 @@ void aio::ev::Buffer::onClose(const zero::async::promise::Reason &reason) {
         std::shared_ptr(mPromise[WAIT_CLOSED])->resolve();
 }
 
-void aio::ev::Buffer::onBufferRead(bufferevent *bev) {
+void aio::ev::Buffer::onBufferRead() {
     if (!mPromise[READ]) {
-        bufferevent_disable(bev, EV_READ);
+        bufferevent_disable(mBev, EV_READ);
         return;
     }
 
     std::shared_ptr(mPromise[READ])->resolve();
 }
 
-void aio::ev::Buffer::onBufferWrite(bufferevent *bev) {
+void aio::ev::Buffer::onBufferWrite() {
     if (!mPromise[DRAIN])
         return;
 
     std::shared_ptr(mPromise[DRAIN])->resolve();
 }
 
-void aio::ev::Buffer::onBufferEvent(bufferevent *bev, short what) {
+void aio::ev::Buffer::onBufferEvent(short what) {
     if (what & BEV_EVENT_EOF) {
         onClose({0, "buffer is closed"});
     } else if (what & BEV_EVENT_ERROR) {

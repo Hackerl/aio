@@ -17,7 +17,7 @@ namespace aio::ev {
 
     public:
         std::shared_ptr<zero::async::promise::Promise<void>> setTimeout(const std::chrono::milliseconds &delay);
-        std::shared_ptr<zero::async::promise::Promise<void>> setInterval(const std::chrono::milliseconds &delay, const std::function<bool(void)> &func);
+        std::shared_ptr<zero::async::promise::Promise<void>> setInterval(const std::chrono::milliseconds &period, const std::function<bool(void)> &func);
 
     private:
         event *mEvent;

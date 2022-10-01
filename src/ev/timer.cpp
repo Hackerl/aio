@@ -19,7 +19,7 @@ bool aio::ev::Timer::cancel() {
         return false;
 
     evtimer_del(mEvent);
-    mPromise->reject({});
+    std::shared_ptr(mPromise)->reject({});
 
     return true;
 }
@@ -48,9 +48,9 @@ aio::ev::Timer::setTimeout(const std::chrono::milliseconds &delay) {
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>>
-aio::ev::Timer::setInterval(const std::chrono::milliseconds &delay, const std::function<bool(void)> &func) {
+aio::ev::Timer::setInterval(const std::chrono::milliseconds &period, const std::function<bool(void)> &func) {
     return zero::async::promise::loop<void>([=](const auto &loop) {
-        setTimeout(delay)->then([=]() {
+        setTimeout(period)->then([=]() {
             if (!func()) {
                 P_BREAK(loop);
                 return;

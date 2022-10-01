@@ -45,10 +45,27 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(libevent)
 
-add_library(aio src/ev/buffer.cpp src/ev/pipe.cpp src/ev/timer.cpp src/http/request.cpp)
+add_library(
+        aio
+        src/ev/buffer.cpp
+        src/ev/pipe.cpp
+        src/ev/event.cpp
+        src/ev/timer.cpp
+        src/http/request.cpp
+)
 
 target_include_directories(aio PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(aio zero libcurl event_core_static event_openssl_static event_extra_static OpenSSL::SSL OpenSSL::Crypto)
+
+target_link_libraries(
+        aio
+        zero
+        libcurl
+        event_core_static
+        event_openssl_static
+        event_extra_static
+        OpenSSL::SSL
+        OpenSSL::Crypto
+)
 
 add_executable(test main.cpp)
 target_link_libraries(test aio)

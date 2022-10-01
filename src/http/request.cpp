@@ -1,4 +1,5 @@
 #include <aio/http/request.h>
+#include <aio/ev/event.h>
 #include <cstring>
 
 aio::http::Response::Response(CURL *easy, std::shared_ptr<ev::IBuffer> buffer) : mEasy(easy), mBuffer(std::move(buffer)) {
@@ -23,12 +24,21 @@ long aio::http::Response::contentLength() {
     return length;
 }
 
+void aio::http::Response::setError(const std::string &error) {
+    mError = error;
+}
+
 std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::string() {
     long length = contentLength();
 
     if (length > 0)
         return mBuffer->read(length)->then([=](const std::vector<char> &buffer) -> std::string {
             return {buffer.data(), buffer.size()};
+        })->fail([self = shared_from_this()](const zero::async::promise::Reason &reason) {
+            if (self->mError.empty())
+                return zero::async::promise::reject<std::string>(reason);
+
+            return zero::async::promise::reject<std::string>({-1, self->mError});
         });
 
     std::shared_ptr<std::string> content = std::make_shared<std::string>();
@@ -37,9 +47,14 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response:
         mBuffer->read()->then([=](const std::vector<char> &buffer) {
             content->append(buffer.data(), buffer.size());
             P_CONTINUE(p);
-        })->fail([=](const zero::async::promise::Reason &reason) {
+        })->fail([content, p, self = shared_from_this()](const zero::async::promise::Reason &reason) {
             if (reason.code < 0) {
                 P_BREAK_E(p, reason);
+                return;
+            }
+
+            if (!self->mError.empty()) {
+                P_BREAK_E(p, {-1, self->mError});
                 return;
             }
 
@@ -48,12 +63,8 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response:
     });
 }
 
-aio::http::Request::Request(const aio::Context &context) : mContext(context) {
+aio::http::Request::Request(const aio::Context &context) : mContext(context), mTimer(std::make_shared<ev::Timer>(context)) {
     struct stub {
-        static void onTimer(evutil_socket_t fd, short what, void *arg) {
-            static_cast<Request *>(arg)->onTimer();
-        }
-
         static int onCURLTimer(CURLM *multi, long timeout, void *userdata) {
             static_cast<Request *>(userdata)->onCURLTimer(timeout);
             return 0;
@@ -65,7 +76,6 @@ aio::http::Request::Request(const aio::Context &context) : mContext(context) {
         }
     };
 
-    mTimer = evtimer_new(mContext.eventBase, stub::onTimer, this);
     mMulti = curl_multi_init();
 
     curl_multi_setopt(mMulti, CURLMOPT_SOCKETFUNCTION, stub::onCURLEvent);
@@ -75,93 +85,72 @@ aio::http::Request::Request(const aio::Context &context) : mContext(context) {
 }
 
 aio::http::Request::~Request() {
-    event_free(mTimer);
     curl_multi_cleanup(mMulti);
-}
-
-void aio::http::Request::onTimer() {
-    int n = 0;
-    CURLMcode c = curl_multi_socket_action(mMulti, CURL_SOCKET_TIMEOUT, 0, &n);
-
-    // TODO
-    if (c != CURLM_OK)
-        return;
-
-    recycle();
-}
-
-void aio::http::Request::onEvent(evutil_socket_t fd, short what) {
-    int n = 0;
-
-    CURLMcode c = curl_multi_socket_action(
-            mMulti,
-            fd,
-            ((what & EV_READ) ? CURL_CSELECT_IN : 0) | ((what & EV_WRITE) ? CURL_CSELECT_OUT : 0),
-            &n
-    );
-
-    // TODO
-    if (c != CURLM_OK)
-        return;
-
-    recycle();
-
-    if (n > 0 || !evtimer_pending(mTimer, nullptr))
-        return;
-
-    evtimer_del(mTimer);
 }
 
 void aio::http::Request::onCURLTimer(long timeout) {
     if (timeout == -1) {
-        evtimer_del(mTimer);
+        mTimer->cancel();
         return;
     }
 
-    timeval t = {
-            timeout / 1000,
-            (timeout % 1000) * 1000
-    };
-
-    evtimer_add(mTimer, &t);
+    mTimer->setTimeout(std::chrono::milliseconds{timeout})->then([self = shared_from_this()]() {
+        int n = 0;
+        curl_multi_socket_action(self->mMulti, CURL_SOCKET_TIMEOUT, 0, &n);
+        self->recycle(&n);
+    });
 }
 
 void aio::http::Request::onCURLEvent(CURL *easy, curl_socket_t s, int what, void *data) {
-    auto e = (event *) data;
+    auto context = (std::pair<std::shared_ptr<bool>, std::shared_ptr<ev::Event>> *) data;
 
     if (what == CURL_POLL_REMOVE) {
-        if (!e)
+        if (!context)
             return;
 
-        event_free(e);
+        *context->first = true;
+        delete context;
 
         return;
     }
 
-    if (!e) {
-        e = event_new(mContext.eventBase, s, 0, nullptr, this);
-        curl_multi_assign(mMulti, s, e);
+    if (!context) {
+        context = new std::pair<std::shared_ptr<bool>, std::shared_ptr<ev::Event>>();
+
+        context->first = std::make_shared<bool>();
+        context->second = std::make_shared<aio::ev::Event>(mContext, s);
+
+        curl_multi_assign(mMulti, s, context);
     }
 
-    int kind = ((what & CURL_POLL_IN) ? EV_READ : 0) | ((what & CURL_POLL_OUT) ? EV_WRITE : 0) | EV_PERSIST;
+    if (context->second->pending())
+        context->second->cancel();
 
-    struct stub {
-        static void onEvent(evutil_socket_t fd, short what, void *arg) {
-            static_cast<Request *>(arg)->onEvent(fd, what);
-        }
-    };
+    context->second->onPersist(
+            (short) (((what & CURL_POLL_IN) ? EV_READ : 0) | ((what & CURL_POLL_OUT) ? EV_WRITE : 0)),
+            [s, stopped = context->first, self = shared_from_this()](short what) {
+                int n = 0;
+                curl_multi_socket_action(
+                        self->mMulti,
+                        s,
+                        ((what & EV_READ) ? CURL_CSELECT_IN : 0) | ((what & EV_WRITE) ? CURL_CSELECT_OUT : 0),
+                        &n
+                );
 
-    if (event_pending(e, EV_READ | EV_WRITE, nullptr))
-        event_del(e);
+                self->recycle(&n);
 
-    event_assign(e, mContext.eventBase, s, (short) kind, stub::onEvent, this);
-    event_add(e, nullptr);
+                if (n > 0 || !self->mTimer->pending())
+                    return !*stopped;
+
+                self->mTimer->cancel();
+
+                return !*stopped;
+            }
+    );
 }
 
-void aio::http::Request::recycle() {
-    int n = 0;
-
-    while (CURLMsg *msg = curl_multi_info_read(mMulti, &n)) {
+void aio::http::Request::recycle(int *n) {
+    while (CURLMsg *msg = curl_multi_info_read(mMulti, n)) {
         if (msg->msg != CURLMSG_DONE)
             continue;
 
@@ -172,6 +161,7 @@ void aio::http::Request::recycle() {
             if (!connection->transferring) {
                 connection->promise->reject({-1, connection->error});
             } else {
+                connection->response->setError(connection->error);
                 connection->buffer->close();
             }
         } else {
@@ -222,30 +212,30 @@ aio::http::Request::get(const std::string &url) {
         }
     };
 
-    std::array<std::shared_ptr<ev::IBuffer>, 2> buffers = ev::pipe(mContext);
+    return zero::async::promise::chain<std::shared_ptr<aio::http::IResponse>>([=](const auto &p) {
+        std::array<std::shared_ptr<ev::IBuffer>, 2> buffers = ev::pipe(mContext);
 
-    auto connection = new Connection{
-            std::make_shared<zero::async::promise::Promise<std::shared_ptr<IResponse>>>(),
-            std::make_shared<Response>(easy, buffers[1]),
-            buffers[0],
-            easy
-    };
+        auto connection = new Connection{
+                p,
+                std::make_shared<Response>(easy, buffers[1]),
+                buffers[0],
+                easy
+        };
 
-    curl_easy_setopt(easy, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(easy, CURLOPT_HEADERFUNCTION, stub::onHeader);
-    curl_easy_setopt(easy, CURLOPT_HEADERDATA, connection);
-    curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, stub::onWrite);
-    curl_easy_setopt(easy, CURLOPT_WRITEDATA, connection);
-    curl_easy_setopt(easy, CURLOPT_ERRORBUFFER, connection->error);
-    curl_easy_setopt(easy, CURLOPT_PRIVATE, connection);
-    curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(easy, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(easy, CURLOPT_HEADERFUNCTION, stub::onHeader);
+        curl_easy_setopt(easy, CURLOPT_HEADERDATA, connection);
+        curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, stub::onWrite);
+        curl_easy_setopt(easy, CURLOPT_WRITEDATA, connection);
+        curl_easy_setopt(easy, CURLOPT_ERRORBUFFER, connection->error);
+        curl_easy_setopt(easy, CURLOPT_PRIVATE, connection);
+        curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
 
-    CURLMcode c = curl_multi_add_handle(mMulti, easy);
+        CURLMcode c = curl_multi_add_handle(mMulti, easy);
 
-    if (c != CURLM_OK) {
-        curl_easy_cleanup(easy);
-        return zero::async::promise::reject<std::shared_ptr<aio::http::IResponse>>({0, "add easy handle failed"});
-    }
-
-    return connection->promise;
+        if (c != CURLM_OK) {
+            curl_easy_cleanup(easy);
+            p->reject({-1, "add easy handle failed"});
+        }
+    });
 }
