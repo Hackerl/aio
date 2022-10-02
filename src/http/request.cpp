@@ -1,6 +1,5 @@
 #include <aio/http/request.h>
 #include <aio/ev/event.h>
-#include <cstring>
 
 aio::http::Response::Response(CURL *easy, std::shared_ptr<ev::IBuffer> buffer) : mEasy(easy), mBuffer(std::move(buffer)) {
 
@@ -173,69 +172,17 @@ void aio::http::Request::recycle(int *n) {
     }
 }
 
-std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::IResponse>>>
+std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>>
 aio::http::Request::get(const std::string &url) {
-    CURL *easy = curl_easy_init();
+    return perform("GET", url);
+}
 
-    if (!easy)
-        return zero::async::promise::reject<std::shared_ptr<aio::http::IResponse>>({0, "init easy handle failed"});
+std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>>
+aio::http::Request::head(const std::string &url) {
+    return perform("HEAD", url);
+}
 
-    struct stub {
-        static size_t onWrite(char *buffer, size_t size, size_t n, void *userdata) {
-            auto connection = (Connection *) userdata;
-
-            if (connection->buffer->write(buffer, size * n) < 1024 * 1024)
-                return size * n;
-
-            connection->buffer->drain()->then([=]() {
-                curl_easy_pause(connection->easy, CURLPAUSE_CONT);
-            });
-
-            return CURL_WRITEFUNC_PAUSE;
-        }
-
-        static size_t onHeader(char *buffer, size_t size, size_t n, void *userdata) {
-            if (n != 2 || memcmp(buffer, "\r\n", 2) != 0)
-                return size * n;
-
-            auto connection = (Connection *) userdata;
-
-            long code = connection->response->statusCode();
-
-            if (code == 301 || code == 302)
-                return size * n;
-
-            connection->transferring = true;
-            connection->promise->resolve(connection->response);
-
-            return size * n;
-        }
-    };
-
-    return zero::async::promise::chain<std::shared_ptr<aio::http::IResponse>>([=](const auto &p) {
-        std::array<std::shared_ptr<ev::IBuffer>, 2> buffers = ev::pipe(mContext);
-
-        auto connection = new Connection{
-                p,
-                std::make_shared<Response>(easy, buffers[1]),
-                buffers[0],
-                easy
-        };
-
-        curl_easy_setopt(easy, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(easy, CURLOPT_HEADERFUNCTION, stub::onHeader);
-        curl_easy_setopt(easy, CURLOPT_HEADERDATA, connection);
-        curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, stub::onWrite);
-        curl_easy_setopt(easy, CURLOPT_WRITEDATA, connection);
-        curl_easy_setopt(easy, CURLOPT_ERRORBUFFER, connection->error);
-        curl_easy_setopt(easy, CURLOPT_PRIVATE, connection);
-        curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
-
-        CURLMcode c = curl_multi_add_handle(mMulti, easy);
-
-        if (c != CURLM_OK) {
-            curl_easy_cleanup(easy);
-            p->reject({-1, "add easy handle failed"});
-        }
-    });
+std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>>
+aio::http::Request::del(const std::string &url) {
+    return perform("DELETE", url);
 }

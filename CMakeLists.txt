@@ -18,6 +18,8 @@ set(CURL_DISABLE_TESTS ON CACHE BOOL "disable curl tests")
 set(BUILD_CURL_EXE OFF CACHE BOOL "disable curl executable")
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "disable curl shared library")
 
+set(JSON_BuildTests OFF CACHE BOOL "disable json library tests")
+
 include(FindOpenSSL)
 include(FetchContent)
 
@@ -32,7 +34,7 @@ FetchContent_MakeAvailable(zero)
 FetchContent_Declare(
         libcurl
         GIT_REPOSITORY https://github.com/curl/curl
-        GIT_TAG curl-7_82_0
+        GIT_TAG curl-7_85_0
 )
 
 FetchContent_MakeAvailable(libcurl)
@@ -44,6 +46,14 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(libevent)
+
+FetchContent_Declare(
+        json
+        GIT_REPOSITORY https://github.com/nlohmann/json
+        GIT_TAG v3.11.2
+)
+
+FetchContent_MakeAvailable(json)
 
 add_library(
         aio
@@ -60,6 +70,7 @@ target_link_libraries(
         aio
         zero
         libcurl
+        nlohmann_json
         event_core_static
         event_openssl_static
         event_extra_static
