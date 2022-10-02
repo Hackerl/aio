@@ -23,8 +23,14 @@ long aio::http::Response::contentLength() {
     return length;
 }
 
-void aio::http::Response::setError(const std::string &error) {
-    mError = error;
+std::string aio::http::Response::contentType() {
+    char *type = nullptr;
+    curl_easy_getinfo(mEasy, CURLINFO_CONTENT_TYPE, &type);
+
+    if (!type)
+        return "";
+
+    return type;
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::string() {
@@ -60,6 +66,20 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response:
             P_BREAK_V(p, *content);
         });
     });
+}
+
+std::shared_ptr<zero::async::promise::Promise<nlohmann::json>> aio::http::Response::json() {
+    return string()->then([](const std::string &content) {
+        try {
+            return zero::async::promise::resolve<nlohmann::json>(nlohmann::json::parse(content));
+        } catch (const nlohmann::json::parse_error &e) {
+            return zero::async::promise::reject<nlohmann::json>({-1, e.what()});
+        }
+    });
+}
+
+void aio::http::Response::setError(const std::string &error) {
+    mError = error;
 }
 
 aio::http::Request::Request(const aio::Context &context) : mContext(context), mTimer(std::make_shared<ev::Timer>(context)) {

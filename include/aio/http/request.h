@@ -21,8 +21,25 @@ namespace aio::http {
     public:
         long statusCode();
         long contentLength();
-        void setError(const std::string &error);
+        std::string contentType();
+
+    public:
         std::shared_ptr<zero::async::promise::Promise<std::string>> string();
+        std::shared_ptr<zero::async::promise::Promise<nlohmann::json>> json();
+
+        template<typename T>
+        std::shared_ptr<zero::async::promise::Promise<T>> json() {
+            return json()->then([](const nlohmann::json &j) {
+                try {
+                    return zero::async::promise::resolve<T>(j.get<T>());
+                } catch (const nlohmann::json::exception &e) {
+                    return zero::async::promise::reject<T>({-1, e.what()});
+                }
+            });
+        }
+
+    public:
+        void setError(const std::string &error);
 
     private:
         CURL *mEasy;

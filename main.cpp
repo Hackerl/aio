@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
 
     auto request = std::make_shared<aio::http::Request>(context);
 
-    request->get(cmdline.get<std::string>("url"))->then([](const std::shared_ptr<aio::http::IResponse> &response) {
+    request->get(cmdline.get<std::string>("url"))->then([](const std::shared_ptr<aio::http::Response> &response) {
         LOG_INFO("status code: %ld", response->statusCode());
         return response->string();
     })->then([](const std::string &content) {
