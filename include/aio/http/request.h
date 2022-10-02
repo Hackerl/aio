@@ -22,6 +22,7 @@ namespace aio::http {
         long statusCode();
         long contentLength();
         std::string contentType();
+        std::list<std::string> cookies();
 
     public:
         std::shared_ptr<zero::async::promise::Promise<std::string>> string();
@@ -62,10 +63,16 @@ namespace aio::http {
         bool transferring;
     };
 
-    class Request : public std::enable_shared_from_this<Request> {
+    struct Options {
+        std::string proxy;
+        std::map<std::string, std::string> headers;
+        std::map<std::string, std::string> cookies;
+    };
+
+    class Requests : public std::enable_shared_from_this<Requests> {
     public:
-        explicit Request(const aio::Context &context);
-        ~Request();
+        explicit Requests(const aio::Context &context);
+        ~Requests();
 
     private:
         void onCURLTimer(long timeout);
@@ -80,7 +87,7 @@ namespace aio::http {
         std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> del(const std::string &url);
 
         template<typename ...Ts>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> perform(const std::string &method, const std::string &url, Ts ...payload) {
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> request(const std::string &method, const std::string &url, Ts ...payload) {
             CURL *easy = curl_easy_init();
 
             if (!easy)
@@ -138,6 +145,7 @@ namespace aio::http {
                 curl_easy_setopt(easy, CURLOPT_CUSTOMREQUEST, method.c_str());
             }
 
+            curl_easy_setopt(easy, CURLOPT_COOKIEFILE, "");
             curl_easy_setopt(easy, CURLOPT_HEADERFUNCTION, stub::onHeader);
             curl_easy_setopt(easy, CURLOPT_HEADERDATA, connection);
             curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, stub::onWrite);
@@ -147,6 +155,30 @@ namespace aio::http {
             curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(easy, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
             curl_easy_setopt(easy, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
+
+            if (!mOptions.proxy.empty())
+                curl_easy_setopt(easy, CURLOPT_PROXY, mOptions.proxy.c_str());
+
+            if (!mOptions.cookies.empty()) {
+                std::list<std::string> cookies;
+
+                std::transform(
+                        mOptions.cookies.begin(),
+                        mOptions.cookies.end(),
+                        std::back_inserter(cookies),
+                        [](const auto &it) {
+                            return it.first + "=" + it.second;
+                        }
+                );
+
+                curl_easy_setopt(easy, CURLOPT_COOKIE, zero::strings::join(cookies, ", ").c_str());
+            }
+
+            curl_slist *headers = nullptr;
+
+            for (const auto &[k, v]: mOptions.headers) {
+                headers = curl_slist_append(headers, zero::strings::format("%s: %s", k.c_str(), v.c_str()).c_str());
+            }
 
             if constexpr (sizeof...(payload) > 0) {
                 static_assert(sizeof...(payload) == 1);
@@ -197,15 +229,15 @@ namespace aio::http {
                     curl_mime *form = curl_mime_init(easy);
 
                     ([&]() {
-                        for (const auto &[key, value]: payload) {
+                        for (const auto &[k, v]: payload) {
                             curl_mimepart *field = curl_mime_addpart(form);
 
-                            curl_mime_name(field, key.c_str());
+                            curl_mime_name(field, k.c_str());
 
-                            if (value.index() == 0) {
-                                curl_mime_data(field, std::get<std::string>(value).c_str(), CURL_ZERO_TERMINATED);
+                            if (v.index() == 0) {
+                                curl_mime_data(field, std::get<std::string>(v).c_str(), CURL_ZERO_TERMINATED);
                             } else {
-                                curl_mime_filedata(field, std::get<std::filesystem::path>(value).string().c_str());
+                                curl_mime_filedata(field, std::get<std::filesystem::path>(v).string().c_str());
                             }
                         }
                     }(), ...);
@@ -224,13 +256,16 @@ namespace aio::http {
                         );
                     }(), ...);
 
-                    curl_slist *headers = curl_slist_append(nullptr, "Content-Type: application/json");
-                    curl_easy_setopt(easy, CURLOPT_HTTPHEADER, headers);
-
-                    connection->defers.push_back([headers]() {
-                        curl_slist_free_all(headers);
-                    });
+                    headers = curl_slist_append(nullptr, "Content-Type: application/json");
                 }
+            }
+
+            if (headers) {
+                curl_easy_setopt(easy, CURLOPT_HTTPHEADER, headers);
+
+                connection->defers.push_back([headers]() {
+                    curl_slist_free_all(headers);
+                });
             }
 
             return zero::async::promise::chain<std::shared_ptr<aio::http::Response>>([=](const auto &p) {
@@ -246,22 +281,23 @@ namespace aio::http {
 
         template<typename T>
         std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> post(const std::string &url, T payload) {
-            return perform("POST", url, payload);
+            return request("POST", url, payload);
         }
 
         template<typename T>
         std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> put(const std::string &url, T payload) {
-            return perform("PUT", url, payload);
+            return request("PUT", url, payload);
         }
 
         template<typename T>
         std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> patch(const std::string &url, T payload) {
-            return perform("PATCH", url, payload);
+            return request("PATCH", url, payload);
         }
 
     private:
         CURLM *mMulti;
         Context mContext;
+        Options mOptions;
         std::shared_ptr<ev::Timer> mTimer;
     };
 }

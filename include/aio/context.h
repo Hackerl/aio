@@ -6,9 +6,9 @@
 
 namespace aio {
     struct Context {
-        event_base *eventBase;
+        event_base *base;
         evdns_base *dnsBase;
-        SSL_CTX *sslContext;
+        SSL_CTX *ssl;
     };
 }
 

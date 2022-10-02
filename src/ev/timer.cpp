@@ -7,7 +7,7 @@ aio::ev::Timer::Timer(const aio::Context &context) {
         }
     };
 
-    mEvent = evtimer_new(context.eventBase, stub::onEvent, this);
+    mEvent = evtimer_new(context.base, stub::onEvent, this);
 }
 
 aio::ev::Timer::~Timer() {

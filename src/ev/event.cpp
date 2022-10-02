@@ -7,7 +7,7 @@ aio::ev::Event::Event(const aio::Context &context, evutil_socket_t fd) {
         }
     };
 
-    mEvent = event_new(context.eventBase, fd, 0, stub::onEvent, this);
+    mEvent = event_new(context.base, fd, 0, stub::onEvent, this);
 }
 
 aio::ev::Event::~Event() {

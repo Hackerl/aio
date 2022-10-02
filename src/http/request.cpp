@@ -33,6 +33,21 @@ std::string aio::http::Response::contentType() {
     return type;
 }
 
+std::list<std::string> aio::http::Response::cookies() {
+    curl_slist *list = nullptr;
+    curl_easy_getinfo(mEasy, CURLINFO_COOKIELIST, &list);
+
+    std::list<std::string> cookies;
+
+    for (curl_slist *ptr = list; ptr; ptr = ptr->next) {
+        cookies.emplace_back(ptr->data);
+    }
+
+    curl_slist_free_all(list);
+
+    return cookies;
+}
+
 std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::string() {
     long length = contentLength();
 
@@ -82,15 +97,15 @@ void aio::http::Response::setError(const std::string &error) {
     mError = error;
 }
 
-aio::http::Request::Request(const aio::Context &context) : mContext(context), mTimer(std::make_shared<ev::Timer>(context)) {
+aio::http::Requests::Requests(const aio::Context &context) : mContext(context), mTimer(std::make_shared<ev::Timer>(context)) {
     struct stub {
         static int onCURLTimer(CURLM *multi, long timeout, void *userdata) {
-            static_cast<Request *>(userdata)->onCURLTimer(timeout);
+            static_cast<Requests *>(userdata)->onCURLTimer(timeout);
             return 0;
         }
 
         static int onCURLEvent(CURL *easy, curl_socket_t s, int what, void *userdata, void *data) {
-            static_cast<Request *>(userdata)->onCURLEvent(easy, s, what, data);
+            static_cast<Requests *>(userdata)->onCURLEvent(easy, s, what, data);
             return 0;
         }
     };
@@ -103,11 +118,11 @@ aio::http::Request::Request(const aio::Context &context) : mContext(context), mT
     curl_multi_setopt(mMulti, CURLMOPT_TIMERDATA, this);
 }
 
-aio::http::Request::~Request() {
+aio::http::Requests::~Requests() {
     curl_multi_cleanup(mMulti);
 }
 
-void aio::http::Request::onCURLTimer(long timeout) {
+void aio::http::Requests::onCURLTimer(long timeout) {
     if (timeout == -1) {
         mTimer->cancel();
         return;
@@ -120,7 +135,7 @@ void aio::http::Request::onCURLTimer(long timeout) {
     });
 }
 
-void aio::http::Request::onCURLEvent(CURL *easy, curl_socket_t s, int what, void *data) {
+void aio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what, void *data) {
     auto context = (std::pair<std::shared_ptr<bool>, std::shared_ptr<ev::Event>> *) data;
 
     if (what == CURL_POLL_REMOVE) {
@@ -168,7 +183,7 @@ void aio::http::Request::onCURLEvent(CURL *easy, curl_socket_t s, int what, void
     );
 }
 
-void aio::http::Request::recycle(int *n) {
+void aio::http::Requests::recycle(int *n) {
     while (CURLMsg *msg = curl_multi_info_read(mMulti, n)) {
         if (msg->msg != CURLMSG_DONE)
             continue;
@@ -193,16 +208,16 @@ void aio::http::Request::recycle(int *n) {
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>>
-aio::http::Request::get(const std::string &url) {
-    return perform("GET", url);
+aio::http::Requests::get(const std::string &url) {
+    return request("GET", url);
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>>
-aio::http::Request::head(const std::string &url) {
-    return perform("HEAD", url);
+aio::http::Requests::head(const std::string &url) {
+    return request("HEAD", url);
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>>
-aio::http::Request::del(const std::string &url) {
-    return perform("DELETE", url);
+aio::http::Requests::del(const std::string &url) {
+    return request("DELETE", url);
 }
