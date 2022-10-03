@@ -28,6 +28,7 @@ namespace aio::http {
     public:
         std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> read();
         std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> read(size_t n);
+        std::shared_ptr<zero::async::promise::Promise<std::string>> readLine();
         std::shared_ptr<zero::async::promise::Promise<std::string>> string();
         std::shared_ptr<zero::async::promise::Promise<nlohmann::json>> json();
 

@@ -10,6 +10,7 @@ namespace aio::ev {
     public:
         virtual std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> read() = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> read(size_t n) = 0;
+        virtual std::shared_ptr<zero::async::promise::Promise<std::string>> readLine() = 0;
 
     public:
         virtual size_t write(const void *buffer, size_t n) = 0;
@@ -29,6 +30,7 @@ namespace aio::ev {
     public:
         std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> read() override;
         std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> read(size_t n) override;
+        std::shared_ptr<zero::async::promise::Promise<std::string>> readLine() override;
 
     public:
         size_t write(const void *buffer, size_t n) override;

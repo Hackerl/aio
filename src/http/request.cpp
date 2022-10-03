@@ -71,6 +71,15 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::http::Res
     });
 }
 
+std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::readLine() {
+    return mBuffer->readLine()->fail([self = shared_from_this()](const zero::async::promise::Reason &reason) {
+        if (self->mError.empty())
+            return zero::async::promise::reject<std::string>(reason);
+
+        return zero::async::promise::reject<std::string>({-1, self->mError});
+    });
+}
+
 std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::string() {
     long length = contentLength();
 
@@ -79,7 +88,7 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response:
             return {buffer.data(), buffer.size()};
         });
 
-    return aio::readAll(shared_from_this())->then([](const std::vector<char> &buffer) -> std::string {
+    return aio::readAll(this)->then([](const std::vector<char> &buffer) -> std::string {
         return {buffer.data(), buffer.size()};
     });
 }

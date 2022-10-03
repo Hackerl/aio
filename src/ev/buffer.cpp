@@ -109,6 +109,44 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::ev::Buffe
     });
 }
 
+std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::readLine() {
+    if (!mBev)
+        return zero::async::promise::reject<std::string>({-1, "buffer destroyed"});
+
+    if (mPromise[READ])
+        return zero::async::promise::reject<std::string>({-1, "pending request not completed"});
+
+    char *ptr = evbuffer_readln(bufferevent_get_input(mBev), nullptr, EVBUFFER_EOL_ANY);
+
+    if (ptr)
+        return zero::async::promise::resolve<std::string>(std::unique_ptr<char>(ptr).get());
+
+    if (mClosed)
+        return zero::async::promise::reject<std::string>(mReason);
+
+    return zero::async::promise::loop<std::string>([this](const auto &loop) {
+        zero::async::promise::chain<void>([this](const auto &p) {
+            mPromise[READ] = p;
+
+            bufferevent_setwatermark(mBev, EV_READ, 0, 0);
+            bufferevent_enable(mBev, EV_READ);
+        })->finally([self = shared_from_this()]() {
+            self->mPromise[READ].reset();
+        })->then([loop, this]() {
+            char *ptr = evbuffer_readln(bufferevent_get_input(mBev), nullptr, EVBUFFER_EOL_ANY);
+
+            if (!ptr) {
+                P_CONTINUE(loop);
+                return;
+            }
+
+            P_BREAK_V(loop, std::unique_ptr<char>(ptr).get());
+        }, [loop](const zero::async::promise::Reason &reason) {
+            P_BREAK_E(loop, reason);
+        });
+    });
+}
+
 size_t aio::ev::Buffer::write(const void *buffer, size_t n) {
     if (mClosed)
         return -1;
