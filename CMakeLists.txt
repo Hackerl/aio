@@ -61,6 +61,8 @@ add_library(
         src/ev/pipe.cpp
         src/ev/event.cpp
         src/ev/timer.cpp
+        src/net/ssl.cpp
+        src/net/stream.cpp
         src/http/request.cpp
 )
 

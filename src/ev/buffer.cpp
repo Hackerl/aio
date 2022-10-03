@@ -9,16 +9,16 @@ enum PromiseType {
 
 aio::ev::Buffer::Buffer(bufferevent *bev) : mBev(bev) {
     struct stub {
-        static void onRead(bufferevent *bev, void *ctx) {
-            static_cast<Buffer *>(ctx)->onBufferRead();
+        static void onRead(bufferevent *bev, void *arg) {
+            static_cast<Buffer *>(arg)->onBufferRead();
         }
 
-        static void onWrite(bufferevent *bev, void *ctx) {
-            static_cast<Buffer *>(ctx)->onBufferWrite();
+        static void onWrite(bufferevent *bev, void *arg) {
+            static_cast<Buffer *>(arg)->onBufferWrite();
         }
 
-        static void onEvent(bufferevent *bev, short what, void *ctx) {
-            static_cast<Buffer *>(ctx)->onBufferEvent(what);
+        static void onEvent(bufferevent *bev, short what, void *arg) {
+            static_cast<Buffer *>(arg)->onBufferEvent(what);
         }
     };
 
