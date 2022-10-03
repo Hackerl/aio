@@ -1,4 +1,5 @@
 #include <aio/http/request.h>
+#include <aio/io.h>
 #include <aio/ev/event.h>
 
 aio::http::Response::Response(CURL *easy, std::shared_ptr<ev::IBuffer> buffer) : mEasy(easy), mBuffer(std::move(buffer)) {
@@ -48,38 +49,38 @@ std::list<std::string> aio::http::Response::cookies() {
     return cookies;
 }
 
+std::map<std::string, std::string> &aio::http::Response::headers() {
+    return mHeaders;
+}
+
+std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::http::Response::read() {
+    return mBuffer->read()->fail([self = shared_from_this()](const zero::async::promise::Reason &reason) {
+        if (self->mError.empty())
+            return zero::async::promise::reject<std::vector<char>>(reason);
+
+        return zero::async::promise::reject<std::vector<char>>({-1, self->mError});
+    });
+}
+
+std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::http::Response::read(size_t n) {
+    return mBuffer->read(n)->fail([self = shared_from_this()](const zero::async::promise::Reason &reason) {
+        if (self->mError.empty())
+            return zero::async::promise::reject<std::vector<char>>(reason);
+
+        return zero::async::promise::reject<std::vector<char>>({-1, self->mError});
+    });
+}
+
 std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::string() {
     long length = contentLength();
 
     if (length > 0)
-        return mBuffer->read(length)->then([=](const std::vector<char> &buffer) -> std::string {
+        return read(length)->then([=](const std::vector<char> &buffer) -> std::string {
             return {buffer.data(), buffer.size()};
-        })->fail([self = shared_from_this()](const zero::async::promise::Reason &reason) {
-            if (self->mError.empty())
-                return zero::async::promise::reject<std::string>(reason);
-
-            return zero::async::promise::reject<std::string>({-1, self->mError});
         });
 
-    std::shared_ptr<std::string> content = std::make_shared<std::string>();
-
-    return zero::async::promise::loop<std::string>([=](const auto &p) {
-        mBuffer->read()->then([=](const std::vector<char> &buffer) {
-            content->append(buffer.data(), buffer.size());
-            P_CONTINUE(p);
-        })->fail([content, p, self = shared_from_this()](const zero::async::promise::Reason &reason) {
-            if (reason.code < 0) {
-                P_BREAK_E(p, reason);
-                return;
-            }
-
-            if (!self->mError.empty()) {
-                P_BREAK_E(p, {-1, self->mError});
-                return;
-            }
-
-            P_BREAK_V(p, *content);
-        });
+    return aio::readAll(shared_from_this())->then([](const std::vector<char> &buffer) -> std::string {
+        return {buffer.data(), buffer.size()};
     });
 }
 
@@ -131,7 +132,7 @@ void aio::http::Requests::onCURLTimer(long timeout) {
     mTimer->setTimeout(std::chrono::milliseconds{timeout})->then([self = shared_from_this()]() {
         int n = 0;
         curl_multi_socket_action(self->mMulti, CURL_SOCKET_TIMEOUT, 0, &n);
-        self->recycle(&n);
+        self->recycle();
     });
 }
 
@@ -171,7 +172,7 @@ void aio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what, voi
                         &n
                 );
 
-                self->recycle(&n);
+                n = self->recycle();
 
                 if (n > 0 || !self->mTimer->pending())
                     return !*stopped;
@@ -183,8 +184,10 @@ void aio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what, voi
     );
 }
 
-void aio::http::Requests::recycle(int *n) {
-    while (CURLMsg *msg = curl_multi_info_read(mMulti, n)) {
+int aio::http::Requests::recycle() {
+    int n = 0;
+
+    while (CURLMsg *msg = curl_multi_info_read(mMulti, &n)) {
         if (msg->msg != CURLMSG_DONE)
             continue;
 
@@ -205,6 +208,8 @@ void aio::http::Requests::recycle(int *n) {
         curl_multi_remove_handle(mMulti, msg->easy_handle);
         delete connection;
     }
+
+    return n;
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>>

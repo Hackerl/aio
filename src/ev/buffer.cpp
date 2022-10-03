@@ -53,7 +53,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::ev::Buffe
     }
 
     if (mClosed)
-        return zero::async::promise::reject<std::vector<char>>({-1, "buffer is closed"});
+        return zero::async::promise::reject<std::vector<char>>(mReason);
 
     return zero::async::promise::chain<void>([this](const auto &p) {
         mPromise[READ] = p;
@@ -90,7 +90,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::ev::Buffe
     }
 
     if (mClosed)
-        return zero::async::promise::reject<std::vector<char>>({-1, "buffer is closed"});
+        return zero::async::promise::reject<std::vector<char>>(mReason);
 
     return zero::async::promise::chain<void>([n, this](const auto &p) {
         mPromise[READ] = p;
@@ -110,10 +110,8 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::ev::Buffe
 }
 
 size_t aio::ev::Buffer::write(const void *buffer, size_t n) {
-    if (mClosed) {
-        LOG_ERROR("buffer is closed");
-        return 0;
-    }
+    if (mClosed)
+        return -1;
 
     evbuffer *output = bufferevent_get_output(mBev);
     evbuffer_add(output, buffer, n);
@@ -129,7 +127,7 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::drain() {
         return zero::async::promise::reject<void>({-1, "pending request not completed"});
 
     if (mClosed)
-        return zero::async::promise::reject<void>({-1, "buffer is closed"});
+        return zero::async::promise::reject<void>(mReason);
 
     evbuffer *output = bufferevent_get_output(mBev);
 
@@ -144,12 +142,17 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::drain() {
 }
 
 void aio::ev::Buffer::close() {
+    if (mClosed)
+        return;
+
     onClose({0, "buffer will be closed"});
 
-    if (mBev) {
-        bufferevent_free(mBev);
-        mBev = nullptr;
-    }
+    bufferevent_free(mBev);
+    mBev = nullptr;
+}
+
+bool aio::ev::Buffer::closed() {
+    return mClosed;
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::waitClosed() {
@@ -171,12 +174,13 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::waitClosed
 
 void aio::ev::Buffer::onClose(const zero::async::promise::Reason &reason) {
     mClosed = true;
+    mReason = reason;
 
     if (mPromise[READ])
-        std::shared_ptr(mPromise[READ])->reject(reason);
+        std::shared_ptr(mPromise[READ])->reject(mReason);
 
     if (mPromise[DRAIN])
-        std::shared_ptr(mPromise[DRAIN])->reject(reason);
+        std::shared_ptr(mPromise[DRAIN])->reject(mReason);
 
     if (mPromise[WAIT_CLOSED])
         std::shared_ptr(mPromise[WAIT_CLOSED])->resolve();

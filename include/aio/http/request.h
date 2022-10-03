@@ -23,8 +23,11 @@ namespace aio::http {
         long contentLength();
         std::string contentType();
         std::list<std::string> cookies();
+        std::map<std::string, std::string> &headers();
 
     public:
+        std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> read();
+        std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> read(size_t n);
         std::shared_ptr<zero::async::promise::Promise<std::string>> string();
         std::shared_ptr<zero::async::promise::Promise<nlohmann::json>> json();
 
@@ -46,6 +49,7 @@ namespace aio::http {
         CURL *mEasy;
         std::string mError;
         std::shared_ptr<ev::IBuffer> mBuffer;
+        std::map<std::string, std::string> mHeaders;
     };
 
     struct Connection {
@@ -79,7 +83,7 @@ namespace aio::http {
         void onCURLEvent(CURL *easy, curl_socket_t s, int what, void *data);
 
     private:
-        void recycle(int *n);
+        int recycle();
 
     public:
         std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> get(const std::string &url);
@@ -108,15 +112,25 @@ namespace aio::http {
                 }
 
                 static size_t onHeader(char *buffer, size_t size, size_t n, void *userdata) {
-                    if (n != 2 || memcmp(buffer, "\r\n", 2) != 0)
-                        return size * n;
-
                     auto connection = (Connection *) userdata;
+
+                    if (n != 2 || memcmp(buffer, "\r\n", 2) != 0) {
+                        std::vector<std::string> tokens = zero::strings::split(buffer, ":", 1);
+
+                        if (tokens.size() != 2)
+                            return size * n;
+
+                        connection->response->headers()[tokens[0]] = zero::strings::trim(tokens[1]);
+
+                        return size * n;
+                    }
 
                     long code = connection->response->statusCode();
 
-                    if (code == 301 || code == 302)
+                    if (code == 301 || code == 302) {
+                        connection->response->headers().clear();
                         return size * n;
+                    }
 
                     connection->transferring = true;
                     connection->promise->resolve(connection->response);
@@ -154,7 +168,6 @@ namespace aio::http {
             curl_easy_setopt(easy, CURLOPT_PRIVATE, connection);
             curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(easy, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
-            curl_easy_setopt(easy, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
 
             if (!mOptions.proxy.empty())
                 curl_easy_setopt(easy, CURLOPT_PROXY, mOptions.proxy.c_str());
@@ -171,7 +184,7 @@ namespace aio::http {
                         }
                 );
 
-                curl_easy_setopt(easy, CURLOPT_COOKIE, zero::strings::join(cookies, ", ").c_str());
+                curl_easy_setopt(easy, CURLOPT_COOKIE, zero::strings::join(cookies, "; ").c_str());
             }
 
             curl_slist *headers = nullptr;
@@ -182,19 +195,16 @@ namespace aio::http {
 
             if constexpr (sizeof...(payload) > 0) {
                 static_assert(sizeof...(payload) == 1);
-                using T = typename std::remove_cv_t<std::remove_reference_t<std::tuple_element_t<0, std::tuple<Ts...>>>>;
 
-                if constexpr (std::is_pointer_v<T> && std::is_same_v<std::remove_const_t<std::remove_pointer_t<T>>, char>) {
-                    ([&]() {
+                [&](auto payload) {
+                    using T = typename std::remove_cv_t<std::remove_reference_t<std::tuple_element_t<0, std::tuple<Ts...>>>>;
+
+                    if constexpr (std::is_pointer_v<T> && std::is_same_v<std::remove_const_t<std::remove_pointer_t<T>>, char>) {
                         curl_easy_setopt(easy, CURLOPT_COPYPOSTFIELDS, payload);
-                    }(), ...);
-                } else if constexpr (std::is_same_v<T, std::string>) {
-                    ([&]() {
+                    } else if constexpr (std::is_same_v<T, std::string>) {
                         curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE, (long) payload.length());
                         curl_easy_setopt(easy, CURLOPT_COPYPOSTFIELDS, payload.c_str());
-                    }(), ...);
-                } else if constexpr (std::is_same_v<T, std::map<std::string, std::string>>) {
-                    ([&]() {
+                    } else if constexpr (std::is_same_v<T, std::map<std::string, std::string>>) {
                         std::list<std::string> items;
 
                         std::transform(
@@ -207,28 +217,24 @@ namespace aio::http {
                         );
 
                         curl_easy_setopt(easy, CURLOPT_COPYPOSTFIELDS, zero::strings::join(items, "&").c_str());
-                    }(), ...);
-                } else if constexpr (std::is_same_v<T, std::map<std::string, std::filesystem::path>>) {
-                    curl_mime *form = curl_mime_init(easy);
+                    } else if constexpr (std::is_same_v<T, std::map<std::string, std::filesystem::path>>) {
+                        curl_mime *form = curl_mime_init(easy);
 
-                    ([&]() {
                         for (const auto &[key, value]: payload) {
                             curl_mimepart *field = curl_mime_addpart(form);
 
                             curl_mime_name(field, key.c_str());
                             curl_mime_filedata(field, value.string().c_str());
                         }
-                    }(), ...);
 
-                    curl_easy_setopt(easy, CURLOPT_MIMEPOST, form);
+                        curl_easy_setopt(easy, CURLOPT_MIMEPOST, form);
 
-                    connection->defers.push_back([form]() {
-                        curl_mime_free(form);
-                    });
-                } else if constexpr (std::is_same_v<T, std::map<std::string, std::variant<std::string, std::filesystem::path>>>) {
-                    curl_mime *form = curl_mime_init(easy);
+                        connection->defers.push_back([form]() {
+                            curl_mime_free(form);
+                        });
+                    } else if constexpr (std::is_same_v<T, std::map<std::string, std::variant<std::string, std::filesystem::path>>>) {
+                        curl_mime *form = curl_mime_init(easy);
 
-                    ([&]() {
                         for (const auto &[k, v]: payload) {
                             curl_mimepart *field = curl_mime_addpart(form);
 
@@ -240,24 +246,22 @@ namespace aio::http {
                                 curl_mime_filedata(field, std::get<std::filesystem::path>(v).string().c_str());
                             }
                         }
-                    }(), ...);
 
-                    curl_easy_setopt(easy, CURLOPT_MIMEPOST, form);
+                        curl_easy_setopt(easy, CURLOPT_MIMEPOST, form);
 
-                    connection->defers.push_back([form]() {
-                        curl_mime_free(form);
-                    });
-                } else if constexpr (nlohmann::detail::has_to_json<nlohmann::json, T>::value){
-                    ([&]() {
+                        connection->defers.push_back([form]() {
+                            curl_mime_free(form);
+                        });
+                    } else if constexpr (nlohmann::detail::has_to_json<nlohmann::json, T>::value){
                         curl_easy_setopt(
                                 easy,
                                 CURLOPT_COPYPOSTFIELDS,
                                 nlohmann::json(payload).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str()
                         );
-                    }(), ...);
 
-                    headers = curl_slist_append(nullptr, "Content-Type: application/json");
-                }
+                        headers = curl_slist_append(nullptr, "Content-Type: application/json");
+                    }
+                }(payload...);
             }
 
             if (headers) {

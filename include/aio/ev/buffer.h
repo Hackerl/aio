@@ -17,6 +17,7 @@ namespace aio::ev {
 
     public:
         virtual void close() = 0;
+        virtual bool closed() = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> waitClosed() = 0;
     };
 
@@ -35,6 +36,7 @@ namespace aio::ev {
 
     public:
         void close() override;
+        bool closed() override;
         std::shared_ptr<zero::async::promise::Promise<void>> waitClosed() override;
 
     private:
@@ -50,6 +52,7 @@ namespace aio::ev {
 
     private:
         bool mClosed{};
+        zero::async::promise::Reason mReason;
         std::shared_ptr<zero::async::promise::Promise<void>> mPromise[3];
     };
 }
