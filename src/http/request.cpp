@@ -107,7 +107,7 @@ void aio::http::Response::setError(const std::string &error) {
     mError = error;
 }
 
-aio::http::Requests::Requests(const aio::Context &context) : mContext(context), mTimer(std::make_shared<ev::Timer>(context)) {
+aio::http::Requests::Requests(const aio::Context &context, Options options) : mContext(context), mOptions(std::move(options)), mTimer(std::make_shared<ev::Timer>(context)) {
     struct stub {
         static int onCURLTimer(CURLM *multi, long timeout, void *userdata) {
             static_cast<Requests *>(userdata)->onCURLTimer(timeout);
@@ -234,4 +234,8 @@ aio::http::Requests::head(const std::string &url) {
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>>
 aio::http::Requests::del(const std::string &url) {
     return request("DELETE", url);
+}
+
+aio::http::Options &aio::http::Requests::HTTPOptions() {
+    return mOptions;
 }

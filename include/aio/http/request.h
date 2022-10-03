@@ -76,7 +76,7 @@ namespace aio::http {
 
     class Requests : public std::enable_shared_from_this<Requests> {
     public:
-        explicit Requests(const aio::Context &context);
+        explicit Requests(const aio::Context &context, Options options = {});
         ~Requests();
 
     private:
@@ -298,6 +298,9 @@ namespace aio::http {
         std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> patch(const std::string &url, T payload) {
             return request("PATCH", url, payload);
         }
+
+    public:
+        Options &HTTPOptions();
 
     private:
         CURLM *mMulti;
