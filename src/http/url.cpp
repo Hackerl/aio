@@ -2,17 +2,12 @@
 #include <zero/strings/strings.h>
 #include <memory>
 
-aio::http::URL::URL(const char *url) {
-    mURL = curl_url();
+aio::http::URL::URL() : mURL(curl_url()) {
 
-    if (!mURL)
-        return;
+}
 
-    if (curl_url_set(mURL, CURLUPART_URL, url, 0) != CURLUE_OK) {
-        curl_url_cleanup(mURL);
-        mURL = nullptr;
-        return;
-    }
+aio::http::URL::URL(const char *url) : URL() {
+    curl_url_set(mURL, CURLUPART_URL, url, 0);
 }
 
 aio::http::URL::URL(const std::string &url) : URL(url.c_str()) {
@@ -38,8 +33,10 @@ aio::http::URL &aio::http::URL::operator=(const aio::http::URL &rhs) {
     if (this == &rhs)
         return *this;
 
-    if (mURL)
+    if (mURL) {
         curl_url_cleanup(mURL);
+        mURL = nullptr;
+    }
 
     mURL = curl_url_dup(rhs.mURL);
 
@@ -55,10 +52,6 @@ aio::http::URL &aio::http::URL::operator=(aio::http::URL &&rhs) noexcept {
     std::swap(mURL, rhs.mURL);
 
     return *this;
-}
-
-aio::http::URL::operator bool() const {
-    return mURL != nullptr;
 }
 
 std::string aio::http::URL::string() const {

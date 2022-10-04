@@ -87,11 +87,8 @@ namespace aio::http {
         int recycle();
 
     public:
-        template<typename ...Ts>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> request(const std::string &method, const URL &url, Ts ...payload) {
-            if (!url)
-                return zero::async::promise::reject<std::shared_ptr<aio::http::Response>>({-1, "invalid url"});
-
+        template<typename T, typename ...Ts>
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> request(const std::string &method, T url, Ts ...payload) {
             CURL *easy = curl_easy_init();
 
             if (!easy)
@@ -147,7 +144,15 @@ namespace aio::http {
                     buffers[0]
             };
 
-            curl_easy_setopt(easy, CURLOPT_URL, url.string().c_str());
+            if constexpr (std::is_pointer_v<T> && std::is_same_v<std::remove_const_t<std::remove_pointer_t<T>>, char>) {
+                curl_easy_setopt(easy, CURLOPT_URL, url);
+            } else if constexpr (std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, std::string>){
+                curl_easy_setopt(easy, CURLOPT_URL, url.c_str());
+            } else if constexpr (std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, URL>){
+                curl_easy_setopt(easy, CURLOPT_URL, url.string().c_str());
+            } else {
+                static_assert(!sizeof(T *), "url type not supported");
+            }
 
             if (method == "HEAD") {
                 curl_easy_setopt(easy, CURLOPT_NOBODY, 1L);
@@ -197,14 +202,14 @@ namespace aio::http {
                 static_assert(sizeof...(payload) == 1);
 
                 [&](auto payload) {
-                    using T = typename std::remove_cv_t<std::remove_reference_t<std::tuple_element_t<0, std::tuple<Ts...>>>>;
+                    using Payload = std::remove_cv_t<std::remove_reference_t<std::tuple_element_t<0, std::tuple<Ts...>>>>;
 
-                    if constexpr (std::is_pointer_v<T> && std::is_same_v<std::remove_const_t<std::remove_pointer_t<T>>, char>) {
+                    if constexpr (std::is_pointer_v<Payload> && std::is_same_v<std::remove_const_t<std::remove_pointer_t<T>>, char>) {
                         curl_easy_setopt(easy, CURLOPT_COPYPOSTFIELDS, payload);
-                    } else if constexpr (std::is_same_v<T, std::string>) {
+                    } else if constexpr (std::is_same_v<Payload, std::string>) {
                         curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE, (long) payload.length());
                         curl_easy_setopt(easy, CURLOPT_COPYPOSTFIELDS, payload.c_str());
-                    } else if constexpr (std::is_same_v<T, std::map<std::string, std::string>>) {
+                    } else if constexpr (std::is_same_v<Payload, std::map<std::string, std::string>>) {
                         std::list<std::string> items;
 
                         std::transform(
@@ -217,7 +222,7 @@ namespace aio::http {
                         );
 
                         curl_easy_setopt(easy, CURLOPT_COPYPOSTFIELDS, zero::strings::join(items, "&").c_str());
-                    } else if constexpr (std::is_same_v<T, std::map<std::string, std::filesystem::path>>) {
+                    } else if constexpr (std::is_same_v<Payload, std::map<std::string, std::filesystem::path>>) {
                         curl_mime *form = curl_mime_init(easy);
 
                         for (const auto &[key, value]: payload) {
@@ -232,7 +237,7 @@ namespace aio::http {
                         connection->defers.push_back([form]() {
                             curl_mime_free(form);
                         });
-                    } else if constexpr (std::is_same_v<T, std::map<std::string, std::variant<std::string, std::filesystem::path>>>) {
+                    } else if constexpr (std::is_same_v<Payload, std::map<std::string, std::variant<std::string, std::filesystem::path>>>) {
                         curl_mime *form = curl_mime_init(easy);
 
                         for (const auto &[k, v]: payload) {
@@ -252,7 +257,7 @@ namespace aio::http {
                         connection->defers.push_back([form]() {
                             curl_mime_free(form);
                         });
-                    } else if constexpr (nlohmann::detail::has_to_json<nlohmann::json, T>::value){
+                    } else if constexpr (nlohmann::detail::has_to_json<nlohmann::json, Payload>::value){
                         curl_easy_setopt(
                                 easy,
                                 CURLOPT_COPYPOSTFIELDS,
@@ -260,6 +265,8 @@ namespace aio::http {
                         );
 
                         headers = curl_slist_append(nullptr, "Content-Type: application/json");
+                    } else {
+                        static_assert(!sizeof(Payload *), "payload type not supported");
                     }
                 }(payload...);
             }
@@ -283,22 +290,33 @@ namespace aio::http {
             });
         }
 
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> get(const URL &url);
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> head(const URL &url);
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> del(const URL &url);
+        template<typename T>
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> get(T url) {
+            return request("GET", url);
+        }
 
         template<typename T>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> post(const URL &url, T payload) {
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> head(T url) {
+            return request("HEAD", url);
+        }
+
+        template<typename T>
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> del(T url) {
+            return request("DELETE", url);
+        }
+
+        template<typename T, typename Payload>
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> post(T url, Payload payload) {
             return request("POST", url, payload);
         }
 
-        template<typename T>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> put(const URL &url, T payload) {
+        template<typename T, typename Payload>
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> put(T url, Payload payload) {
             return request("PUT", url, payload);
         }
 
-        template<typename T>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> patch(const URL &url, T payload) {
+        template<typename T, typename Payload>
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> patch(T url, Payload payload) {
             return request("PATCH", url, payload);
         }
 

@@ -221,21 +221,6 @@ int aio::http::Requests::recycle() {
     return n;
 }
 
-std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>>
-aio::http::Requests::get(const URL &url) {
-    return request("GET", url);
-}
-
-std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>>
-aio::http::Requests::head(const URL &url) {
-    return request("HEAD", url);
-}
-
-std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>>
-aio::http::Requests::del(const URL &url) {
-    return request("DELETE", url);
-}
-
 aio::http::Options &aio::http::Requests::HTTPOptions() {
     return mOptions;
 }

@@ -7,8 +7,9 @@
 namespace aio::http {
     class URL {
     public:
-        URL(const char *url);
-        URL(const std::string &url);
+        URL();
+        explicit URL(const char *url);
+        explicit URL(const std::string &url);
         URL(const URL &rhs);
         URL(URL &&rhs) noexcept;
         ~URL();
@@ -16,9 +17,6 @@ namespace aio::http {
     public:
         URL &operator=(const URL &rhs);
         URL &operator=(URL &&rhs) noexcept;
-
-    public:
-        explicit operator bool() const;
 
     public:
         [[nodiscard]] std::string string() const;
