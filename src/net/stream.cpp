@@ -12,16 +12,21 @@ aio::net::Listener::Listener(const Context &context, evconnlistener *listener) :
         }
     };
 
-    evconnlistener_disable(mListener);
     evconnlistener_set_cb(mListener, stub::onAccept, this);
     evconnlistener_set_error_cb(mListener, stub::onError);
 }
 
 aio::net::Listener::~Listener() {
-    evconnlistener_free(mListener);
+    if (mListener) {
+        evconnlistener_free(mListener);
+        mListener = nullptr;
+    }
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::ev::IBuffer>>> aio::net::Listener::accept() {
+    if (!mListener)
+        return zero::async::promise::reject<std::shared_ptr<aio::ev::IBuffer>>({-1, "listener destroyed"});
+
     if (mPromise)
         return zero::async::promise::reject<std::shared_ptr<aio::ev::IBuffer>>({-1, "pending request not completed"});
 
@@ -34,6 +39,17 @@ std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::ev::IBuffer>>
         evconnlistener_disable(self->mListener);
         self->mPromise.reset();
     });
+}
+
+void aio::net::Listener::close() {
+    if (!mListener)
+        return;
+
+    if (mPromise)
+        std::shared_ptr(mPromise)->reject({0, "listener will be closed"});
+
+    evconnlistener_free(mListener);
+    mListener = nullptr;
 }
 
 std::shared_ptr<aio::net::Listener> aio::net::listen(const aio::Context &context, const std::string &host, short port) {
@@ -49,7 +65,7 @@ std::shared_ptr<aio::net::Listener> aio::net::listen(const aio::Context &context
             context.base,
             nullptr,
             nullptr,
-            LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE,
+            LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE | LEV_OPT_DISABLED,
             -1,
             (sockaddr *) &sin,
             sizeof(sin)

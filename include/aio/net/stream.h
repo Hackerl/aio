@@ -13,6 +13,7 @@ namespace aio::net {
 
     public:
         std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<ev::IBuffer>>> accept();
+        void close();
 
     private:
         Context mContext;
