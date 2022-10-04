@@ -222,17 +222,17 @@ int aio::http::Requests::recycle() {
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>>
-aio::http::Requests::get(const std::string &url) {
+aio::http::Requests::get(const URL &url) {
     return request("GET", url);
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>>
-aio::http::Requests::head(const std::string &url) {
+aio::http::Requests::head(const URL &url) {
     return request("HEAD", url);
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>>
-aio::http::Requests::del(const std::string &url) {
+aio::http::Requests::del(const URL &url) {
     return request("DELETE", url);
 }
 

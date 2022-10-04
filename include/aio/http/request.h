@@ -1,9 +1,9 @@
 #ifndef AIO_REQUEST_H
 #define AIO_REQUEST_H
 
+#include "url.h"
 #include <aio/ev/pipe.h>
 #include <aio/ev/timer.h>
-#include <curl/curl.h>
 #include <cstring>
 #include <map>
 #include <variant>
@@ -87,12 +87,11 @@ namespace aio::http {
         int recycle();
 
     public:
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> get(const std::string &url);
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> head(const std::string &url);
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> del(const std::string &url);
-
         template<typename ...Ts>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> request(const std::string &method, const std::string &url, Ts ...payload) {
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> request(const std::string &method, const URL &url, Ts ...payload) {
+            if (!url)
+                return zero::async::promise::reject<std::shared_ptr<aio::http::Response>>({-1, "invalid url"});
+
             CURL *easy = curl_easy_init();
 
             if (!easy)
@@ -148,7 +147,7 @@ namespace aio::http {
                     buffers[0]
             };
 
-            curl_easy_setopt(easy, CURLOPT_URL, url.c_str());
+            curl_easy_setopt(easy, CURLOPT_URL, url.string().c_str());
 
             if (method == "HEAD") {
                 curl_easy_setopt(easy, CURLOPT_NOBODY, 1L);
@@ -284,18 +283,22 @@ namespace aio::http {
             });
         }
 
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> get(const URL &url);
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> head(const URL &url);
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> del(const URL &url);
+
         template<typename T>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> post(const std::string &url, T payload) {
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> post(const URL &url, T payload) {
             return request("POST", url, payload);
         }
 
         template<typename T>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> put(const std::string &url, T payload) {
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> put(const URL &url, T payload) {
             return request("PUT", url, payload);
         }
 
         template<typename T>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> patch(const std::string &url, T payload) {
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> patch(const URL &url, T payload) {
             return request("PATCH", url, payload);
         }
 
