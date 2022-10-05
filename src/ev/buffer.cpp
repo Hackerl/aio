@@ -109,14 +109,14 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::ev::Buffe
     });
 }
 
-std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::readLine() {
+std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::readLine(evbuffer_eol_style style) {
     if (!mBev)
         return zero::async::promise::reject<std::string>({-1, "buffer destroyed"});
 
     if (mPromise[READ])
         return zero::async::promise::reject<std::string>({-1, "pending request not completed"});
 
-    char *ptr = evbuffer_readln(bufferevent_get_input(mBev), nullptr, EVBUFFER_EOL_ANY);
+    char *ptr = evbuffer_readln(bufferevent_get_input(mBev), nullptr, style);
 
     if (ptr)
         return zero::async::promise::resolve<std::string>(std::unique_ptr<char>(ptr).get());
@@ -124,7 +124,7 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
     if (mClosed)
         return zero::async::promise::reject<std::string>(mReason);
 
-    return zero::async::promise::loop<std::string>([this](const auto &loop) {
+    return zero::async::promise::loop<std::string>([style, this](const auto &loop) {
         zero::async::promise::chain<void>([this](const auto &p) {
             mPromise[READ] = p;
 
@@ -132,8 +132,8 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
             bufferevent_enable(mBev, EV_READ);
         })->finally([self = shared_from_this()]() {
             self->mPromise[READ].reset();
-        })->then([loop, this]() {
-            char *ptr = evbuffer_readln(bufferevent_get_input(mBev), nullptr, EVBUFFER_EOL_ANY);
+        })->then([style, loop, this]() {
+            char *ptr = evbuffer_readln(bufferevent_get_input(mBev), nullptr, style);
 
             if (!ptr) {
                 P_CONTINUE(loop);
@@ -145,6 +145,10 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
             P_BREAK_E(loop, reason);
         });
     });
+}
+
+size_t aio::ev::Buffer::write(const std::string &data) {
+    return write(data.c_str(), data.length());
 }
 
 size_t aio::ev::Buffer::write(const void *buffer, size_t n) {

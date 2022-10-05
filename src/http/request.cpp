@@ -71,8 +71,8 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::http::Res
     });
 }
 
-std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::readLine() {
-    return mBuffer->readLine()->fail([self = shared_from_this()](const zero::async::promise::Reason &reason) {
+std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::readLine(evbuffer_eol_style style) {
+    return mBuffer->readLine(style)->fail([self = shared_from_this()](const zero::async::promise::Reason &reason) {
         if (self->mError.empty())
             return zero::async::promise::reject<std::string>(reason);
 

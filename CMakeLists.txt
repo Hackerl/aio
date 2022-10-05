@@ -65,6 +65,7 @@ add_library(
         src/net/stream.cpp
         src/http/url.cpp
         src/http/request.cpp
+        src/http/websocket.cpp
 )
 
 target_include_directories(aio PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

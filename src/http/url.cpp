@@ -7,7 +7,7 @@ aio::http::URL::URL() : mURL(curl_url()) {
 }
 
 aio::http::URL::URL(const char *url) : URL() {
-    curl_url_set(mURL, CURLUPART_URL, url, 0);
+    curl_url_set(mURL, CURLUPART_URL, url, CURLU_NON_SUPPORT_SCHEME);
 }
 
 aio::http::URL::URL(const std::string &url) : URL(url.c_str()) {
@@ -156,12 +156,17 @@ aio::http::URL &aio::http::URL::path(const std::string &path) {
     return *this;
 }
 
-aio::http::URL &aio::http::URL::query(const std::string &query, bool replace) {
-    curl_url_set(mURL, CURLUPART_QUERY, query.c_str(), !replace ? CURLU_APPENDQUERY : 0);
+aio::http::URL &aio::http::URL::query(const std::string &query) {
+    curl_url_set(mURL, CURLUPART_QUERY, query.c_str(), 0);
     return *this;
 }
 
 aio::http::URL &aio::http::URL::port(short port) {
     curl_url_set(mURL, CURLUPART_PORT, std::to_string(port).c_str(), 0);
+    return *this;
+}
+
+aio::http::URL &aio::http::URL::appendQuery(const std::string &query) {
+    curl_url_set(mURL, CURLUPART_QUERY, query.c_str(), CURLU_APPENDQUERY);
     return *this;
 }
