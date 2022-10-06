@@ -100,10 +100,9 @@ aio::http::ws::WebSocket::readPayload() {
 std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http::ws::WebSocket::readMessage() {
     return readPayload()->then([this](const aio::http::ws::Header &header, const std::vector<char> &buffer) {
         if (!header.final()) {
-            std::shared_ptr opcode = std::make_shared<Opcode>(header.opcode());
             std::shared_ptr fragments = std::make_shared<std::vector<char>>(buffer);
 
-            return zero::async::promise::loop<aio::http::ws::Message>([opcode, fragments, this](const auto &loop) {
+            return zero::async::promise::loop<aio::http::ws::Message>([opcode = header.opcode(), fragments, this](const auto &loop) {
                 readPayload()->then([opcode, fragments, loop](const aio::http::ws::Header &header, const std::vector<char> &buffer) {
                     fragments->insert(fragments->end(), buffer.begin(), buffer.end());
 
@@ -112,7 +111,7 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
                         return;
                     }
 
-                    P_BREAK_V(loop, Message{*opcode, *fragments});
+                    P_BREAK_V(loop, Message{opcode, *fragments});
                 })->fail([loop](const zero::async::promise::Reason &reason) {
                     P_BREAK_E(loop, reason);
                 });
@@ -205,8 +204,10 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
                     break;
 
                 case PING:
-                    pong(message.data.data(), message.data.size());
-                    P_CONTINUE(loop);
+                    pong(message.data.data(), message.data.size())->then([loop]() {
+                        P_CONTINUE(loop);
+                    });
+
                     break;
 
                 default:
