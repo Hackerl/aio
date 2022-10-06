@@ -14,11 +14,11 @@ aio::http::URL::URL(const std::string &url) : URL(url.c_str()) {
 
 }
 
-aio::http::URL::URL(const aio::http::URL &rhs) : mURL(curl_url_dup(rhs.mURL)) {
+aio::http::URL::URL(const URL &rhs) : mURL(curl_url_dup(rhs.mURL)) {
 
 }
 
-aio::http::URL::URL(aio::http::URL &&rhs) noexcept : mURL() {
+aio::http::URL::URL(URL &&rhs) noexcept : mURL() {
     std::swap(mURL, rhs.mURL);
 }
 
@@ -29,7 +29,7 @@ aio::http::URL::~URL() {
     }
 }
 
-aio::http::URL &aio::http::URL::operator=(const aio::http::URL &rhs) {
+aio::http::URL &aio::http::URL::operator=(const URL &rhs) {
     if (this == &rhs)
         return *this;
 
@@ -43,7 +43,7 @@ aio::http::URL &aio::http::URL::operator=(const aio::http::URL &rhs) {
     return *this;
 }
 
-aio::http::URL &aio::http::URL::operator=(aio::http::URL &&rhs) noexcept {
+aio::http::URL &aio::http::URL::operator=(URL &&rhs) noexcept {
     if (mURL) {
         curl_url_cleanup(mURL);
         mURL = nullptr;

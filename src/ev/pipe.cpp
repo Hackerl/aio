@@ -9,7 +9,7 @@ void aio::ev::PairedBuffer::close() {
     Buffer::close();
 }
 
-std::array<std::shared_ptr<aio::ev::IBuffer>, 2> aio::ev::pipe(const aio::Context &context) {
+std::array<std::shared_ptr<aio::ev::IBuffer>, 2> aio::ev::pipe(const Context &context) {
     bufferevent *pair[2];
     bufferevent_pair_new(context.base, BEV_OPT_DEFER_CALLBACKS, pair);
 

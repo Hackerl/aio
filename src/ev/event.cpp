@@ -1,6 +1,6 @@
 #include <aio/ev/event.h>
 
-aio::ev::Event::Event(const aio::Context &context, evutil_socket_t fd) {
+aio::ev::Event::Event(const Context &context, evutil_socket_t fd) {
     struct stub {
         static void onEvent(evutil_socket_t fd, short what, void *arg) {
             std::shared_ptr(static_cast<Event *>(arg)->mPromise)->resolve(what);

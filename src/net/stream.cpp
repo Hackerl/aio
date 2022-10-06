@@ -25,10 +25,10 @@ aio::net::Listener::~Listener() {
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::ev::IBuffer>>> aio::net::Listener::accept() {
     if (!mListener)
-        return zero::async::promise::reject<std::shared_ptr<aio::ev::IBuffer>>({-1, "listener destroyed"});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "listener destroyed"});
 
     if (mPromise)
-        return zero::async::promise::reject<std::shared_ptr<aio::ev::IBuffer>>({-1, "pending request not completed"});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "pending request not completed"});
 
     return zero::async::promise::chain<evutil_socket_t>([this](const auto &p) {
         mPromise = p;
@@ -52,7 +52,7 @@ void aio::net::Listener::close() {
     mListener = nullptr;
 }
 
-std::shared_ptr<aio::net::Listener> aio::net::listen(const aio::Context &context, const std::string &host, short port) {
+std::shared_ptr<aio::net::Listener> aio::net::listen(const Context &context, const std::string &host, short port) {
     sockaddr_in sin = {};
 
     sin.sin_family = AF_INET;
@@ -78,16 +78,16 @@ std::shared_ptr<aio::net::Listener> aio::net::listen(const aio::Context &context
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::ev::IBuffer>>>
-aio::net::connect(const aio::Context &context, const std::string &host, short port) {
+aio::net::connect(const Context &context, const std::string &host, short port) {
     bufferevent *bev = bufferevent_socket_new(context.base, -1, BEV_OPT_CLOSE_ON_FREE);
 
     if (!bev)
-        return zero::async::promise::reject<std::shared_ptr<aio::ev::IBuffer>>({-1, "new buffer failed"});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "new buffer failed"});
 
     if (bufferevent_socket_connect_hostname(bev, context.dnsBase, AF_UNSPEC, host.c_str(), port) != 0)
-        return zero::async::promise::reject<std::shared_ptr<aio::ev::IBuffer>>({-1, "buffer connect failed"});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "buffer connect failed"});
 
-    return zero::async::promise::chain<void>([bev](const auto &p) {
+    return zero::async::promise::chain<void>([=](const auto &p) {
         struct stub {
             static void onEvent(bufferevent *bev, short what, void *arg) {
                 auto p = static_cast<std::shared_ptr<zero::async::promise::Promise<void>> *>(arg);
@@ -104,10 +104,10 @@ aio::net::connect(const aio::Context &context, const std::string &host, short po
         };
 
         bufferevent_setcb(bev, nullptr, nullptr, stub::onEvent, new std::shared_ptr(p));
-    })->then([bev]() -> std::shared_ptr<aio::ev::IBuffer> {
-        return std::make_shared<aio::ev::Buffer>(bev);
-    })->fail([bev](const zero::async::promise::Reason &reason) {
+    })->then([=]() -> std::shared_ptr<ev::IBuffer> {
+        return std::make_shared<ev::Buffer>(bev);
+    })->fail([=](const zero::async::promise::Reason &reason) {
         bufferevent_free(bev);
-        return zero::async::promise::reject<std::shared_ptr<aio::ev::IBuffer>>(reason);
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>(reason);
     });
 }

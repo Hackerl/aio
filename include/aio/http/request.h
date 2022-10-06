@@ -76,7 +76,7 @@ namespace aio::http {
 
     class Requests : public std::enable_shared_from_this<Requests> {
     public:
-        explicit Requests(const aio::Context &context, Options options = {});
+        explicit Requests(const Context &context, Options options = {});
         ~Requests();
 
     private:
@@ -92,7 +92,7 @@ namespace aio::http {
             CURL *easy = curl_easy_init();
 
             if (!easy)
-                return zero::async::promise::reject<std::shared_ptr<aio::http::Response>>({-1, "init easy handle failed"});
+                return zero::async::promise::reject<std::shared_ptr<Response>>({-1, "init easy handle failed"});
 
             struct stub {
                 static size_t onWrite(char *buffer, size_t size, size_t n, void *userdata) {
@@ -279,7 +279,7 @@ namespace aio::http {
                 });
             }
 
-            return zero::async::promise::chain<std::shared_ptr<aio::http::Response>>([=](const auto &p) {
+            return zero::async::promise::chain<std::shared_ptr<Response>>([=](const auto &p) {
                 connection->promise = p;
                 CURLMcode c = curl_multi_add_handle(mMulti, connection->easy);
 

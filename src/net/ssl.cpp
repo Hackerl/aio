@@ -5,17 +5,17 @@
 #include <event2/bufferevent_ssl.h>
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::ev::IBuffer>>>
-aio::net::ssl::connect(const aio::Context &context, const std::string &host, short port) {
+aio::net::ssl::connect(const Context &context, const std::string &host, short port) {
     SSL *ssl = SSL_new(context.ssl);
 
     if (!ssl)
-        return zero::async::promise::reject<std::shared_ptr<aio::ev::IBuffer>>({-1, ERR_error_string(ERR_get_error(), nullptr)});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, ERR_error_string(ERR_get_error(), nullptr)});
 
     SSL_set_hostflags(ssl, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
 
     if (!SSL_set1_host(ssl, host.c_str())) {
         SSL_free(ssl);
-        return zero::async::promise::reject<std::shared_ptr<aio::ev::IBuffer>>({-1, ERR_error_string(ERR_get_error(), nullptr)});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, ERR_error_string(ERR_get_error(), nullptr)});
     }
 
     SSL_set_verify(ssl, SSL_VERIFY_PEER, nullptr);
@@ -29,12 +29,12 @@ aio::net::ssl::connect(const aio::Context &context, const std::string &host, sho
     );
 
     if (!bev)
-        return zero::async::promise::reject<std::shared_ptr<aio::ev::IBuffer>>({-1, "new buffer failed"});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "new buffer failed"});
 
     if (bufferevent_socket_connect_hostname(bev, context.dnsBase, AF_UNSPEC, host.c_str(), port) != 0)
-        return zero::async::promise::reject<std::shared_ptr<aio::ev::IBuffer>>({-1, "buffer connect failed"});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "buffer connect failed"});
 
-    return zero::async::promise::chain<void>([bev](const auto &p) {
+    return zero::async::promise::chain<void>([=](const auto &p) {
         struct stub {
             static void onEvent(bufferevent *bev, short what, void *arg) {
                 auto p = static_cast<std::shared_ptr<zero::async::promise::Promise<void>> *>(arg);
@@ -51,10 +51,10 @@ aio::net::ssl::connect(const aio::Context &context, const std::string &host, sho
         };
 
         bufferevent_setcb(bev, nullptr, nullptr, stub::onEvent, new std::shared_ptr(p));
-    })->then([bev]() -> std::shared_ptr<aio::ev::IBuffer> {
-        return std::make_shared<aio::ev::Buffer>(bev);
-    })->fail([bev](const zero::async::promise::Reason &reason) {
+    })->then([=]() -> std::shared_ptr<ev::IBuffer> {
+        return std::make_shared<ev::Buffer>(bev);
+    })->fail([=](const zero::async::promise::Reason &reason) {
         bufferevent_free(bev);
-        return zero::async::promise::reject<std::shared_ptr<aio::ev::IBuffer>>(reason);
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>(reason);
     });
 }

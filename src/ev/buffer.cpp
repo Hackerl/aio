@@ -92,12 +92,12 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::ev::Buffe
     if (mClosed)
         return zero::async::promise::reject<std::vector<char>>(mReason);
 
-    return zero::async::promise::chain<void>([n, this](const auto &p) {
+    return zero::async::promise::chain<void>([=](const auto &p) {
         mPromise[READ] = p;
 
         bufferevent_setwatermark(mBev, EV_READ, n, 0);
         bufferevent_enable(mBev, EV_READ);
-    })->then([n, this]() {
+    })->then([=]() {
         evbuffer *input = bufferevent_get_input(mBev);
         std::vector<char> buffer(n);
 
@@ -132,7 +132,7 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
             bufferevent_enable(mBev, EV_READ);
         })->finally([self = shared_from_this()]() {
             self->mPromise[READ].reset();
-        })->then([style, loop, this]() {
+        })->then([=]() {
             char *ptr = evbuffer_readln(bufferevent_get_input(mBev), nullptr, style);
 
             if (!ptr) {
@@ -141,7 +141,7 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
             }
 
             P_BREAK_V(loop, std::unique_ptr<char>(ptr).get());
-        }, [loop](const zero::async::promise::Reason &reason) {
+        }, [=](const zero::async::promise::Reason &reason) {
             P_BREAK_E(loop, reason);
         });
     });

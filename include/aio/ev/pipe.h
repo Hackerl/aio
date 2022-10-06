@@ -13,7 +13,7 @@ namespace aio::ev {
         void close() override;
     };
 
-    std::array<std::shared_ptr<IBuffer>, 2> pipe(const aio::Context &context);
+    std::array<std::shared_ptr<IBuffer>, 2> pipe(const Context &context);
 }
 
 #endif //AIO_PIPE_H

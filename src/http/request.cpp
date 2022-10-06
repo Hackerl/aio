@@ -88,7 +88,7 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response:
             return {buffer.data(), buffer.size()};
         });
 
-    return aio::readAll(this)->then([](const std::vector<char> &buffer) -> std::string {
+    return readAll(this)->then([](const std::vector<char> &buffer) -> std::string {
         return {buffer.data(), buffer.size()};
     });
 }
@@ -107,7 +107,7 @@ void aio::http::Response::setError(const std::string &error) {
     mError = error;
 }
 
-aio::http::Requests::Requests(const aio::Context &context, Options options) : mContext(context), mOptions(std::move(options)), mTimer(std::make_shared<ev::Timer>(context)) {
+aio::http::Requests::Requests(const Context &context, Options options) : mContext(context), mOptions(std::move(options)), mTimer(std::make_shared<ev::Timer>(context)) {
     struct stub {
         static int onCURLTimer(CURLM *multi, long timeout, void *userdata) {
             static_cast<Requests *>(userdata)->onCURLTimer(timeout);
@@ -162,7 +162,7 @@ void aio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what, voi
         context = new std::pair<std::shared_ptr<bool>, std::shared_ptr<ev::Event>>();
 
         context->first = std::make_shared<bool>();
-        context->second = std::make_shared<aio::ev::Event>(mContext, s);
+        context->second = std::make_shared<ev::Event>(mContext, s);
 
         curl_multi_assign(mMulti, s, context);
     }

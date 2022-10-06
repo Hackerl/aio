@@ -26,7 +26,7 @@ constexpr auto WS_SECURE_SCHEME = "wss";
 constexpr auto WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 aio::http::ws::Opcode aio::http::ws::Header::opcode() const {
-    return (Opcode)(mBytes[0] & OPCODE_MASK);
+    return (Opcode) (mBytes[0] & OPCODE_MASK);
 }
 
 bool aio::http::ws::Header::final() const {
@@ -41,7 +41,7 @@ bool aio::http::ws::Header::mask() const {
     return mBytes[1] & MASK_BIT;
 }
 
-void aio::http::ws::Header::opcode(aio::http::ws::Opcode opcode) {
+void aio::http::ws::Header::opcode(Opcode opcode) {
     mBytes[0] = (char) (mBytes[0] | (opcode & OPCODE_MASK));
 }
 
@@ -72,38 +72,38 @@ aio::http::ws::WebSocket::WebSocket(std::shared_ptr<ev::IBuffer> buffer) : mBuff
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::tuple<aio::http::ws::Header, std::vector<char>>>>
-aio::http::ws::WebSocket::readPayload() {
+aio::http::ws::WebSocket::readFrame() {
     return mBuffer->read(sizeof(Header))->then([self = shared_from_this()](const std::vector<char> &buffer) {
-        auto header = (Header *)buffer.data();
+        auto header = *(Header *)buffer.data();
 
-        if (header->mask())
+        if (header.mask())
             return zero::async::promise::reject<std::tuple<Header, std::vector<char>>>({-1, "masked server frame not supported"});
 
         std::shared_ptr<zero::async::promise::Promise<std::tuple<Header, std::vector<char>>>> promise;
 
-        if (header->length() >= TWO_BYTE_PAYLOAD_LENGTH) {
-            size_t extendedBytes = header->length() == EIGHT_BYTE_PAYLOAD_LENGTH ? 8 : 2;
+        if (header.length() >= TWO_BYTE_PAYLOAD_LENGTH) {
+            size_t extendedBytes = header.length() == EIGHT_BYTE_PAYLOAD_LENGTH ? 8 : 2;
 
-            return self->mBuffer->read(extendedBytes)->then([extendedBytes, self](const std::vector<char> &buffer) {
+            return self->mBuffer->read(extendedBytes)->then([=](const std::vector<char> &buffer) {
                 return self->mBuffer->read(extendedBytes == 2 ? ntohs(*(uint16_t *)buffer.data()) : be64toh(*(uint64_t *)buffer.data()));
-            })->then([header = *header](const std::vector<char> &buffer) -> std::tuple<Header, std::vector<char>> {
+            })->then([=](const std::vector<char> &buffer) -> std::tuple<Header, std::vector<char>> {
                 return {header, buffer};
             });
         }
 
-        return self->mBuffer->read(header->length())->then([header = *header](const std::vector<char> &buffer) -> std::tuple<Header, std::vector<char>> {
-            return {header, buffer};
+        return self->mBuffer->read(header.length())->then([=](const std::vector<char> &buffer) {
+            return std::tuple<Header, std::vector<char>>{header, buffer};
         });
     });
 }
 
 std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http::ws::WebSocket::readMessage() {
-    return readPayload()->then([this](const aio::http::ws::Header &header, const std::vector<char> &buffer) {
+    return readFrame()->then([this](const Header &header, const std::vector<char> &buffer) {
         if (!header.final()) {
             std::shared_ptr fragments = std::make_shared<std::vector<char>>(buffer);
 
-            return zero::async::promise::loop<aio::http::ws::Message>([opcode = header.opcode(), fragments, this](const auto &loop) {
-                readPayload()->then([opcode, fragments, loop](const aio::http::ws::Header &header, const std::vector<char> &buffer) {
+            return zero::async::promise::loop<Message>([opcode = header.opcode(), fragments, this](const auto &loop) {
+                readFrame()->then([=](const Header &header, const std::vector<char> &buffer) {
                     fragments->insert(fragments->end(), buffer.begin(), buffer.end());
 
                     if (!header.final()) {
@@ -112,18 +112,18 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
                     }
 
                     P_BREAK_V(loop, Message{opcode, *fragments});
-                })->fail([loop](const zero::async::promise::Reason &reason) {
+                })->fail([=](const zero::async::promise::Reason &reason) {
                     P_BREAK_E(loop, reason);
                 });
             });
         }
 
-        return zero::async::promise::resolve<aio::http::ws::Message>(Message{header.opcode(), buffer});
+        return zero::async::promise::resolve<Message>(Message{header.opcode(), buffer});
     });
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>>
-aio::http::ws::WebSocket::writeMessage(const aio::http::ws::Message &message) {
+aio::http::ws::WebSocket::writeMessage(const Message &message) {
     Header header = {};
 
     header.opcode(message.opcode);
@@ -179,8 +179,8 @@ aio::http::ws::WebSocket::writeMessage(const aio::http::ws::Message &message) {
 }
 
 std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http::ws::WebSocket::read() {
-    return zero::async::promise::loop<aio::http::ws::Message>([this](const auto &loop) {
-        readMessage()->then([loop, this](const Message &message) {
+    return zero::async::promise::loop<Message>([this](const auto &loop) {
+        readMessage()->then([=](const Message &message) {
             switch (message.opcode) {
                 case CONTINUATION:
                     P_BREAK_E(loop, {-1, "unexpected continuation message"});
@@ -195,16 +195,16 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
                 case CLOSE:
                     writeMessage({Opcode::CLOSE, message.data})->then([this]() {
                         return mBuffer->waitClosed();
-                    })->then([loop]() {
+                    })->then([=]() {
                         P_BREAK_E(loop, {-1, "websocket is closed"});
-                    }, [loop](const zero::async::promise::Reason &reason) {
+                    }, [=](const zero::async::promise::Reason &reason) {
                         P_BREAK_E(loop, reason);
                     });
 
                     break;
 
                 case PING:
-                    pong(message.data.data(), message.data.size())->then([loop]() {
+                    pong(message.data.data(), message.data.size())->then([=]() {
                         P_CONTINUE(loop);
                     });
 
@@ -213,7 +213,7 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
                 default:
                     P_BREAK_E(loop, {-1, "unknown opcode"});
             }
-        })->fail([loop](const zero::async::promise::Reason &reason) {
+        })->fail([=](const zero::async::promise::Reason &reason) {
             P_BREAK_E(loop, reason);
         });
     });
@@ -237,14 +237,14 @@ aio::http::ws::WebSocket::close(unsigned short code, const std::string &reason) 
 
     return writeMessage({Opcode::CLOSE, buffer})->then([this]() {
         return zero::async::promise::loop<void>([this](const auto &loop) {
-            readMessage()->then([loop](const Message &message) {
+            readMessage()->then([=](const Message &message) {
                 if (message.opcode != Opcode::CLOSE) {
                     P_CONTINUE(loop);
                     return;
                 }
 
                 P_BREAK(loop);
-            })->fail([loop](const zero::async::promise::Reason &reason) {
+            })->fail([=](const zero::async::promise::Reason &reason) {
                 P_BREAK_E(loop, reason);
             });
         });
@@ -262,24 +262,24 @@ aio::http::ws::WebSocket::pong(const void *buffer, size_t length) {
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::ws::WebSocket>>>
-aio::http::ws::connect(const aio::Context &context, const std::string &url) {
-    return connect(context, aio::http::URL(url));
+aio::http::ws::connect(const Context &context, const std::string &url) {
+    return connect(context, URL(url));
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::ws::WebSocket>>>
-aio::http::ws::connect(const aio::Context &context, const aio::http::URL &url) {
+aio::http::ws::connect(const Context &context, const URL &url) {
     std::string scheme = url.scheme();
-    std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::ev::IBuffer>>> promise;
+    std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<ev::IBuffer>>> promise;
 
     if (scheme == WS_SCHEME) {
-        promise = aio::net::connect(context, url.host(), url.port());
+        promise = net::connect(context, url.host(), url.port());
     } else if (scheme == WS_SECURE_SCHEME) {
-        promise = aio::net::ssl::connect(context, url.host(), url.port());
+        promise = net::ssl::connect(context, url.host(), url.port());
     } else {
-        return zero::async::promise::reject<std::shared_ptr<aio::http::ws::WebSocket>>({-1, "unsupported scheme"});
+        return zero::async::promise::reject<std::shared_ptr<WebSocket>>({-1, "unsupported scheme"});
     }
 
-    return promise->then([url](const std::shared_ptr<aio::ev::IBuffer> &buffer) {
+    return promise->then([=](const std::shared_ptr<ev::IBuffer> &buffer) {
         std::random_device rd;
         char secret[16] = {};
 
@@ -312,9 +312,9 @@ aio::http::ws::connect(const aio::Context &context, const aio::http::URL &url) {
 
         buffer->write("\r\n");
 
-        return buffer->drain()->then([buffer]() {
+        return buffer->drain()->then([=]() {
             return buffer->readLine(EVBUFFER_EOL_ANY);
-        })->then([buffer](const std::string &line) {
+        })->then([=](const std::string &line) {
             std::vector<std::string> tokens = zero::strings::split(line, " ");
 
             if (tokens.size() < 2) {
@@ -335,10 +335,10 @@ aio::http::ws::connect(const aio::Context &context, const aio::http::URL &url) {
             }
 
             return zero::async::promise::resolve<void>();
-        })->then([key, buffer]() {
+        })->then([=]() {
             std::shared_ptr headers = std::make_shared<std::map<std::string, std::string>>();
 
-            return zero::async::promise::loop<std::shared_ptr<ev::IBuffer>>([key, buffer, headers](const auto &loop) {
+            return zero::async::promise::loop<std::shared_ptr<ev::IBuffer>>([=](const auto &loop) {
                 buffer->readLine(EVBUFFER_EOL_CRLF)->then([=](const std::string &line) {
                     if (!line.empty()) {
                         std::vector<std::string> tokens = zero::strings::split(line, ":", 1);
