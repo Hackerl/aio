@@ -10,10 +10,10 @@
 constexpr auto SWITCHING_PROTOCOLS_STATUS = 101;
 constexpr auto MASKING_KEY_LENGTH = 4;
 
-constexpr auto TWO_BYTE_PAYLOAD_LENGTH = 126U;
-constexpr auto EIGHT_BYTE_PAYLOAD_LENGTH = 127U;
+constexpr auto TWO_BYTE_PAYLOAD_LENGTH = 126;
+constexpr auto EIGHT_BYTE_PAYLOAD_LENGTH = 127;
 
-constexpr auto MAX_SINGLE_BYTE_PAYLOAD_LENGTH = 125U;
+constexpr auto MAX_SINGLE_BYTE_PAYLOAD_LENGTH = 125;
 constexpr auto MAX_TWO_BYTE_PAYLOAD_LENGTH = UINT16_MAX;
 
 constexpr auto OPCODE_MASK = 0x0f;
@@ -79,15 +79,13 @@ aio::http::ws::WebSocket::readFrame() {
         if (header.mask())
             return zero::async::promise::reject<std::tuple<Header, std::vector<char>>>({-1, "masked server frame not supported"});
 
-        std::shared_ptr<zero::async::promise::Promise<std::tuple<Header, std::vector<char>>>> promise;
-
         if (header.length() >= TWO_BYTE_PAYLOAD_LENGTH) {
             size_t extendedBytes = header.length() == EIGHT_BYTE_PAYLOAD_LENGTH ? 8 : 2;
 
             return self->mBuffer->read(extendedBytes)->then([=](const std::vector<char> &buffer) {
                 return self->mBuffer->read(extendedBytes == 2 ? ntohs(*(uint16_t *)buffer.data()) : be64toh(*(uint64_t *)buffer.data()));
-            })->then([=](const std::vector<char> &buffer) -> std::tuple<Header, std::vector<char>> {
-                return {header, buffer};
+            })->then([=](const std::vector<char> &buffer) {
+                return std::tuple<Header, std::vector<char>>{header, buffer};
             });
         }
 
@@ -124,7 +122,7 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
 
 std::shared_ptr<zero::async::promise::Promise<void>>
 aio::http::ws::WebSocket::writeMessage(const Message &message) {
-    Header header = {};
+    Header header;
 
     header.opcode(message.opcode);
     header.final(true);
