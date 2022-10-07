@@ -26,8 +26,8 @@ namespace aio::http {
         std::map<std::string, std::string> &headers();
 
     public:
-        std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> read();
-        std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> read(size_t n);
+        std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read();
+        std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read(size_t n);
         std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(evbuffer_eol_style style);
         std::shared_ptr<zero::async::promise::Promise<std::string>> string();
         std::shared_ptr<zero::async::promise::Promise<nlohmann::json>> json();

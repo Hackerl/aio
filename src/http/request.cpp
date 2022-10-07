@@ -53,21 +53,21 @@ std::map<std::string, std::string> &aio::http::Response::headers() {
     return mHeaders;
 }
 
-std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::http::Response::read() {
+std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::http::Response::read() {
     return mBuffer->read()->fail([self = shared_from_this()](const zero::async::promise::Reason &reason) {
         if (self->mError.empty())
-            return zero::async::promise::reject<std::vector<char>>(reason);
+            return zero::async::promise::reject<std::vector<std::byte>>(reason);
 
-        return zero::async::promise::reject<std::vector<char>>({-1, self->mError});
+        return zero::async::promise::reject<std::vector<std::byte>>({-1, self->mError});
     });
 }
 
-std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::http::Response::read(size_t n) {
+std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::http::Response::read(size_t n) {
     return mBuffer->read(n)->fail([self = shared_from_this()](const zero::async::promise::Reason &reason) {
         if (self->mError.empty())
-            return zero::async::promise::reject<std::vector<char>>(reason);
+            return zero::async::promise::reject<std::vector<std::byte>>(reason);
 
-        return zero::async::promise::reject<std::vector<char>>({-1, self->mError});
+        return zero::async::promise::reject<std::vector<std::byte>>({-1, self->mError});
     });
 }
 
@@ -84,12 +84,12 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response:
     long length = contentLength();
 
     if (length > 0)
-        return read(length)->then([=](const std::vector<char> &buffer) -> std::string {
-            return {buffer.data(), buffer.size()};
+        return read(length)->then([=](const std::vector<std::byte> &buffer) -> std::string {
+            return {(const char *)buffer.data(), buffer.size()};
         });
 
-    return readAll(this)->then([](const std::vector<char> &buffer) -> std::string {
-        return {buffer.data(), buffer.size()};
+    return readAll(this)->then([](const std::vector<std::byte> &buffer) -> std::string {
+        return {(const char *)buffer.data(), buffer.size()};
     });
 }
 

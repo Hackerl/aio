@@ -34,26 +34,26 @@ aio::ev::Buffer::~Buffer() {
     }
 }
 
-std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::ev::Buffer::read() {
+std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::Buffer::read() {
     if (!mBev)
-        return zero::async::promise::reject<std::vector<char>>({-1, "buffer destroyed"});
+        return zero::async::promise::reject<std::vector<std::byte>>({-1, "buffer destroyed"});
 
     if (mPromise[READ])
-        return zero::async::promise::reject<std::vector<char>>({-1, "pending request not completed"});
+        return zero::async::promise::reject<std::vector<std::byte>>({-1, "pending request not completed"});
 
     evbuffer *input = bufferevent_get_input(mBev);
 
     size_t length = evbuffer_get_length(input);
 
     if (length > 0) {
-        std::vector<char> buffer(length);
+        std::vector<std::byte> buffer(length);
         evbuffer_remove(input, buffer.data(), length);
 
-        return zero::async::promise::resolve<std::vector<char>>(buffer);
+        return zero::async::promise::resolve<std::vector<std::byte>>(buffer);
     }
 
     if (mClosed)
-        return zero::async::promise::reject<std::vector<char>>(mReason);
+        return zero::async::promise::reject<std::vector<std::byte>>(mReason);
 
     return zero::async::promise::chain<void>([this](const auto &p) {
         mPromise[READ] = p;
@@ -62,7 +62,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::ev::Buffe
         bufferevent_enable(mBev, EV_READ);
     })->then([this]() {
         evbuffer *input = bufferevent_get_input(mBev);
-        std::vector<char> buffer(evbuffer_get_length(input));
+        std::vector<std::byte> buffer(evbuffer_get_length(input));
 
         evbuffer_remove(input, buffer.data(), buffer.size());
         return buffer;
@@ -71,26 +71,26 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::ev::Buffe
     });
 }
 
-std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::ev::Buffer::read(size_t n) {
+std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::Buffer::read(size_t n) {
     if (!mBev)
-        return zero::async::promise::reject<std::vector<char>>({-1, "buffer destroyed"});
+        return zero::async::promise::reject<std::vector<std::byte>>({-1, "buffer destroyed"});
 
     if (mPromise[READ])
-        return zero::async::promise::reject<std::vector<char>>({-1, "pending request not completed"});
+        return zero::async::promise::reject<std::vector<std::byte>>({-1, "pending request not completed"});
 
     evbuffer *input = bufferevent_get_input(mBev);
 
     size_t length = evbuffer_get_length(input);
 
     if (length >= n) {
-        std::vector<char> buffer(n);
+        std::vector<std::byte> buffer(n);
         evbuffer_remove(input, buffer.data(), n);
 
-        return zero::async::promise::resolve<std::vector<char>>(buffer);
+        return zero::async::promise::resolve<std::vector<std::byte>>(buffer);
     }
 
     if (mClosed)
-        return zero::async::promise::reject<std::vector<char>>(mReason);
+        return zero::async::promise::reject<std::vector<std::byte>>(mReason);
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         mPromise[READ] = p;
@@ -99,7 +99,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> aio::ev::Buffe
         bufferevent_enable(mBev, EV_READ);
     })->then([=]() {
         evbuffer *input = bufferevent_get_input(mBev);
-        std::vector<char> buffer(n);
+        std::vector<std::byte> buffer(n);
 
         evbuffer_remove(input, buffer.data(), buffer.size());
         return buffer;

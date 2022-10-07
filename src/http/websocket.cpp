@@ -6,6 +6,7 @@
 #include <cstring>
 #include <random>
 #include <map>
+#include <cstddef>
 
 constexpr auto SWITCHING_PROTOCOLS_STATUS = 101;
 constexpr auto MASKING_KEY_LENGTH = 4;
@@ -16,10 +17,10 @@ constexpr auto EIGHT_BYTE_PAYLOAD_LENGTH = 127;
 constexpr auto MAX_SINGLE_BYTE_PAYLOAD_LENGTH = 125;
 constexpr auto MAX_TWO_BYTE_PAYLOAD_LENGTH = UINT16_MAX;
 
-constexpr auto OPCODE_MASK = 0x0f;
-constexpr auto FINAL_BIT = 0x80;
-constexpr auto LENGTH_MASK = 0x7f;
-constexpr auto MASK_BIT = 0x80;
+constexpr auto OPCODE_MASK = std::byte{0x0f};
+constexpr auto FINAL_BIT = std::byte{0x80};
+constexpr auto LENGTH_MASK = std::byte{0x7f};
+constexpr auto MASK_BIT = std::byte{0x80};
 
 constexpr auto WS_SCHEME = "ws";
 constexpr auto WS_SECURE_SCHEME = "wss";
@@ -30,78 +31,78 @@ aio::http::ws::Opcode aio::http::ws::Header::opcode() const {
 }
 
 bool aio::http::ws::Header::final() const {
-    return mBytes[0] & FINAL_BIT;
+    return std::to_integer<int>(mBytes[0] & FINAL_BIT);
 }
 
 size_t aio::http::ws::Header::length() const {
-    return mBytes[1] & LENGTH_MASK;
+    return std::to_integer<int>(mBytes[1] & LENGTH_MASK);
 }
 
 bool aio::http::ws::Header::mask() const {
-    return mBytes[1] & MASK_BIT;
+    return std::to_integer<int>(mBytes[1] & MASK_BIT);
 }
 
 void aio::http::ws::Header::opcode(Opcode opcode) {
-    mBytes[0] = (char) (mBytes[0] | (opcode & OPCODE_MASK));
+    mBytes[0] |= (std::byte(opcode) & OPCODE_MASK);
 }
 
 void aio::http::ws::Header::final(bool final) {
     if (!final) {
-        mBytes[0] = (char) (mBytes[0] & ~FINAL_BIT);
+        mBytes[0] &= ~FINAL_BIT;
         return;
     }
 
-    mBytes[0] = (char) (mBytes[0] | FINAL_BIT);
+    mBytes[0] |= FINAL_BIT;
 }
 
 void aio::http::ws::Header::length(size_t length) {
-    mBytes[1] = (char) (mBytes[1] | (length & LENGTH_MASK));
+    mBytes[1] |= (std::byte(length) & LENGTH_MASK);
 }
 
 void aio::http::ws::Header::mask(bool mask) {
     if (!mask) {
-        mBytes[1] = (char) (mBytes[1] & ~MASK_BIT);
+        mBytes[1] &= ~MASK_BIT;
         return;
     }
 
-    mBytes[1] = (char) (mBytes[1] | MASK_BIT);
+    mBytes[1] |= MASK_BIT;
 }
 
 aio::http::ws::WebSocket::WebSocket(std::shared_ptr<ev::IBuffer> buffer) : mBuffer(std::move(buffer)) {
 
 }
 
-std::shared_ptr<zero::async::promise::Promise<std::tuple<aio::http::ws::Header, std::vector<char>>>>
+std::shared_ptr<zero::async::promise::Promise<std::tuple<aio::http::ws::Header, std::vector<std::byte>>>>
 aio::http::ws::WebSocket::readFrame() {
-    return mBuffer->read(sizeof(Header))->then([self = shared_from_this()](const std::vector<char> &buffer) {
+    return mBuffer->read(sizeof(Header))->then([self = shared_from_this()](const std::vector<std::byte> &buffer) {
         auto header = *(Header *)buffer.data();
 
         if (header.mask())
-            return zero::async::promise::reject<std::tuple<Header, std::vector<char>>>({-1, "masked server frame not supported"});
+            return zero::async::promise::reject<std::tuple<Header, std::vector<std::byte>>>({-1, "masked server frame not supported"});
 
         if (header.length() >= TWO_BYTE_PAYLOAD_LENGTH) {
             size_t extendedBytes = header.length() == EIGHT_BYTE_PAYLOAD_LENGTH ? 8 : 2;
 
-            return self->mBuffer->read(extendedBytes)->then([=](const std::vector<char> &buffer) {
+            return self->mBuffer->read(extendedBytes)->then([=](const std::vector<std::byte> &buffer) {
                 return self->mBuffer->read(extendedBytes == 2 ? ntohs(*(uint16_t *)buffer.data()) : be64toh(*(uint64_t *)buffer.data()));
-            })->then([=](const std::vector<char> &buffer) {
-                return std::tuple<Header, std::vector<char>>{header, buffer};
+            })->then([=](const std::vector<std::byte> &buffer) {
+                return std::tuple<Header, std::vector<std::byte>>{header, buffer};
             });
         }
 
-        return self->mBuffer->read(header.length())->then([=](const std::vector<char> &buffer) {
-            return std::tuple<Header, std::vector<char>>{header, buffer};
+        return self->mBuffer->read(header.length())->then([=](const std::vector<std::byte> &buffer) {
+            return std::tuple<Header, std::vector<std::byte>>{header, buffer};
         });
     });
 }
 
 std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http::ws::WebSocket::readMessage() {
-    return readFrame()->then([this](const Header &header, const std::vector<char> &buffer) {
+    return readFrame()->then([this](const Header &header, const std::vector<std::byte> &buffer) {
         if (!header.final()) {
-            std::shared_ptr fragments = std::make_shared<std::vector<char>>(buffer);
+            std::shared_ptr fragments = std::make_shared<std::vector<std::byte>>(buffer);
 
             return zero::async::promise::loop<Message>([opcode = header.opcode(), fragments, this](const auto &loop) {
-                readFrame()->then([=](const Header &header, const std::vector<char> &buffer) {
+                readFrame()->then([=](const Header &header, const std::vector<std::byte> &buffer) {
                     fragments->insert(fragments->end(), buffer.begin(), buffer.end());
 
                     if (!header.final()) {
@@ -131,14 +132,14 @@ aio::http::ws::WebSocket::writeMessage(const Message &message) {
     size_t extendedBytes = 0;
     size_t length = message.data.size();
 
-    std::unique_ptr<unsigned char> extended;
+    std::unique_ptr<std::byte[]> extended;
 
     if (length > MAX_TWO_BYTE_PAYLOAD_LENGTH) {
         extendedBytes = 8;
         header.length(EIGHT_BYTE_PAYLOAD_LENGTH);
 
         uint64_t extendedLength = htobe64(length);
-        extended = std::make_unique<unsigned char>(extendedBytes);
+        extended = std::make_unique<std::byte[]>(extendedBytes);
 
         memcpy(extended.get(), &extendedLength, sizeof(uint64_t));
     } else if (length > MAX_SINGLE_BYTE_PAYLOAD_LENGTH) {
@@ -146,7 +147,7 @@ aio::http::ws::WebSocket::writeMessage(const Message &message) {
         header.length(TWO_BYTE_PAYLOAD_LENGTH);
 
         uint16_t extendedLength = htons(length);
-        extended = std::make_unique<unsigned char>(extendedBytes);
+        extended = std::make_unique<std::byte[]>(extendedBytes);
 
         memcpy(extended.get(), &extendedLength, sizeof(uint16_t));
     } else {
@@ -160,18 +161,21 @@ aio::http::ws::WebSocket::writeMessage(const Message &message) {
     }
 
     std::random_device rd;
-    unsigned char maskingKey[MASKING_KEY_LENGTH] = {};
+    std::byte maskingKey[MASKING_KEY_LENGTH] = {};
 
-    for (unsigned char &i : maskingKey) {
-        i = static_cast<unsigned char>(rd() & 0xff);
+    for (auto &b: maskingKey) {
+        b = std::byte(rd() & 0xff);
     }
 
     mBuffer->write(maskingKey, MASKING_KEY_LENGTH);
 
+    std::unique_ptr buffer = std::make_unique<std::byte[]>(length);
+
     for (size_t i = 0; i < length; i++) {
-        unsigned char c = message.data[i] ^ maskingKey[i % 4];
-        mBuffer->write(&c, 1);
+        buffer[i] = message.data[i] ^ maskingKey[i % 4];
     }
+
+    mBuffer->write(buffer.get(), length);
 
     return mBuffer->drain();
 }
@@ -218,20 +222,20 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>> aio::http::ws::WebSocket::sendText(const std::string &text) {
-    return writeMessage({Opcode::TEXT, {text.begin(), text.end()}});
+    return writeMessage({Opcode::TEXT, {(std::byte *)text.data(), (std::byte *)text.data() + text.length()}});
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>>
 aio::http::ws::WebSocket::sendBinary(const void *buffer, size_t length) {
-    return writeMessage({Opcode::BINARY, {(char *)buffer, (char *)buffer + length}});
+    return writeMessage({Opcode::BINARY, {(std::byte *)buffer, (std::byte *)buffer + length}});
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>>
 aio::http::ws::WebSocket::close(unsigned short code, const std::string &reason) {
-    std::vector<char> buffer;
+    std::vector<std::byte> buffer;
 
-    buffer.insert(buffer.end(), (char *)&code, (char *)&code + sizeof(unsigned short));
-    buffer.insert(buffer.end(), reason.begin(), reason.end());
+    buffer.insert(buffer.end(), (std::byte *)&code, (std::byte *)&code + sizeof(unsigned short));
+    buffer.insert(buffer.end(), (std::byte *)reason.data(), (std::byte *)reason.data() + reason.length());
 
     return writeMessage({Opcode::CLOSE, buffer})->then([this]() {
         return zero::async::promise::loop<void>([this](const auto &loop) {
@@ -251,12 +255,12 @@ aio::http::ws::WebSocket::close(unsigned short code, const std::string &reason) 
 
 std::shared_ptr<zero::async::promise::Promise<void>>
 aio::http::ws::WebSocket::ping(const void *buffer, size_t length) {
-    return writeMessage({Opcode::PING, {(char *)buffer, (char *)buffer + length}});
+    return writeMessage({Opcode::PING, {(std::byte *)buffer, (std::byte *)buffer + length}});
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>>
 aio::http::ws::WebSocket::pong(const void *buffer, size_t length) {
-    return writeMessage({Opcode::PONG, {(char *)buffer, (char *)buffer + length}});
+    return writeMessage({Opcode::PONG, {(std::byte *)buffer, (std::byte *)buffer + length}});
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::ws::WebSocket>>>
@@ -279,13 +283,13 @@ aio::http::ws::connect(const Context &context, const URL &url) {
 
     return promise->then([=](const std::shared_ptr<ev::IBuffer> &buffer) {
         std::random_device rd;
-        char secret[16] = {};
+        std::byte secret[16] = {};
 
-        for (char &i : secret) {
-            i = static_cast<char>(rd() & 0xff);
+        for (auto &b: secret) {
+            b = std::byte(rd() & 0xff);
         }
 
-        std::string key = zero::encoding::base64::encode((const unsigned char *) secret, sizeof(secret));
+        std::string key = zero::encoding::base64::encode((const unsigned char *)secret, sizeof(secret));
 
         buffer->write(zero::strings::format(
                 "GET %s HTTP/1.1\r\n",
@@ -336,7 +340,7 @@ aio::http::ws::connect(const Context &context, const URL &url) {
         })->then([=]() {
             std::shared_ptr headers = std::make_shared<std::map<std::string, std::string>>();
 
-            return zero::async::promise::loop<std::shared_ptr<ev::IBuffer>>([=](const auto &loop) {
+            return zero::async::promise::loop<std::shared_ptr<WebSocket>>([=](const auto &loop) {
                 buffer->readLine(EVBUFFER_EOL_CRLF)->then([=](const std::string &line) {
                     if (!line.empty()) {
                         std::vector<std::string> tokens = zero::strings::split(line, ":", 1);
@@ -370,11 +374,9 @@ aio::http::ws::connect(const Context &context, const URL &url) {
                         return;
                     }
 
-                    P_BREAK_V(loop, buffer);
+                    P_BREAK_V(loop, std::make_shared<WebSocket>(buffer));
                 });
             });
         });
-    })->then([](const std::shared_ptr<ev::IBuffer> &buffer) {
-        return std::make_shared<WebSocket>(buffer);
     });
 }

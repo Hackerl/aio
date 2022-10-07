@@ -8,8 +8,8 @@
 namespace aio::ev {
     class IBuffer : public zero::Interface {
     public:
-        virtual std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> read() = 0;
-        virtual std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> read(size_t n) = 0;
+        virtual std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read() = 0;
+        virtual std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read(size_t n) = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(evbuffer_eol_style style) = 0;
 
     public:
@@ -29,8 +29,8 @@ namespace aio::ev {
         ~Buffer() override;
 
     public:
-        std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> read() override;
-        std::shared_ptr<zero::async::promise::Promise<std::vector<char>>> read(size_t n) override;
+        std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read() override;
+        std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read(size_t n) override;
         std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(evbuffer_eol_style style) override;
 
     public:

@@ -4,7 +4,7 @@
 #include <openssl/err.h>
 #include <aio/ev/timer.h>
 #include <aio/http/request.h>
-#include <aio/ev/event.h>
+#include <aio/net/stream.h>
 
 int main(int argc, char **argv) {
     INIT_CONSOLE_LOG(zero::INFO);
@@ -59,6 +59,45 @@ int main(int argc, char **argv) {
         return true;
     });
 
+    auto listener = aio::net::listen(context ,"127.0.0.1", 8000);
+
+    if (listener) {
+        zero::async::promise::loop<void>([listener](const auto &loop) {
+            listener->accept()->then([](const std::shared_ptr<aio::ev::IBuffer> &buffer) {
+                zero::async::promise::loop<void>([buffer](const auto &loop) {
+                    buffer->read()->then([buffer](const std::vector<std::byte> &data) {
+                        buffer->write(data.data(), data.size());
+                        return buffer->drain();
+                    })->then([loop]() {
+                        P_CONTINUE(loop);
+                    }, [loop](const zero::async::promise::Reason &reason) {
+                        LOG_INFO("echo server finished: %s", reason.message.c_str());
+                        P_BREAK(loop);
+                    });
+                });
+            })->then([loop]() {
+                P_CONTINUE(loop);
+            }, [loop](const zero::async::promise::Reason &reason) {
+                P_BREAK_E(loop, reason);
+            });
+        });
+    }
+
+    aio::net::connect(context, "baidu.com", 80)->then([](const std::shared_ptr<aio::ev::IBuffer> &buffer) {
+        std::string message = "GET / HTTP/1.1\r\nHost: baidu.com\r\n\r\n";
+        buffer->write(message.c_str(), message.length());
+
+        buffer->drain()->then([buffer]() {
+            return buffer->readLine(EVBUFFER_EOL_ANY);
+        })->then([](const std::string &line) {
+            LOG_INFO("%s", line.c_str());
+        })->finally([buffer]() {
+           buffer->close();
+        });
+    })->fail([](const zero::async::promise::Reason &reason) {
+        LOG_INFO("error: %s", reason.message.c_str());
+    });
+
     std::array<std::shared_ptr<aio::ev::IBuffer>, 2> buffers = aio::ev::pipe(context);
 
     std::string message = "hello";
@@ -67,14 +106,14 @@ int main(int argc, char **argv) {
 
     buffers[0]->drain()->then([=]() {
         return buffers[0]->read(5);
-    })->then([=](const std::vector<char> &buffer) {
+    })->then([=](const std::vector<std::byte> &buffer) {
         LOG_INFO("read: %.*s", buffer.size(), buffer.data());
         return buffers[0]->waitClosed();
     })->then([]() {
         LOG_INFO("closed");
     });
 
-    buffers[1]->read(5)->then([=](const std::vector<char> &buffer) {
+    buffers[1]->read(5)->then([=](const std::vector<std::byte> &buffer) {
         buffers[1]->write(buffer.data(), buffer.size());
         return buffers[1]->drain();
     })->then([=]() {
@@ -83,7 +122,7 @@ int main(int argc, char **argv) {
 
     auto requests = std::make_shared<aio::http::Requests>(context);
 
-    requests->get(cmdline.get<std::string>("url"))->then([](const std::shared_ptr<aio::http::Response> &response) {
+    requests->get(aio::http::URL("https://baidu.com").path("s").query("wd=丁丹林"))->then([](const std::shared_ptr<aio::http::Response> &response) {
         LOG_INFO("status code: %ld", response->statusCode());
         return response->string();
     })->then([](const std::string &content) {

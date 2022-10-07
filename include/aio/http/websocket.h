@@ -16,7 +16,7 @@ namespace aio::http::ws {
 
     struct Message {
         Opcode opcode;
-        std::vector<char> data;
+        std::vector<std::byte> data;
     };
 
     class Header {
@@ -33,7 +33,7 @@ namespace aio::http::ws {
         void mask(bool mask);
 
     private:
-        char mBytes[2]{};
+        std::byte mBytes[2]{};
     };
 
     class WebSocket : public std::enable_shared_from_this<WebSocket> {
@@ -41,7 +41,7 @@ namespace aio::http::ws {
         explicit WebSocket(std::shared_ptr<ev::IBuffer> buffer);
 
     private:
-        std::shared_ptr<zero::async::promise::Promise<std::tuple<Header, std::vector<char>>>> readFrame();
+        std::shared_ptr<zero::async::promise::Promise<std::tuple<Header, std::vector<std::byte>>>> readFrame();
 
     public:
         std::shared_ptr<zero::async::promise::Promise<Message>> readMessage();
