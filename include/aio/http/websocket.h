@@ -15,6 +15,11 @@ namespace aio::http::ws {
     };
 
     struct Message {
+    public:
+        [[nodiscard]] std::string text() const;
+        [[nodiscard]] std::tuple<unsigned short, std::string> reason() const;
+
+    public:
         Opcode opcode;
         std::vector<std::byte> data;
     };
@@ -51,18 +56,15 @@ namespace aio::http::ws {
         std::shared_ptr<zero::async::promise::Promise<Message>> read();
 
     public:
-        std::shared_ptr<zero::async::promise::Promise<void>> sendText(const std::string &text);
+        std::shared_ptr<zero::async::promise::Promise<void>> sendText(std::string_view text);
         std::shared_ptr<zero::async::promise::Promise<void>> sendBinary(const void *buffer, size_t length);
-        std::shared_ptr<zero::async::promise::Promise<void>> close(unsigned short code, const std::string &reason);
+        std::shared_ptr<zero::async::promise::Promise<void>> close(unsigned short code, std::string_view reason);
         std::shared_ptr<zero::async::promise::Promise<void>> ping(const void *buffer, size_t length);
         std::shared_ptr<zero::async::promise::Promise<void>> pong(const void *buffer, size_t length);
 
     private:
         std::shared_ptr<ev::IBuffer> mBuffer;
     };
-
-    std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<WebSocket>>>
-    connect(const Context &context, const std::string &url);
 
     std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<WebSocket>>>
     connect(const Context &context, const URL &url);

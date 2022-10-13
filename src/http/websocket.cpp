@@ -26,6 +26,17 @@ constexpr auto WS_SCHEME = "ws";
 constexpr auto WS_SECURE_SCHEME = "wss";
 constexpr auto WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
+std::string aio::http::ws::Message::text() const {
+    return {(const char *) data.data(), data.size()};
+}
+
+std::tuple<unsigned short, std::string> aio::http::ws::Message::reason() const {
+    return {
+            *(unsigned short *) data.data(),
+            {(const char *) data.data() + sizeof(unsigned short), data.size() - sizeof(unsigned short)}
+    };
+}
+
 aio::http::ws::Opcode aio::http::ws::Header::opcode() const {
     return (Opcode) (mBytes[0] & OPCODE_MASK);
 }
@@ -221,7 +232,7 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
     });
 }
 
-std::shared_ptr<zero::async::promise::Promise<void>> aio::http::ws::WebSocket::sendText(const std::string &text) {
+std::shared_ptr<zero::async::promise::Promise<void>> aio::http::ws::WebSocket::sendText(std::string_view text) {
     return writeMessage({Opcode::TEXT, {(std::byte *)text.data(), (std::byte *)text.data() + text.length()}});
 }
 
@@ -231,7 +242,7 @@ aio::http::ws::WebSocket::sendBinary(const void *buffer, size_t length) {
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>>
-aio::http::ws::WebSocket::close(unsigned short code, const std::string &reason) {
+aio::http::ws::WebSocket::close(unsigned short code, std::string_view reason) {
     std::vector<std::byte> buffer;
 
     buffer.insert(buffer.end(), (std::byte *)&code, (std::byte *)&code + sizeof(unsigned short));
@@ -264,11 +275,6 @@ aio::http::ws::WebSocket::pong(const void *buffer, size_t length) {
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::ws::WebSocket>>>
-aio::http::ws::connect(const Context &context, const std::string &url) {
-    return connect(context, URL(url));
-}
-
-std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::ws::WebSocket>>>
 aio::http::ws::connect(const Context &context, const URL &url) {
     std::string scheme = url.scheme();
     std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<ev::IBuffer>>> promise;
@@ -289,7 +295,7 @@ aio::http::ws::connect(const Context &context, const URL &url) {
             b = std::byte(rd() & 0xff);
         }
 
-        std::string key = zero::encoding::base64::encode((const unsigned char *)secret, sizeof(secret));
+        std::string key = zero::encoding::base64::encode(secret, sizeof(secret));
 
         buffer->write(zero::strings::format(
                 "GET %s HTTP/1.1\r\n",
@@ -367,7 +373,7 @@ aio::http::ws::connect(const Context &context, const URL &url) {
                     unsigned char digest[SHA_DIGEST_LENGTH] = {};
 
                     SHA1((const unsigned char *)data.data(), data.size(), digest);
-                    std::string hash = zero::encoding::base64::encode(digest, SHA_DIGEST_LENGTH);
+                    std::string hash = zero::encoding::base64::encode((std::byte *)digest, SHA_DIGEST_LENGTH);
 
                     if (it->second != hash) {
                         P_BREAK_E(loop, {-1, "hash error"});

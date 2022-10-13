@@ -8,8 +8,8 @@ namespace aio::http {
     class URL {
     public:
         URL();
-        explicit URL(const char *url);
-        explicit URL(const std::string &url);
+        URL(const char *url);
+        URL(const std::string &url);
         URL(const URL &rhs);
         URL(URL &&rhs) noexcept;
         ~URL();

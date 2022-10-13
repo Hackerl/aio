@@ -103,7 +103,7 @@ std::shared_ptr<zero::async::promise::Promise<nlohmann::json>> aio::http::Respon
     });
 }
 
-void aio::http::Response::setError(const std::string &error) {
+void aio::http::Response::setError(const char *error) {
     mError = error;
 }
 

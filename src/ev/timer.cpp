@@ -28,8 +28,7 @@ bool aio::ev::Timer::pending() {
     return mPromise.operator bool();
 }
 
-std::shared_ptr<zero::async::promise::Promise<void>>
-aio::ev::Timer::setTimeout(const std::chrono::milliseconds &delay) {
+std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Timer::setTimeout(std::chrono::milliseconds delay) {
     if (mPromise)
         return zero::async::promise::reject<void>({-1, "pending timer has been set"});
 
@@ -48,7 +47,7 @@ aio::ev::Timer::setTimeout(const std::chrono::milliseconds &delay) {
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>>
-aio::ev::Timer::setInterval(const std::chrono::milliseconds &period, const std::function<bool(void)> &func) {
+aio::ev::Timer::setInterval(std::chrono::milliseconds period, const std::function<bool(void)> &func) {
     return zero::async::promise::loop<void>([=](const auto &loop) {
         setTimeout(period)->then([=]() {
             if (!func()) {

@@ -147,8 +147,8 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
     });
 }
 
-size_t aio::ev::Buffer::write(const std::string &data) {
-    return write(data.c_str(), data.length());
+size_t aio::ev::Buffer::write(std::string_view str) {
+    return write(str.data(), str.length());
 }
 
 size_t aio::ev::Buffer::write(const void *buffer, size_t n) {

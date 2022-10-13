@@ -122,7 +122,7 @@ int main(int argc, char **argv) {
 
     auto requests = std::make_shared<aio::http::Requests>(context);
 
-    requests->get(aio::http::URL("https://baidu.com").path("s").query("wd=丁丹林"))->then([](const std::shared_ptr<aio::http::Response> &response) {
+    requests->get("https://baidu.com")->then([](const std::shared_ptr<aio::http::Response> &response) {
         LOG_INFO("status code: %ld", response->statusCode());
         return response->string();
     })->then([](const std::string &content) {

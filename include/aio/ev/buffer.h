@@ -13,7 +13,7 @@ namespace aio::ev {
         virtual std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(evbuffer_eol_style style) = 0;
 
     public:
-        virtual size_t write(const std::string &data) = 0;
+        virtual size_t write(std::string_view str) = 0;
         virtual size_t write(const void *buffer, size_t n) = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> drain() = 0;
 
@@ -34,7 +34,7 @@ namespace aio::ev {
         std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(evbuffer_eol_style style) override;
 
     public:
-        size_t write(const std::string &data) override;
+        size_t write(std::string_view str) override;
         size_t write(const void *buffer, size_t n) override;
         std::shared_ptr<zero::async::promise::Promise<void>> drain() override;
 
