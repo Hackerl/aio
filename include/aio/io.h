@@ -28,7 +28,7 @@ namespace aio {
         return zero::async::promise::loop<void>([=](const auto &loop) {
             src->read()->then([=](const std::vector<std::byte> &buffer) {
                 dst->write(buffer.data(), buffer.size());
-                return dst->drain()->then([loop]() {
+                return dst->drain()->then([=]() {
                     P_CONTINUE(loop);
                 });
             })->fail([=](const zero::async::promise::Reason &reason) {
@@ -53,7 +53,7 @@ namespace aio {
                 zero::async::promise::loop<void>([=](const auto &loop) {
                     first->read()->then([=](const std::vector<std::byte> &buffer) {
                         second->write(buffer.data(), buffer.size());
-                        return second->drain()->then([loop]() {
+                        return second->drain()->then([=]() {
                             P_CONTINUE(loop);
                         });
                     })->fail([=](const zero::async::promise::Reason &reason) {
@@ -68,7 +68,7 @@ namespace aio {
                 zero::async::promise::loop<void>([=](const auto &loop) {
                     second->read()->then([=](const std::vector<std::byte> &buffer) {
                         first->write(buffer.data(), buffer.size());
-                        return first->drain()->then([loop]() {
+                        return first->drain()->then([=]() {
                             P_CONTINUE(loop);
                         });
                     })->fail([=](const zero::async::promise::Reason &reason) {

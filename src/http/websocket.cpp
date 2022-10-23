@@ -321,7 +321,7 @@ aio::http::ws::connect(const Context &context, const URL &url) {
         buffer->write("\r\n");
 
         return buffer->drain()->then([=]() {
-            return buffer->readLine(EVBUFFER_EOL_ANY);
+            return buffer->readLine(EVBUFFER_EOL_CRLF);
         })->then([=](const std::string &line) {
             std::vector<std::string> tokens = zero::strings::split(line, " ");
 
@@ -381,6 +381,8 @@ aio::http::ws::connect(const Context &context, const URL &url) {
                     }
 
                     P_BREAK_V(loop, std::make_shared<WebSocket>(buffer));
+                })->fail([=](const zero::async::promise::Reason &reason) {
+                    P_BREAK_E(loop, reason);
                 });
             });
         });

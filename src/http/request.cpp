@@ -84,7 +84,7 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response:
     long length = contentLength();
 
     if (length > 0)
-        return read(length)->then([=](const std::vector<std::byte> &buffer) -> std::string {
+        return read(length)->then([](const std::vector<std::byte> &buffer) -> std::string {
             return {(const char *)buffer.data(), buffer.size()};
         });
 

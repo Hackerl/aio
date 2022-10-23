@@ -26,7 +26,7 @@ include(FetchContent)
 FetchContent_Declare(
         zero
         GIT_REPOSITORY https://github.com/Hackerl/zero
-        GIT_TAG c2ae1772df3f88c6375bb3733a5973894a01e675
+        GIT_TAG 36592c4db8005419153c6f95a2614f81ff62adcb
 )
 
 FetchContent_MakeAvailable(zero)
@@ -81,6 +81,3 @@ target_link_libraries(
         OpenSSL::SSL
         OpenSSL::Crypto
 )
-
-add_executable(test main.cpp)
-target_link_libraries(test aio)
