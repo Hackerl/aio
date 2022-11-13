@@ -2,6 +2,7 @@
 #define AIO_PIPE_H
 
 #include "buffer.h"
+#include <array>
 #include <aio/context.h>
 
 namespace aio::ev {

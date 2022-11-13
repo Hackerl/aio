@@ -1,4 +1,6 @@
 #include <aio/net/stream.h>
+#include <linux/in.h>
+#include <endian.h>
 #include <cstring>
 
 aio::net::Listener::Listener(const Context &context, evconnlistener *listener) : mContext(context), mListener(listener) {

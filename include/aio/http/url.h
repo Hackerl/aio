@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <curl/curl.h>
+#include <string>
 
 namespace aio::http {
     class URL {

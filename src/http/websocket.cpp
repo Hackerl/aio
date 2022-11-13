@@ -7,6 +7,7 @@
 #include <random>
 #include <map>
 #include <cstddef>
+#include <endian.h>
 
 constexpr auto SWITCHING_PROTOCOLS_STATUS = 101;
 constexpr auto MASKING_KEY_LENGTH = 4;

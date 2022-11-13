@@ -2,6 +2,7 @@
 #define AIO_WEBSOCKET_H
 
 #include "url.h"
+#include <vector>
 #include <aio/net/stream.h>
 
 namespace aio::http::ws {
