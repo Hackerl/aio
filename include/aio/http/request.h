@@ -248,6 +248,14 @@ namespace aio::http {
                         connection->defers.push_back([form]() {
                             curl_mime_free(form);
                         });
+                    } else if constexpr (std::is_same_v<T, nlohmann::json>) {
+                        curl_easy_setopt(
+                                easy,
+                                CURLOPT_COPYPOSTFIELDS,
+                                payload.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str()
+                        );
+
+                        headers = curl_slist_append(headers, "Content-Type: application/json");
                     } else if constexpr (nlohmann::detail::has_to_json<nlohmann::json, T>::value){
                         curl_easy_setopt(
                                 easy,
@@ -255,7 +263,7 @@ namespace aio::http {
                                 nlohmann::json(payload).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str()
                         );
 
-                        headers = curl_slist_append(nullptr, "Content-Type: application/json");
+                        headers = curl_slist_append(headers, "Content-Type: application/json");
                     } else {
                         static_assert(!sizeof(T *), "payload type not supported");
                     }
