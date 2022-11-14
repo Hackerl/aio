@@ -317,7 +317,7 @@ namespace aio::http {
         }
 
     public:
-        Options &HTTPOptions();
+        Options &options();
 
     private:
         CURLM *mMulti;

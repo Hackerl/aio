@@ -221,6 +221,6 @@ int aio::http::Requests::recycle() {
     return n;
 }
 
-aio::http::Options &aio::http::Requests::HTTPOptions() {
+aio::http::Options &aio::http::Requests::options() {
     return mOptions;
 }
