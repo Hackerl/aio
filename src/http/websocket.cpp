@@ -23,8 +23,8 @@ constexpr auto FINAL_BIT = std::byte{0x80};
 constexpr auto LENGTH_MASK = std::byte{0x7f};
 constexpr auto MASK_BIT = std::byte{0x80};
 
-constexpr auto WS_SCHEME = "ws";
-constexpr auto WS_SECURE_SCHEME = "wss";
+constexpr auto WS_SCHEME = "http";
+constexpr auto WS_SECURE_SCHEME = "https";
 constexpr auto WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 std::string aio::http::ws::Message::text() const {
