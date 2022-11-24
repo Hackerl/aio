@@ -137,7 +137,7 @@ std::shared_ptr<aio::net::Listener> aio::net::listen(const Context &context, con
             context.base,
             nullptr,
             nullptr,
-            LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE | LEV_OPT_DISABLED,
+            LEV_OPT_CLOSE_ON_FREE | LEV_OPT_DISABLED,
             -1,
             (sockaddr *) &sa,
             sizeof(sa)
