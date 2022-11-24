@@ -3,6 +3,8 @@ project(aio)
 
 set(CMAKE_CXX_STANDARD 17)
 
+option(DISABLE_SSL "disable ssl support" OFF)
+
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
@@ -20,7 +22,11 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "disable curl shared library")
 
 set(JSON_BuildTests OFF CACHE BOOL "disable json library tests")
 
-include(FindOpenSSL)
+if (DISABLE_SSL)
+    set(CURL_ENABLE_SSL OFF CACHE BOOL "disable curl openssl")
+    set(EVENT__DISABLE_OPENSSL ON CACHE BOOL "disable event openssl")
+endif ()
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -61,11 +67,11 @@ add_library(
         src/ev/pipe.cpp
         src/ev/event.cpp
         src/ev/timer.cpp
-        src/net/ssl.cpp
         src/net/stream.cpp
         src/http/url.cpp
         src/http/request.cpp
-        src/http/websocket.cpp
+        $<$<NOT:$<BOOL:${DISABLE_SSL}>>:src/net/ssl.cpp>
+        $<$<NOT:$<BOOL:${DISABLE_SSL}>>:src/http/websocket.cpp>
 )
 
 target_include_directories(aio PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -76,8 +82,6 @@ target_link_libraries(
         libcurl
         nlohmann_json
         event_core_static
-        event_openssl_static
         event_extra_static
-        OpenSSL::SSL
-        OpenSSL::Crypto
+        $<$<NOT:$<BOOL:${DISABLE_SSL}>>:event_openssl_static>
 )

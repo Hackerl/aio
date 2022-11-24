@@ -94,48 +94,6 @@ namespace aio::http {
             if (!easy)
                 return zero::async::promise::reject<std::shared_ptr<Response>>({-1, "init easy handle failed"});
 
-            struct stub {
-                static size_t onWrite(char *buffer, size_t size, size_t n, void *userdata) {
-                    auto connection = (Connection *) userdata;
-
-                    if (connection->buffer->write(buffer, size * n) < 1024 * 1024)
-                        return size * n;
-
-                    connection->buffer->drain()->then([=]() {
-                        curl_easy_pause(connection->easy, CURLPAUSE_CONT);
-                    });
-
-                    return CURL_WRITEFUNC_PAUSE;
-                }
-
-                static size_t onHeader(char *buffer, size_t size, size_t n, void *userdata) {
-                    auto connection = (Connection *) userdata;
-
-                    if (n != 2 || memcmp(buffer, "\r\n", 2) != 0) {
-                        std::vector<std::string> tokens = zero::strings::split(buffer, ":", 1);
-
-                        if (tokens.size() != 2)
-                            return size * n;
-
-                        connection->response->headers()[tokens[0]] = zero::strings::trim(tokens[1]);
-
-                        return size * n;
-                    }
-
-                    long code = connection->response->statusCode();
-
-                    if (code == 301 || code == 302) {
-                        connection->response->headers().clear();
-                        return size * n;
-                    }
-
-                    connection->transferring = true;
-                    connection->promise->resolve(connection->response);
-
-                    return size * n;
-                }
-            };
-
             std::array<std::shared_ptr<ev::IBuffer>, 2> buffers = ev::pipe(mContext);
 
             auto connection = new Connection{
@@ -156,9 +114,57 @@ namespace aio::http {
 
             curl_easy_setopt(easy, CURLOPT_URL, url.string().c_str());
             curl_easy_setopt(easy, CURLOPT_COOKIEFILE, "");
-            curl_easy_setopt(easy, CURLOPT_HEADERFUNCTION, stub::onHeader);
+
+            curl_easy_setopt(
+                    easy,
+                    CURLOPT_HEADERFUNCTION,
+                    [](char *buffer, size_t size, size_t n, void *userdata) {
+                        auto connection = (Connection *) userdata;
+
+                        if (n != 2 || memcmp(buffer, "\r\n", 2) != 0) {
+                            std::vector<std::string> tokens = zero::strings::split(buffer, ":", 1);
+
+                            if (tokens.size() != 2)
+                                return size * n;
+
+                            connection->response->headers()[tokens[0]] = zero::strings::trim(tokens[1]);
+
+                            return size * n;
+                        }
+
+                        long code = connection->response->statusCode();
+
+                        if (code == 301 || code == 302) {
+                            connection->response->headers().clear();
+                            return size * n;
+                        }
+
+                        connection->transferring = true;
+                        connection->promise->resolve(connection->response);
+
+                        return size * n;
+                    }
+            );
+
             curl_easy_setopt(easy, CURLOPT_HEADERDATA, connection);
-            curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, stub::onWrite);
+
+            curl_easy_setopt(
+                    easy,
+                    CURLOPT_WRITEFUNCTION,
+                    [](char *buffer, size_t size, size_t n, void *userdata) -> size_t {
+                        auto connection = (Connection *) userdata;
+
+                        if (connection->buffer->write(buffer, size * n) < 1024 * 1024)
+                            return size * n;
+
+                        connection->buffer->drain()->then([=]() {
+                            curl_easy_pause(connection->easy, CURLPAUSE_CONT);
+                        });
+
+                        return CURL_WRITEFUNC_PAUSE;
+                    }
+            );
+
             curl_easy_setopt(easy, CURLOPT_WRITEDATA, connection);
             curl_easy_setopt(easy, CURLOPT_ERRORBUFFER, connection->error);
             curl_easy_setopt(easy, CURLOPT_PRIVATE, connection);

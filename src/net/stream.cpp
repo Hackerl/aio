@@ -1,21 +1,32 @@
 #include <aio/net/stream.h>
+#include <zero/strings/strings.h>
 #include <linux/in.h>
 #include <endian.h>
 #include <cstring>
 
-aio::net::Listener::Listener(const Context &context, evconnlistener *listener) : mContext(context), mListener(listener) {
-    struct stub {
-        static void onAccept(evconnlistener *listener, evutil_socket_t fd, sockaddr *addr, int socklen, void *arg) {
-            std::shared_ptr(static_cast<Listener *>(arg)->mPromise)->resolve(fd);
-        }
+#ifdef __unix__
+#include <sys/un.h>
+#endif
 
-        static void onError(evconnlistener *listener, void *arg) {
-            std::shared_ptr(static_cast<Listener *>(arg)->mPromise)->reject({-1, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
-        }
-    };
+aio::net::Listener::Listener(const Context &context, evconnlistener *listener)
+        : mContext(context), mListener(listener) {
+    evconnlistener_set_cb(
+            mListener,
+            [](evconnlistener *listener, evutil_socket_t fd, sockaddr *addr, int socklen, void *arg) {
+                std::shared_ptr(static_cast<Listener *>(arg)->mPromise)->resolve(fd);
+            },
+            this
+    );
 
-    evconnlistener_set_cb(mListener, stub::onAccept, this);
-    evconnlistener_set_error_cb(mListener, stub::onError);
+
+    evconnlistener_set_error_cb(
+            mListener,
+            [](evconnlistener *listener, void *arg) {
+                std::shared_ptr(static_cast<Listener *>(arg)->mPromise)->reject(
+                        {-1, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())}
+                );
+            }
+    );
 }
 
 aio::net::Listener::~Listener() {
@@ -55,12 +66,12 @@ void aio::net::Listener::close() {
 }
 
 std::shared_ptr<aio::net::Listener> aio::net::listen(const Context &context, const std::string &host, short port) {
-    sockaddr_in sin = {};
+    sockaddr_in sa = {};
 
-    sin.sin_family = AF_INET;
-    sin.sin_port = htons(port);
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(port);
 
-    if (evutil_inet_pton(sin.sin_family, host.c_str(), &sin.sin_addr) < 0)
+    if (evutil_inet_pton(sa.sin_family, host.c_str(), &sa.sin_addr) < 0)
         return nullptr;
 
     evconnlistener *listener = evconnlistener_new_bind(
@@ -69,8 +80,8 @@ std::shared_ptr<aio::net::Listener> aio::net::listen(const Context &context, con
             nullptr,
             LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE | LEV_OPT_DISABLED,
             -1,
-            (sockaddr *) &sin,
-            sizeof(sin)
+            (sockaddr *) &sa,
+            sizeof(sa)
     );
 
     if (!listener)
@@ -86,26 +97,27 @@ aio::net::connect(const Context &context, const std::string &host, short port) {
     if (!bev)
         return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "new buffer failed"});
 
-    if (bufferevent_socket_connect_hostname(bev, context.dnsBase, AF_UNSPEC, host.c_str(), port) != 0)
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "buffer connect failed"});
-
     return zero::async::promise::chain<void>([=](const auto &p) {
-        struct stub {
-            static void onEvent(bufferevent *bev, short what, void *arg) {
-                auto p = static_cast<std::shared_ptr<zero::async::promise::Promise<void>> *>(arg);
+        bufferevent_setcb(
+                bev,
+                nullptr,
+                nullptr,
+                [](bufferevent *bev, short what, void *arg) {
+                    auto p = static_cast<std::shared_ptr<zero::async::promise::Promise<void>> *>(arg);
 
-                if ((what & BEV_EVENT_CONNECTED) == 0) {
-                    p->operator*().reject({-1, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+                    if ((what & BEV_EVENT_CONNECTED) == 0) {
+                        p->operator*().reject({-1, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+                        delete p;
+                        return;
+                    }
+
+                    p->operator*().resolve();
                     delete p;
-                    return;
-                }
+                },
+                new std::shared_ptr(p)
+        );
 
-                p->operator*().resolve();
-                delete p;
-            }
-        };
-
-        bufferevent_setcb(bev, nullptr, nullptr, stub::onEvent, new std::shared_ptr(p));
+        bufferevent_socket_connect_hostname(bev, context.dnsBase, AF_UNSPEC, host.c_str(), port);
     })->then([=]() -> std::shared_ptr<ev::IBuffer> {
         return std::make_shared<ev::Buffer>(bev);
     })->fail([=](const zero::async::promise::Reason &reason) {
@@ -113,3 +125,68 @@ aio::net::connect(const Context &context, const std::string &host, short port) {
         return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>(reason);
     });
 }
+
+#ifdef __unix__
+std::shared_ptr<aio::net::Listener> aio::net::listen(const Context &context, const std::string &path) {
+    sockaddr_un sa = {};
+
+    sa.sun_family = AF_UNIX;
+    strncpy(sa.sun_path, path.c_str(), sizeof(sa.sun_path) - 1);
+
+    evconnlistener *listener = evconnlistener_new_bind(
+            context.base,
+            nullptr,
+            nullptr,
+            LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE | LEV_OPT_DISABLED,
+            -1,
+            (sockaddr *) &sa,
+            sizeof(sa)
+    );
+
+    if (!listener)
+        return nullptr;
+
+    return std::make_shared<Listener>(context, listener);
+}
+
+std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::ev::IBuffer>>>
+aio::net::connect(const Context &context, const std::string &path) {
+    sockaddr_un sa = {};
+
+    sa.sun_family = AF_UNIX;
+    strncpy(sa.sun_path, path.c_str(), sizeof(sa.sun_path) - 1);
+
+    bufferevent *bev = bufferevent_socket_new(context.base, -1, BEV_OPT_CLOSE_ON_FREE);
+
+    if (!bev)
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "new buffer failed"});
+
+    return zero::async::promise::chain<void>([=](const auto &p) {
+        bufferevent_setcb(
+                bev,
+                nullptr,
+                nullptr,
+                [](bufferevent *bev, short what, void *arg) {
+                    auto p = static_cast<std::shared_ptr<zero::async::promise::Promise<void>> *>(arg);
+
+                    if ((what & BEV_EVENT_CONNECTED) == 0) {
+                        p->operator*().reject({-1, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+                        delete p;
+                        return;
+                    }
+
+                    p->operator*().resolve();
+                    delete p;
+                },
+                new std::shared_ptr(p)
+        );
+
+        bufferevent_socket_connect(bev, (sockaddr *) &sa, sizeof(sa));
+    })->then([=]() -> std::shared_ptr<ev::IBuffer> {
+        return std::make_shared<ev::Buffer>(bev);
+    })->fail([=](const zero::async::promise::Reason &reason) {
+        bufferevent_free(bev);
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>(reason);
+    });
+}
+#endif

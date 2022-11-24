@@ -108,23 +108,28 @@ void aio::http::Response::setError(const char *error) {
 }
 
 aio::http::Requests::Requests(const Context &context, Options options) : mContext(context), mOptions(std::move(options)), mTimer(std::make_shared<ev::Timer>(context)) {
-    struct stub {
-        static int onCURLTimer(CURLM *multi, long timeout, void *userdata) {
-            static_cast<Requests *>(userdata)->onCURLTimer(timeout);
-            return 0;
-        }
-
-        static int onCURLEvent(CURL *easy, curl_socket_t s, int what, void *userdata, void *data) {
-            static_cast<Requests *>(userdata)->onCURLEvent(easy, s, what, data);
-            return 0;
-        }
-    };
-
     mMulti = curl_multi_init();
 
-    curl_multi_setopt(mMulti, CURLMOPT_SOCKETFUNCTION, stub::onCURLEvent);
+    curl_multi_setopt(
+            mMulti,
+            CURLMOPT_SOCKETFUNCTION,
+            [](CURL *easy, curl_socket_t s, int what, void *userdata, void *data) {
+                static_cast<Requests *>(userdata)->onCURLEvent(easy, s, what, data);
+                return 0;
+            }
+    );
+
     curl_multi_setopt(mMulti, CURLMOPT_SOCKETDATA, this);
-    curl_multi_setopt(mMulti, CURLMOPT_TIMERFUNCTION, stub::onCURLTimer);
+
+    curl_multi_setopt(
+            mMulti,
+            CURLMOPT_TIMERFUNCTION,
+            [](CURLM *multi, long timeout, void *userdata) {
+                static_cast<Requests *>(userdata)->onCURLTimer(timeout);
+                return 0;
+            }
+    );
+
     curl_multi_setopt(mMulti, CURLMOPT_TIMERDATA, this);
 }
 

@@ -1,13 +1,13 @@
 #include <aio/ev/timer.h>
 
 aio::ev::Timer::Timer(const Context &context) {
-    struct stub {
-        static void onEvent(evutil_socket_t fd, short what, void *arg) {
-            std::shared_ptr(static_cast<Timer *>(arg)->mPromise)->resolve();
-        }
-    };
-
-    mEvent = evtimer_new(context.base, stub::onEvent, this);
+    mEvent = evtimer_new(
+            context.base,
+            [](evutil_socket_t fd, short what, void *arg) {
+                std::shared_ptr(static_cast<Timer *>(arg)->mPromise)->resolve();
+            },
+            this
+    );
 }
 
 aio::ev::Timer::~Timer() {

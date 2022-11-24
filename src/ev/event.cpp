@@ -1,13 +1,15 @@
 #include <aio/ev/event.h>
 
 aio::ev::Event::Event(const Context &context, evutil_socket_t fd) {
-    struct stub {
-        static void onEvent(evutil_socket_t fd, short what, void *arg) {
-            std::shared_ptr(static_cast<Event *>(arg)->mPromise)->resolve(what);
-        }
-    };
-
-    mEvent = event_new(context.base, fd, 0, stub::onEvent, this);
+    mEvent = event_new(
+            context.base,
+            fd,
+            0,
+            [](evutil_socket_t fd, short what, void *arg) {
+                std::shared_ptr(static_cast<Event *>(arg)->mPromise)->resolve(what);
+            },
+            this
+    );
 }
 
 aio::ev::Event::~Event() {

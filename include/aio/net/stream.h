@@ -25,6 +25,13 @@ namespace aio::net {
 
     std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<ev::IBuffer>>>
     connect(const Context &context, const std::string &host, short port);
+
+#ifdef __unix__
+    std::shared_ptr<Listener> listen(const Context &context, const std::string &path);
+
+    std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<ev::IBuffer>>>
+    connect(const Context &context, const std::string &path);
+#endif
 }
 
 #endif //AIO_STREAM_H

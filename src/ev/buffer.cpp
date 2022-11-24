@@ -8,21 +8,20 @@ enum PromiseType {
 };
 
 aio::ev::Buffer::Buffer(bufferevent *bev) : mBev(bev) {
-    struct stub {
-        static void onRead(bufferevent *bev, void *arg) {
-            static_cast<Buffer *>(arg)->onBufferRead();
-        }
+    bufferevent_setcb(
+            mBev,
+            [](bufferevent *bev, void *arg) {
+                static_cast<Buffer *>(arg)->onBufferRead();
+            },
+            [](bufferevent *bev, void *arg) {
+                static_cast<Buffer *>(arg)->onBufferWrite();
+            },
+            [](bufferevent *bev, short what, void *arg) {
+                static_cast<Buffer *>(arg)->onBufferEvent(what);
+            },
+            this
+    );
 
-        static void onWrite(bufferevent *bev, void *arg) {
-            static_cast<Buffer *>(arg)->onBufferWrite();
-        }
-
-        static void onEvent(bufferevent *bev, short what, void *arg) {
-            static_cast<Buffer *>(arg)->onBufferEvent(what);
-        }
-    };
-
-    bufferevent_setcb(mBev, stub::onRead, stub::onWrite, stub::onEvent, this);
     bufferevent_enable(mBev, EV_READ | EV_WRITE);
     bufferevent_setwatermark(mBev, EV_READ | EV_WRITE, 0, 0);
 }
