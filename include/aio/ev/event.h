@@ -15,6 +15,9 @@ namespace aio::ev {
         bool pending();
 
     public:
+        void trigger(short events);
+
+    public:
         std::shared_ptr<zero::async::promise::Promise<short>> on(short events);
         std::shared_ptr<zero::async::promise::Promise<void>> onPersist(short events, const std::function<bool(short)> &func);
 

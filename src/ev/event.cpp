@@ -30,6 +30,10 @@ bool aio::ev::Event::pending() {
     return mPromise.operator bool();
 }
 
+void aio::ev::Event::trigger(short events) {
+    event_active(mEvent, events, 0);
+}
+
 std::shared_ptr<zero::async::promise::Promise<short>> aio::ev::Event::on(short events) {
     if (mPromise)
         return zero::async::promise::reject<short>({-1, "pending event has been set"});

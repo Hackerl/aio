@@ -83,5 +83,6 @@ target_link_libraries(
         nlohmann_json
         event_core_static
         event_extra_static
+        event_openssl_static
         $<$<NOT:$<BOOL:${DISABLE_SSL}>>:event_openssl_static>
 )
