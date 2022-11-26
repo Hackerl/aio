@@ -32,7 +32,7 @@ include(FetchContent)
 FetchContent_Declare(
         zero
         GIT_REPOSITORY https://github.com/Hackerl/zero
-        GIT_TAG beb65ec9f125b77a5163cb7ee80f037fb2f58ca4
+        GIT_TAG f713e8d24e948891940bd6ce3754789b1cf91420
 )
 
 FetchContent_MakeAvailable(zero)
