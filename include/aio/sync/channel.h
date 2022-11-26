@@ -1,7 +1,7 @@
 #ifndef AIO_CHANNEL_H
 #define AIO_CHANNEL_H
 
-#include <queue>
+#include <list>
 #include <mutex>
 #include <aio/context.h>
 #include <aio/ev/event.h>
@@ -12,7 +12,7 @@ namespace aio::sync {
     template<typename T, size_t N>
     class Channel : public std::enable_shared_from_this<Channel<T, N>> {
     public:
-        Channel(const Context &context) : mContext(context) {
+        explicit Channel(const Context &context) : mContext(context) {
 
         }
 
@@ -31,8 +31,10 @@ namespace aio::sync {
             if (mPending.empty())
                 return;
 
-            mPending.front()->trigger(EV_READ);
-            mPending.pop();
+            for (const auto &p : mPending)
+                p->trigger(EV_READ);
+
+            mPending.clear();
         }
 
         std::shared_ptr<zero::async::promise::Promise<T>> receive() {
@@ -47,7 +49,7 @@ namespace aio::sync {
                         P_CONTINUE(loop);
                     });
 
-                    self->mPending.push(event);
+                    self->mPending.push_back(event);
                     return;
                 }
 
@@ -62,7 +64,7 @@ namespace aio::sync {
         Context mContext;
         std::mutex mMutex;
         zero::atomic::CircularBuffer<T, N> mBuffer;
-        std::queue<std::shared_ptr<ev::Event>> mPending;
+        std::list<std::shared_ptr<ev::Event>> mPending;
     };
 }
 
