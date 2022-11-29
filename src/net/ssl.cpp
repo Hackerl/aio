@@ -32,6 +32,8 @@ aio::net::ssl::connect(const Context &context, const std::string &host, short po
         return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "new buffer failed"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
+        auto ctx = new std::shared_ptr(p);
+
         bufferevent_setcb(
                 bev,
                 nullptr,
@@ -48,10 +50,13 @@ aio::net::ssl::connect(const Context &context, const std::string &host, short po
                     p->operator*().resolve();
                     delete p;
                 },
-                new std::shared_ptr(p)
+                ctx
         );
 
-        bufferevent_socket_connect_hostname(bev, context.dnsBase, AF_UNSPEC, host.c_str(), port);
+        if (bufferevent_socket_connect_hostname(bev, context.dnsBase, AF_UNSPEC, host.c_str(), port) < 0) {
+            delete ctx;
+            p->reject({-1, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+        }
     })->then([=]() -> std::shared_ptr<ev::IBuffer> {
         return std::make_shared<ev::Buffer>(bev);
     })->fail([=](const zero::async::promise::Reason &reason) {
