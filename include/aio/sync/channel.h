@@ -5,6 +5,7 @@
 #include <mutex>
 #include <aio/context.h>
 #include <aio/ev/event.h>
+#include <zero/interface.h>
 #include <zero/async/promise.h>
 #include <zero/atomic/circular_buffer.h>
 
