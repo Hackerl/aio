@@ -327,8 +327,8 @@ namespace aio::http {
 
     private:
         CURLM *mMulti;
-        Context mContext;
         Options mOptions;
+        const Context &mContext;
         std::shared_ptr<ev::Timer> mTimer;
     };
 }

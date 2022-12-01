@@ -1,11 +1,9 @@
 #include <aio/ev/buffer.h>
 #include <zero/log.h>
 
-enum PromiseType {
-    READ,
-    DRAIN,
-    WAIT_CLOSED
-};
+constexpr auto READ = 0;
+constexpr auto DRAIN = 1;
+constexpr auto WAIT_CLOSED = 2;
 
 aio::ev::Buffer::Buffer(bufferevent *bev) : mBev(bev) {
     bufferevent_setcb(
