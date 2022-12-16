@@ -34,7 +34,7 @@ void aio::ev::Event::trigger(short events) {
     event_active(mEvent, events, 0);
 }
 
-std::shared_ptr<zero::async::promise::Promise<short>> aio::ev::Event::on(short events) {
+std::shared_ptr<zero::async::promise::Promise<short>> aio::ev::Event::on(short events, std::optional<std::chrono::milliseconds> timeout) {
     if (mPromise)
         return zero::async::promise::reject<short>({-1, "pending event has been set"});
 
@@ -45,16 +45,26 @@ std::shared_ptr<zero::async::promise::Promise<short>> aio::ev::Event::on(short e
         mPromise = p;
         mEvent->ev_events = events;
 
-        event_add(mEvent, nullptr);
+        if (!timeout) {
+            event_add(mEvent, nullptr);
+            return;
+        }
+
+        timeval tv = {
+                timeout->count() / 1000,
+                (timeout->count() % 1000) * 1000
+        };
+
+        event_add(mEvent, &tv);
     })->finally([self = shared_from_this()]() {
         self->mPromise.reset();
     });
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>>
-aio::ev::Event::onPersist(short events, const std::function<bool(short)> &func) {
+aio::ev::Event::onPersist(short events, const std::function<bool(short)> &func, std::optional<std::chrono::milliseconds> timeout) {
     return zero::async::promise::loop<void>([=](const auto &loop) {
-        on(events)->then([=](short what) {
+        on(events, timeout)->then([=](short what) {
             if (!func(what)) {
                 P_BREAK(loop);
                 return;
