@@ -83,6 +83,6 @@ target_link_libraries(
         nlohmann_json
         event_core_static
         event_extra_static
-        event_pthreads_static
+        $<$<BOOL:$<PLATFORM_ID:Linux>>:event_pthreads_static>
         $<$<NOT:$<BOOL:${DISABLE_SSL}>>:event_openssl_static>
 )

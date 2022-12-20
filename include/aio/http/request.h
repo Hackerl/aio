@@ -118,7 +118,7 @@ namespace aio::http {
             curl_easy_setopt(
                     easy,
                     CURLOPT_HEADERFUNCTION,
-                    [](char *buffer, size_t size, size_t n, void *userdata) {
+                    static_cast<size_t (*)(char *, size_t, size_t, void *)>([](char *buffer, size_t size, size_t n, void *userdata) {
                         auto connection = (Connection *) userdata;
 
                         if (n != 2 || memcmp(buffer, "\r\n", 2) != 0) {
@@ -143,7 +143,7 @@ namespace aio::http {
                         connection->promise->resolve(connection->response);
 
                         return size * n;
-                    }
+                    })
             );
 
             curl_easy_setopt(easy, CURLOPT_HEADERDATA, connection);
@@ -151,7 +151,7 @@ namespace aio::http {
             curl_easy_setopt(
                     easy,
                     CURLOPT_WRITEFUNCTION,
-                    [](char *buffer, size_t size, size_t n, void *userdata) -> size_t {
+                    static_cast<size_t (*)(char *, size_t, size_t, void *)>([](char *buffer, size_t size, size_t n, void *userdata) -> size_t {
                         auto connection = (Connection *) userdata;
 
                         if (connection->buffer->write(buffer, size * n) < 1024 * 1024)
@@ -162,7 +162,7 @@ namespace aio::http {
                         });
 
                         return CURL_WRITEFUNC_PAUSE;
-                    }
+                    })
             );
 
             curl_easy_setopt(easy, CURLOPT_WRITEDATA, connection);

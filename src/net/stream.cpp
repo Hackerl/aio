@@ -1,8 +1,11 @@
 #include <aio/net/stream.h>
 #include <zero/strings/strings.h>
+#include <cstring>
+
+#ifdef __linux__
 #include <linux/in.h>
 #include <endian.h>
-#include <cstring>
+#endif
 
 #ifdef __unix__
 #include <sys/un.h>

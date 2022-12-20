@@ -113,10 +113,10 @@ aio::http::Requests::Requests(const Context &context, Options options) : mContex
     curl_multi_setopt(
             mMulti,
             CURLMOPT_SOCKETFUNCTION,
-            [](CURL *easy, curl_socket_t s, int what, void *userdata, void *data) {
+            static_cast<int (*)(CURL *, curl_socket_t, int, void *, void *)>([](CURL *easy, curl_socket_t s, int what, void *userdata, void *data) {
                 static_cast<Requests *>(userdata)->onCURLEvent(easy, s, what, data);
                 return 0;
-            }
+            })
     );
 
     curl_multi_setopt(mMulti, CURLMOPT_SOCKETDATA, this);
@@ -124,10 +124,10 @@ aio::http::Requests::Requests(const Context &context, Options options) : mContex
     curl_multi_setopt(
             mMulti,
             CURLMOPT_TIMERFUNCTION,
-            [](CURLM *multi, long timeout, void *userdata) {
+            static_cast<int (*)(CURLM *, long, void *)>([](CURLM *multi, long timeout, void *userdata) {
                 static_cast<Requests *>(userdata)->onCURLTimer(timeout);
                 return 0;
-            }
+            })
     );
 
     curl_multi_setopt(mMulti, CURLMOPT_TIMERDATA, this);
