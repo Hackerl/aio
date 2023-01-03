@@ -183,8 +183,8 @@ namespace aio::sync {
         }
 
     private:
+        Context mContext;
         std::mutex mMutex;
-        const Context &mContext;
         std::atomic<bool> mClosed;
         zero::atomic::CircularBuffer<T, N> mBuffer;
         std::list<std::shared_ptr<ev::Event>> mPending[2];

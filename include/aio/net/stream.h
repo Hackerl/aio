@@ -16,7 +16,7 @@ namespace aio::net {
         void close();
 
     private:
-        const Context &mContext;
+        Context mContext;
         evconnlistener *mListener;
         std::shared_ptr<zero::async::promise::Promise<evutil_socket_t>> mPromise;
     };
