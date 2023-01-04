@@ -52,12 +52,12 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
     if (mClosed)
         return zero::async::promise::reject<std::vector<std::byte>>(mReason);
 
-    return zero::async::promise::chain<void>([this](const auto &p) {
+    return zero::async::promise::chain<void>([=](const auto &p) {
         mPromise[READ] = p;
 
         bufferevent_setwatermark(mBev, EV_READ, 0, 0);
         bufferevent_enable(mBev, EV_READ);
-    })->then([this]() {
+    })->then([=]() {
         evbuffer *input = bufferevent_get_input(mBev);
         std::vector<std::byte> buffer(evbuffer_get_length(input));
 
@@ -122,7 +122,7 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
         return zero::async::promise::reject<std::string>(mReason);
 
     return zero::async::promise::loop<std::string>([style, this](const auto &loop) {
-        zero::async::promise::chain<void>([this](const auto &p) {
+        zero::async::promise::chain<void>([=](const auto &p) {
             mPromise[READ] = p;
 
             bufferevent_setwatermark(mBev, EV_READ, 0, 0);
@@ -173,7 +173,7 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::drain() {
     if (evbuffer_get_length(output) == 0)
         return zero::async::promise::resolve<void>();
 
-    return zero::async::promise::chain<void>([this](const auto &p) {
+    return zero::async::promise::chain<void>([=](const auto &p) {
         mPromise[DRAIN] = p;
     })->finally([self = shared_from_this()]() {
         self->mPromise[DRAIN].reset();
@@ -204,7 +204,7 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::waitClosed
     if (mClosed)
         return zero::async::promise::resolve<void>();
 
-    return zero::async::promise::chain<void>([this](const auto &p) {
+    return zero::async::promise::chain<void>([=](const auto &p) {
         mPromise[WAIT_CLOSED] = p;
     })->finally([self = shared_from_this()]() {
         self->mPromise[WAIT_CLOSED].reset();

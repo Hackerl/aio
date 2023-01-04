@@ -45,10 +45,10 @@ std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::ev::IBuffer>>
     if (mPromise)
         return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "pending request not completed"});
 
-    return zero::async::promise::chain<evutil_socket_t>([this](const auto &p) {
+    return zero::async::promise::chain<evutil_socket_t>([=](const auto &p) {
         mPromise = p;
         evconnlistener_enable(mListener);
-    })->then([this](evutil_socket_t fd) -> std::shared_ptr<ev::IBuffer> {
+    })->then([=](evutil_socket_t fd) -> std::shared_ptr<ev::IBuffer> {
         return std::make_shared<ev::Buffer>(bufferevent_socket_new(mContext.base, fd, BEV_OPT_CLOSE_ON_FREE));
     })->finally([self = shared_from_this()]() {
         evconnlistener_disable(self->mListener);

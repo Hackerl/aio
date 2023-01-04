@@ -3,9 +3,16 @@
 
 #include "url.h"
 #include <vector>
+#include <aio/ev/event.h>
 #include <aio/net/stream.h>
 
 namespace aio::http::ws {
+    enum State {
+        CONNECTED,
+        CLOSING,
+        CLOSED
+    };
+
     enum Opcode {
         CONTINUATION = 0,
         TEXT = 1,
@@ -44,17 +51,18 @@ namespace aio::http::ws {
 
     class WebSocket : public std::enable_shared_from_this<WebSocket> {
     public:
-        explicit WebSocket(std::shared_ptr<ev::IBuffer> buffer);
+        explicit WebSocket(const Context &context, std::shared_ptr<ev::IBuffer> buffer);
 
     private:
         std::shared_ptr<zero::async::promise::Promise<std::tuple<Header, std::vector<std::byte>>>> readFrame();
 
-    public:
+    private:
         std::shared_ptr<zero::async::promise::Promise<Message>> readMessage();
         std::shared_ptr<zero::async::promise::Promise<void>> writeMessage(const Message &message);
 
     public:
         std::shared_ptr<zero::async::promise::Promise<Message>> read();
+        std::shared_ptr<zero::async::promise::Promise<void>> write(const Message &message);
 
     public:
         std::shared_ptr<zero::async::promise::Promise<void>> sendText(std::string_view text);
@@ -64,6 +72,9 @@ namespace aio::http::ws {
         std::shared_ptr<zero::async::promise::Promise<void>> pong(const void *buffer, size_t length);
 
     private:
+        int mRef;
+        State mState;
+        std::shared_ptr<ev::Event> mEvent;
         std::shared_ptr<ev::IBuffer> mBuffer;
     };
 
