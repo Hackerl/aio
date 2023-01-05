@@ -290,34 +290,34 @@ aio::http::ws::WebSocket::close(unsigned short code, std::string_view reason) {
     buffer.insert(buffer.end(), (std::byte *) &code, (std::byte *) &code + sizeof(unsigned short));
     buffer.insert(buffer.end(), (std::byte *) reason.data(), (std::byte *) reason.data() + reason.length());
 
-    return zero::async::promise::loop<void>([buffer, self = shared_from_this()](const auto &loop) {
-        if (self->mRef > 0) {
-            self->mEvent->on(EV_READ)->then([=](short what) {
-                P_CONTINUE(loop);
+    return zero::async::promise::chain<void>([=](const auto &p) {
+        if (mRef > 0) {
+            mEvent->on(EV_READ)->then([=](short what) {
+                p->resolve();
             });
+
+            return;
         }
 
-        self->writeMessage({Opcode::CLOSE, buffer})->then([=]() {
-            return zero::async::promise::loop<void>([=](const auto &loop) {
-                self->readMessage()->then([=](const Message &message) {
-                    if (message.opcode != Opcode::CLOSE) {
-                        P_CONTINUE(loop);
-                        return;
-                    }
+        p->resolve();
+    })->then([=]() {
+        return writeMessage({Opcode::CLOSE, buffer});
+    })->then([=]() {
+        return zero::async::promise::loop<void>([=](const auto &loop) {
+            readMessage()->then([=](const Message &message) {
+                if (message.opcode != Opcode::CLOSE) {
+                    P_CONTINUE(loop);
+                    return;
+                }
 
-                    P_BREAK(loop);
-                })->fail([=](const zero::async::promise::Reason &reason) {
-                    P_BREAK_E(loop, reason);
-                });
+                P_BREAK(loop);
+            })->fail([=](const zero::async::promise::Reason &reason) {
+                P_BREAK_E(loop, reason);
             });
-        })->then([=]() {
-            return self->mBuffer->waitClosed();
-        })->then([=]() {
-            self->mState = CLOSED;
-            P_BREAK(loop);
-        }, [=](const zero::async::promise::Reason &reason) {
-            P_BREAK_E(loop, reason);
         });
+    })->then([self = shared_from_this()]() {
+        self->mBuffer->close();
+        self->mState = CLOSED;
     });
 }
 
