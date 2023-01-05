@@ -219,11 +219,6 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
                     break;
 
                 case CLOSE:
-                    if (mState != CONNECTED) {
-                        P_BREAK_E(loop, { -1, "websocket is closing" });
-                        break;
-                    }
-
                     mState = CLOSING;
 
                     writeMessage({Opcode::CLOSE, message.data})->then([=]() {
@@ -293,6 +288,11 @@ aio::http::ws::WebSocket::close(unsigned short code, std::string_view reason) {
     return zero::async::promise::chain<void>([=](const auto &p) {
         if (mRef > 0) {
             mEvent->on(EV_READ)->then([=](short what) {
+                if (mState == CLOSED) {
+                    p->reject({-1, "websocket is closed"});
+                    return;
+                }
+
                 p->resolve();
             });
 
