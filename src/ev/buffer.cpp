@@ -206,6 +206,7 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::waitClosed
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         mPromise[WAIT_CLOSED] = p;
+        bufferevent_enable(mBev, EV_READ);
     })->finally([self = shared_from_this()]() {
         self->mPromise[WAIT_CLOSED].reset();
     });
@@ -226,6 +227,9 @@ void aio::ev::Buffer::onClose(const zero::async::promise::Reason &reason) {
 }
 
 void aio::ev::Buffer::onBufferRead() {
+    if (mPromise[WAIT_CLOSED])
+        return;
+
     if (!mPromise[READ]) {
         bufferevent_disable(mBev, EV_READ);
         return;
