@@ -3,6 +3,7 @@
 
 #include "url.h"
 #include <vector>
+#include <variant>
 #include <aio/ev/event.h>
 #include <aio/net/stream.h>
 
@@ -22,14 +23,30 @@ namespace aio::http::ws {
         PONG = 10
     };
 
-    struct Message {
-    public:
-        [[nodiscard]] std::string text() const;
-        [[nodiscard]] std::tuple<unsigned short, std::string> reason() const;
+    enum CloseCode : unsigned short {
+        OK = 1000,
+        GOING_AWAY = 1001,
+        PROTOCOL_ERROR = 1002,
+        UNSUPPORTED_DATA = 1003,
+        ABNORMAL_CLOSURE = 1006,
+        INVALID_TEXT = 1007,
+        POLICY_VIOLATION = 1008,
+        MESSAGE_TOO_BIG = 1009,
+        MANDATORY_EXTENSION = 1010,
+        INTERNAL_ERROR = 1011,
+        SERVICE_RESTART = 1012,
+        TRY_AGAIN_LATER = 1013,
+        BAD_GATEWAY = 1014
+    };
 
-    public:
+    struct InternalMessage {
         Opcode opcode;
         std::vector<std::byte> data;
+    };
+
+    struct Message {
+        Opcode opcode;
+        std::variant<std::string, std::vector<std::byte>> data;
     };
 
     class Header {
@@ -57,8 +74,8 @@ namespace aio::http::ws {
         std::shared_ptr<zero::async::promise::Promise<std::tuple<Header, std::vector<std::byte>>>> readFrame();
 
     private:
-        std::shared_ptr<zero::async::promise::Promise<Message>> readMessage();
-        std::shared_ptr<zero::async::promise::Promise<void>> writeMessage(const Message &message);
+        std::shared_ptr<zero::async::promise::Promise<InternalMessage>> readMessage();
+        std::shared_ptr<zero::async::promise::Promise<void>> writeMessage(const InternalMessage &message);
 
     public:
         std::shared_ptr<zero::async::promise::Promise<Message>> read();
@@ -67,7 +84,7 @@ namespace aio::http::ws {
     public:
         std::shared_ptr<zero::async::promise::Promise<void>> sendText(std::string_view text);
         std::shared_ptr<zero::async::promise::Promise<void>> sendBinary(const void *buffer, size_t length);
-        std::shared_ptr<zero::async::promise::Promise<void>> close(unsigned short code, std::string_view reason);
+        std::shared_ptr<zero::async::promise::Promise<void>> close(CloseCode code, std::string_view reason = {});
         std::shared_ptr<zero::async::promise::Promise<void>> ping(const void *buffer, size_t length);
         std::shared_ptr<zero::async::promise::Promise<void>> pong(const void *buffer, size_t length);
 
