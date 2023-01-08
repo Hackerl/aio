@@ -229,7 +229,7 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
                                 {
                                     -1,
                                     zero::strings::format(
-                                            "websocket is closed: %hu[%.*s]",
+                                            "websocket is closed: %hu['%.*s']",
                                             ntohs(*(unsigned short *) message.data.data()),
                                             message.data.size() - sizeof(unsigned short),
                                             (const char *) message.data.data() + sizeof(unsigned short)
@@ -272,7 +272,7 @@ aio::http::ws::WebSocket::write(const aio::http::ws::Message &message) {
 
     switch (message.opcode) {
         case TEXT: {
-            std::string text = std::get<std::string>(message.data);
+            const auto &text = std::get<std::string>(message.data);
             data.insert(data.begin(), (std::byte *) text.data(), (std::byte *) text.data() + text.size());
             break;
         }

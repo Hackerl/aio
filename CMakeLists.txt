@@ -4,6 +4,7 @@ project(aio)
 set(CMAKE_CXX_STANDARD 17)
 
 option(DISABLE_SSL "disable ssl support" OFF)
+option(DISABLE_SAMPLES "disable aio samples" OFF)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
@@ -86,3 +87,7 @@ target_link_libraries(
         $<$<BOOL:$<PLATFORM_ID:Linux>>:event_pthreads_static>
         $<$<NOT:$<BOOL:${DISABLE_SSL}>>:event_openssl_static>
 )
+
+if (NOT DISABLE_SAMPLES)
+    add_subdirectory(sample)
+endif ()
