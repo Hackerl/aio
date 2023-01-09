@@ -84,11 +84,12 @@ namespace aio::http {
         void onCURLEvent(CURL *easy, curl_socket_t s, int what, void *data);
 
     private:
-        int recycle();
+        void recycle();
 
     public:
         template<typename ...Ts>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> request(const std::string &method, const URL &url, Ts ...payload) {
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
+        request(const std::string &method, const URL &url, Ts ...args) {
             CURL *easy = curl_easy_init();
 
             if (!easy)
@@ -118,32 +119,34 @@ namespace aio::http {
             curl_easy_setopt(
                     easy,
                     CURLOPT_HEADERFUNCTION,
-                    static_cast<size_t (*)(char *, size_t, size_t, void *)>([](char *buffer, size_t size, size_t n, void *userdata) {
-                        auto connection = (Connection *) userdata;
+                    static_cast<size_t (*)(char *, size_t, size_t, void *)>(
+                            [](char *buffer, size_t size, size_t n, void *userdata) {
+                                auto connection = (Connection *) userdata;
 
-                        if (n != 2 || memcmp(buffer, "\r\n", 2) != 0) {
-                            std::vector<std::string> tokens = zero::strings::split(buffer, ":", 1);
+                                if (n != 2 || memcmp(buffer, "\r\n", 2) != 0) {
+                                    std::vector<std::string> tokens = zero::strings::split(buffer, ":", 1);
 
-                            if (tokens.size() != 2)
+                                    if (tokens.size() != 2)
+                                        return size * n;
+
+                                    connection->response->headers()[tokens[0]] = zero::strings::trim(tokens[1]);
+
+                                    return size * n;
+                                }
+
+                                long code = connection->response->statusCode();
+
+                                if (code == 301 || code == 302) {
+                                    connection->response->headers().clear();
+                                    return size * n;
+                                }
+
+                                connection->transferring = true;
+                                connection->promise->resolve(connection->response);
+
                                 return size * n;
-
-                            connection->response->headers()[tokens[0]] = zero::strings::trim(tokens[1]);
-
-                            return size * n;
-                        }
-
-                        long code = connection->response->statusCode();
-
-                        if (code == 301 || code == 302) {
-                            connection->response->headers().clear();
-                            return size * n;
-                        }
-
-                        connection->transferring = true;
-                        connection->promise->resolve(connection->response);
-
-                        return size * n;
-                    })
+                            }
+                    )
             );
 
             curl_easy_setopt(easy, CURLOPT_HEADERDATA, connection);
@@ -151,18 +154,21 @@ namespace aio::http {
             curl_easy_setopt(
                     easy,
                     CURLOPT_WRITEFUNCTION,
-                    static_cast<size_t (*)(char *, size_t, size_t, void *)>([](char *buffer, size_t size, size_t n, void *userdata) -> size_t {
-                        auto connection = (Connection *) userdata;
+                    static_cast<size_t (*)(char *, size_t, size_t, void *)>(
+                            [](char *buffer, size_t size, size_t n,
+                               void *userdata) -> size_t {
+                                auto connection = (Connection *) userdata;
 
-                        if (connection->buffer->write(buffer, size * n) < 1024 * 1024)
-                            return size * n;
+                                if (connection->buffer->write(buffer, size * n) < 1024 * 1024)
+                                    return size * n;
 
-                        connection->buffer->drain()->then([=]() {
-                            curl_easy_pause(connection->easy, CURLPAUSE_CONT);
-                        });
+                                connection->buffer->drain()->then([=]() {
+                                    curl_easy_pause(connection->easy, CURLPAUSE_CONT);
+                                });
 
-                        return CURL_WRITEFUNC_PAUSE;
-                    })
+                                return CURL_WRITEFUNC_PAUSE;
+                            }
+                    )
             );
 
             curl_easy_setopt(easy, CURLOPT_WRITEDATA, connection);
@@ -195,85 +201,100 @@ namespace aio::http {
                 headers = curl_slist_append(headers, zero::strings::format("%s: %s", k.c_str(), v.c_str()).c_str());
             }
 
-            if constexpr (sizeof...(payload) > 0) {
-                static_assert(sizeof...(payload) == 1);
+            if constexpr (sizeof...(args) > 0) {
+                static_assert(sizeof...(args) == 1);
 
-                [&](auto payload) {
-                    using T = std::remove_cv_t<std::remove_reference_t<std::tuple_element_t<0, std::tuple<Ts...>>>>;
+                using T = std::remove_cv_t<std::remove_reference_t<std::tuple_element_t<0, std::tuple<Ts...>>>>;
+                auto &payload = (args, ...);
 
-                    if constexpr (std::is_pointer_v<T> && std::is_same_v<std::remove_const_t<std::remove_pointer_t<T>>, char>) {
-                        curl_easy_setopt(easy, CURLOPT_COPYPOSTFIELDS, payload);
-                    } else if constexpr (std::is_same_v<T, std::string>) {
-                        curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE, (long) payload.length());
-                        curl_easy_setopt(easy, CURLOPT_COPYPOSTFIELDS, payload.c_str());
-                    } else if constexpr (std::is_same_v<T, std::map<std::string, std::string>>) {
-                        std::list<std::string> items;
+                if constexpr (std::is_pointer_v<T> &&
+                              std::is_same_v<std::remove_const_t<std::remove_pointer_t<T>>, char>) {
+                    curl_easy_setopt(easy, CURLOPT_COPYPOSTFIELDS, payload);
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE, (long) payload.length());
+                    curl_easy_setopt(easy, CURLOPT_COPYPOSTFIELDS, payload.c_str());
+                } else if constexpr (std::is_same_v<T, std::map<std::string, std::string>>) {
+                    std::list<std::string> items;
 
-                        std::transform(
-                                payload.begin(),
-                                payload.end(),
-                                std::back_inserter(items),
-                                [](const auto &it) {
-                                    return it.first + "=" + it.second;
-                                }
-                        );
+                    std::transform(
+                            payload.begin(),
+                            payload.end(),
+                            std::back_inserter(items),
+                            [](const auto &it) {
+                                return it.first + "=" + it.second;
+                            }
+                    );
 
-                        curl_easy_setopt(easy, CURLOPT_COPYPOSTFIELDS, zero::strings::join(items, "&").c_str());
-                    } else if constexpr (std::is_same_v<T, std::map<std::string, std::filesystem::path>>) {
-                        curl_mime *form = curl_mime_init(easy);
+                    curl_easy_setopt(easy, CURLOPT_COPYPOSTFIELDS, zero::strings::join(items, "&").c_str());
+                } else if constexpr (std::is_same_v<T, std::map<std::string, std::filesystem::path>>) {
+                    curl_mime *form = curl_mime_init(easy);
 
-                        for (const auto &[key, value]: payload) {
-                            curl_mimepart *field = curl_mime_addpart(form);
+                    for (const auto &[key, value]: payload) {
+                        curl_mimepart *field = curl_mime_addpart(form);
+                        curl_mime_name(field, key.c_str());
 
-                            curl_mime_name(field, key.c_str());
-                            curl_mime_filedata(field, value.string().c_str());
-                        }
+                        CURLcode c = curl_mime_filedata(field, value.string().c_str());
 
-                        curl_easy_setopt(easy, CURLOPT_MIMEPOST, form);
-
-                        connection->defers.push_back([form]() {
+                        if (c != CURLE_OK) {
                             curl_mime_free(form);
-                        });
-                    } else if constexpr (std::is_same_v<T, std::map<std::string, std::variant<std::string, std::filesystem::path>>>) {
-                        curl_mime *form = curl_mime_init(easy);
+                            curl_slist_free_all(headers);
+                            delete connection;
+                            return zero::async::promise::reject<std::shared_ptr<Response>>({-1, curl_easy_strerror(c)});
+                        }
+                    }
 
-                        for (const auto &[k, v]: payload) {
-                            curl_mimepart *field = curl_mime_addpart(form);
+                    curl_easy_setopt(easy, CURLOPT_MIMEPOST, form);
 
-                            curl_mime_name(field, k.c_str());
+                    connection->defers.push_back([form]() {
+                        curl_mime_free(form);
+                    });
+                } else if constexpr (std::is_same_v<T, std::map<std::string, std::variant<std::string, std::filesystem::path>>>) {
+                    curl_mime *form = curl_mime_init(easy);
 
-                            if (v.index() == 0) {
-                                curl_mime_data(field, std::get<std::string>(v).c_str(), CURL_ZERO_TERMINATED);
-                            } else {
-                                curl_mime_filedata(field, std::get<std::filesystem::path>(v).string().c_str());
+                    for (const auto &[k, v]: payload) {
+                        curl_mimepart *field = curl_mime_addpart(form);
+                        curl_mime_name(field, k.c_str());
+
+                        if (v.index() == 0) {
+                            curl_mime_data(field, std::get<std::string>(v).c_str(), CURL_ZERO_TERMINATED);
+                        } else {
+                            CURLcode c = curl_mime_filedata(field, std::get<std::filesystem::path>(v).string().c_str());
+
+                            if (c != CURLE_OK) {
+                                curl_mime_free(form);
+                                curl_slist_free_all(headers);
+                                delete connection;
+                                return zero::async::promise::reject<std::shared_ptr<Response>>(
+                                        {-1, curl_easy_strerror(c)}
+                                );
                             }
                         }
-
-                        curl_easy_setopt(easy, CURLOPT_MIMEPOST, form);
-
-                        connection->defers.push_back([form]() {
-                            curl_mime_free(form);
-                        });
-                    } else if constexpr (std::is_same_v<T, nlohmann::json>) {
-                        curl_easy_setopt(
-                                easy,
-                                CURLOPT_COPYPOSTFIELDS,
-                                payload.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str()
-                        );
-
-                        headers = curl_slist_append(headers, "Content-Type: application/json");
-                    } else if constexpr (nlohmann::detail::has_to_json<nlohmann::json, T>::value){
-                        curl_easy_setopt(
-                                easy,
-                                CURLOPT_COPYPOSTFIELDS,
-                                nlohmann::json(payload).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str()
-                        );
-
-                        headers = curl_slist_append(headers, "Content-Type: application/json");
-                    } else {
-                        static_assert(!sizeof(T *), "payload type not supported");
                     }
-                }(payload...);
+
+                    curl_easy_setopt(easy, CURLOPT_MIMEPOST, form);
+
+                    connection->defers.push_back([form]() {
+                        curl_mime_free(form);
+                    });
+                } else if constexpr (std::is_same_v<T, nlohmann::json>) {
+                    curl_easy_setopt(
+                            easy,
+                            CURLOPT_COPYPOSTFIELDS,
+                            payload.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str()
+                    );
+
+                    headers = curl_slist_append(headers, "Content-Type: application/json");
+                } else if constexpr (nlohmann::detail::has_to_json<nlohmann::json, T>::value) {
+                    curl_easy_setopt(
+                            easy,
+                            CURLOPT_COPYPOSTFIELDS,
+                            nlohmann::json(payload).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str()
+                    );
+
+                    headers = curl_slist_append(headers, "Content-Type: application/json");
+                } else {
+                    static_assert(!sizeof(T *), "payload type not supported");
+                }
             }
 
             if (headers) {

@@ -90,8 +90,8 @@ int main(int argc, char **argv) {
 
     SSL_CTX_free(ctx);
 
-    event_base_free(base);
     evdns_base_free(dnsBase, 0);
+    event_base_free(base);
 
     return 0;
 }

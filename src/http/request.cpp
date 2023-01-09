@@ -186,7 +186,7 @@ void aio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what, voi
                         &n
                 );
 
-                n = self->recycle();
+                self->recycle();
 
                 if (n > 0 || !self->mTimer->pending())
                     return !*stopped;
@@ -198,7 +198,7 @@ void aio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what, voi
     );
 }
 
-int aio::http::Requests::recycle() {
+void aio::http::Requests::recycle() {
     int n = 0;
 
     while (CURLMsg *msg = curl_multi_info_read(mMulti, &n)) {
@@ -222,8 +222,6 @@ int aio::http::Requests::recycle() {
         curl_multi_remove_handle(mMulti, msg->easy_handle);
         delete connection;
     }
-
-    return n;
 }
 
 aio::http::Options &aio::http::Requests::options() {
