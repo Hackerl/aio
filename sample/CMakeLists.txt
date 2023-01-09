@@ -3,5 +3,8 @@ if (NOT DISABLE_SSL)
     target_link_libraries(aio_ws aio)
 endif ()
 
+add_executable(aio_tcp tcp/main.cpp)
+target_link_libraries(aio_tcp aio)
+
 add_executable(aio_http http/main.cpp)
 target_link_libraries(aio_http aio)
