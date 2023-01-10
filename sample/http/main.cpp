@@ -44,59 +44,60 @@ int main(int argc, char **argv) {
 
     aio::Context context = {base, dnsBase};
 
-    std::shared_ptr requests = std::make_shared<aio::http::Requests>(context);
+    {
+        aio::http::Options options;
 
-    for (const auto &header: headers) {
-        std::vector<std::string> tokens = zero::strings::split(header, "=");
-
-        if (tokens.size() != 2)
-            continue;
-
-        requests->options().headers[tokens[0]] = tokens[1];
-    }
-
-    std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>> promise;
-
-    if (cmdline.getOptional<bool>("json")) {
-        promise = requests->request(method, url, nlohmann::json::parse(body));
-    } else if (cmdline.getOptional<bool>("form")) {
-        std::vector<std::string> parts = zero::strings::split(body, ",");
-
-        std::map<std::string, std::variant<std::string, std::filesystem::path>> data;
-
-        for (const auto &part: parts) {
-            std::vector<std::string> tokens = zero::strings::split(part, "=");
+        for (const auto &header: headers) {
+            std::vector<std::string> tokens = zero::strings::split(header, "=");
 
             if (tokens.size() != 2)
                 continue;
 
-            if (zero::strings::startsWith(tokens[1], "@")) {
-                data[tokens[0]] = std::filesystem::path(tokens[1].substr(1));
-            } else {
-                data[tokens[0]] = tokens[1];
-            }
+            options.headers[tokens[0]] = tokens[1];
         }
 
-        promise = requests->request(method, url, data);
-    } else if (!body.empty()){
-        promise = requests->request(method, url, body);
-    } else {
-        promise = requests->request(method, url);
+        std::shared_ptr requests = std::make_shared<aio::http::Requests>(context);
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>> promise;
+
+        if (cmdline.getOptional<bool>("json")) {
+            promise = requests->request(method, url, options, nlohmann::json::parse(body));
+        } else if (cmdline.getOptional<bool>("form")) {
+            std::vector<std::string> parts = zero::strings::split(body, ",");
+
+            std::map<std::string, std::variant<std::string, std::filesystem::path>> data;
+
+            for (const auto &part: parts) {
+                std::vector<std::string> tokens = zero::strings::split(part, "=");
+
+                if (tokens.size() != 2)
+                    continue;
+
+                if (zero::strings::startsWith(tokens[1], "@")) {
+                    data[tokens[0]] = std::filesystem::path(tokens[1].substr(1));
+                } else {
+                    data[tokens[0]] = tokens[1];
+                }
+            }
+
+            promise = requests->request(method, url, options, data);
+        } else if (!body.empty()) {
+            promise = requests->request(method, url, options, body);
+        } else {
+            promise = requests->request(method, url, options);
+        }
+
+        promise->then([](const std::shared_ptr<aio::http::Response> &response) {
+            return response->string();
+        })->then([](const std::string &content) {
+            LOG_INFO("content: %s", content.c_str());
+        })->fail([](const zero::async::promise::Reason &reason) {
+            LOG_ERROR("%s", reason.message.c_str());
+        })->finally([=]() {
+            event_base_loopbreak(base);
+        });
     }
 
-    promise->then([](const std::shared_ptr<aio::http::Response> &response) {
-        return response->string();
-    })->then([](const std::string &content) {
-        LOG_INFO("content: %s", content.c_str());
-    })->fail([](const zero::async::promise::Reason &reason) {
-        LOG_ERROR("%s", reason.message.c_str());
-    })->finally([=]() {
-        event_base_loopbreak(base);
-    });
-
     event_base_dispatch(base);
-
-    requests.reset();
 
     evdns_base_free(dnsBase, 0);
     event_base_free(base);

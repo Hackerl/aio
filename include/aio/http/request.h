@@ -89,7 +89,7 @@ namespace aio::http {
     public:
         template<typename ...Ts>
         std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
-        request(const std::string &method, const URL &url, Ts ...args) {
+        request(const std::string &method, const URL &url, const std::optional<Options> &options, Ts ...args) {
             CURL *easy = curl_easy_init();
 
             if (!easy)
@@ -177,15 +177,17 @@ namespace aio::http {
             curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(easy, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
 
-            if (!mOptions.proxy.empty())
-                curl_easy_setopt(easy, CURLOPT_PROXY, mOptions.proxy.c_str());
+            Options opt = options.value_or(mOptions);
 
-            if (!mOptions.cookies.empty()) {
+            if (!opt.proxy.empty())
+                curl_easy_setopt(easy, CURLOPT_PROXY, opt.proxy.c_str());
+
+            if (!opt.cookies.empty()) {
                 std::list<std::string> cookies;
 
                 std::transform(
-                        mOptions.cookies.begin(),
-                        mOptions.cookies.end(),
+                        opt.cookies.begin(),
+                        opt.cookies.end(),
                         std::back_inserter(cookies),
                         [](const auto &it) {
                             return it.first + "=" + it.second;
@@ -197,7 +199,7 @@ namespace aio::http {
 
             curl_slist *headers = nullptr;
 
-            for (const auto &[k, v]: mOptions.headers) {
+            for (const auto &[k, v]: opt.headers) {
                 headers = curl_slist_append(headers, zero::strings::format("%s: %s", k.c_str(), v.c_str()).c_str());
             }
 
@@ -316,31 +318,37 @@ namespace aio::http {
             });
         }
 
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> get(const URL &url) {
-            return request("GET", url);
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
+        get(const URL &url, const std::optional<Options> &options = std::nullopt) {
+            return request("GET", url, options);
         }
 
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> head(const URL &url) {
-            return request("HEAD", url);
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
+        head(const URL &url, const std::optional<Options> &options = std::nullopt) {
+            return request("HEAD", url, options);
         }
 
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> del(const URL &url) {
-            return request("DELETE", url);
-        }
-
-        template<typename T>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> post(const URL &url, T payload) {
-            return request("POST", url, payload);
-        }
-
-        template<typename T>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> put(const URL &url, T payload) {
-            return request("PUT", url, payload);
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
+        del(const URL &url, const std::optional<Options> &options = std::nullopt) {
+            return request("DELETE", url, options);
         }
 
         template<typename T>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> patch(const URL &url, T payload) {
-            return request("PATCH", url, payload);
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
+        post(const URL &url, T payload, const std::optional<Options> &options = std::nullopt) {
+            return request("POST", url, options, payload);
+        }
+
+        template<typename T>
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
+        put(const URL &url, T payload, const std::optional<Options> &options = std::nullopt) {
+            return request("PUT", url, options, payload);
+        }
+
+        template<typename T>
+        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
+        patch(const URL &url, T payload, const std::optional<Options> &options = std::nullopt) {
+            return request("PATCH", url, options, payload);
         }
 
     public:

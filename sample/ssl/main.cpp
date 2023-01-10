@@ -1,6 +1,7 @@
 #include <zero/log.h>
 #include <zero/cmdline.h>
-#include <aio/net/stream.h>
+#include <aio/net/ssl.h>
+#include <openssl/err.h>
 #include <event2/dns.h>
 #include <unistd.h>
 #include <csignal>
@@ -20,10 +21,26 @@ int main(int argc, char **argv) {
 
     signal(SIGPIPE, SIG_IGN);
 
+    SSL_CTX *ctx = SSL_CTX_new(SSLv23_method());
+
+    if (!ctx) {
+        LOG_ERROR("new ssl context failed: %s", ERR_error_string(ERR_get_error(), nullptr));
+        return -1;
+    }
+
+    X509_STORE *store = SSL_CTX_get_cert_store(ctx);
+
+    if (X509_STORE_set_default_paths(store) != 1) {
+        LOG_ERROR("set ssl store failed: %s", ERR_error_string(ERR_get_error(), nullptr));
+        SSL_CTX_free(ctx);
+        return -1;
+    }
+
     event_base *base = event_base_new();
 
     if (!base) {
         LOG_ERROR("new event base failed: %s", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+        SSL_CTX_free(ctx);
         return -1;
     }
 
@@ -31,16 +48,17 @@ int main(int argc, char **argv) {
 
     if (!dnsBase) {
         LOG_ERROR("new dns base failed: %s", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+        SSL_CTX_free(ctx);
         event_base_free(base);
         return -1;
     }
 
-    aio::Context context = {base, dnsBase};
+    aio::Context context = {base, dnsBase, ctx};
 
     {
         std::shared_ptr input = std::make_shared<aio::ev::Buffer>(bufferevent_socket_new(base, STDIN_FILENO, 0));
 
-        aio::net::connect(context, host, port)->then([=](const std::shared_ptr<aio::ev::IBuffer> &buffer) {
+        aio::net::ssl::connect(context, host, port)->then([=](const std::shared_ptr<aio::ev::IBuffer> &buffer) {
             return zero::async::promise::all(
                     zero::async::promise::loop<void>([=](const auto &loop) {
                         input->read()->then([=](const std::vector<std::byte> &data) {
@@ -73,6 +91,8 @@ int main(int argc, char **argv) {
     }
 
     event_base_dispatch(base);
+
+    SSL_CTX_free(ctx);
 
     evdns_base_free(dnsBase, 0);
     event_base_free(base);
