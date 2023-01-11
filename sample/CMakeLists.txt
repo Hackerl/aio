@@ -1,4 +1,4 @@
-if (NOT DISABLE_SSL)
+if (NOT AIO_DISABLE_SSL)
     add_executable(aio_ws ws/main.cpp)
     target_link_libraries(aio_ws aio)
 

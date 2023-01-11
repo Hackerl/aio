@@ -3,8 +3,8 @@ project(aio)
 
 set(CMAKE_CXX_STANDARD 17)
 
-option(DISABLE_SSL "disable ssl support" OFF)
-option(DISABLE_SAMPLES "disable aio samples" OFF)
+option(AIO_DISABLE_SSL "disable ssl support" OFF)
+option(AIO_DISABLE_SAMPLES "disable aio samples" OFF)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
@@ -23,7 +23,7 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "disable curl shared library")
 
 set(JSON_BuildTests OFF CACHE BOOL "disable json library tests")
 
-if (DISABLE_SSL)
+if (AIO_DISABLE_SSL)
     set(CURL_ENABLE_SSL OFF CACHE BOOL "disable curl openssl")
     set(EVENT__DISABLE_OPENSSL ON CACHE BOOL "disable event openssl")
 endif ()
@@ -33,7 +33,7 @@ include(FetchContent)
 FetchContent_Declare(
         zero
         GIT_REPOSITORY https://github.com/Hackerl/zero
-        GIT_TAG 87b75a38d931435490e8c5f36382f39c965341c0
+        GIT_TAG c51f1a02dcdeed046d0d99467f62af07209c58f4
 )
 
 FetchContent_MakeAvailable(zero)
@@ -71,8 +71,8 @@ add_library(
         src/net/stream.cpp
         src/http/url.cpp
         src/http/request.cpp
-        $<$<NOT:$<BOOL:${DISABLE_SSL}>>:src/net/ssl.cpp>
-        $<$<NOT:$<BOOL:${DISABLE_SSL}>>:src/http/websocket.cpp>
+        $<$<NOT:$<BOOL:${AIO_DISABLE_SSL}>>:src/net/ssl.cpp>
+        $<$<NOT:$<BOOL:${AIO_DISABLE_SSL}>>:src/http/websocket.cpp>
 )
 
 target_include_directories(aio PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -85,9 +85,9 @@ target_link_libraries(
         event_core_static
         event_extra_static
         $<$<BOOL:$<PLATFORM_ID:Linux>>:event_pthreads_static>
-        $<$<NOT:$<BOOL:${DISABLE_SSL}>>:event_openssl_static>
+        $<$<NOT:$<BOOL:${AIO_DISABLE_SSL}>>:event_openssl_static>
 )
 
-if (NOT DISABLE_SAMPLES)
+if (NOT AIO_DISABLE_SAMPLES)
     add_subdirectory(sample)
 endif ()
