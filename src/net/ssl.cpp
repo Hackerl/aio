@@ -14,6 +14,7 @@ aio::net::ssl::connect(const Context &context, const std::string &host, short po
                 {-1, ERR_error_string(ERR_get_error(), nullptr)}
         );
 
+    SSL_set_tlsext_host_name(ssl, host.c_str());
     SSL_set_hostflags(ssl, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
 
     if (!SSL_set1_host(ssl, host.c_str())) {
