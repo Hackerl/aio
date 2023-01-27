@@ -33,7 +33,7 @@ include(FetchContent)
 FetchContent_Declare(
         zero
         GIT_REPOSITORY https://github.com/Hackerl/zero
-        GIT_TAG b7d725d6685ef9d6a45e083445b10ae616c9f8e7
+        GIT_TAG 912e293242356e3d384c37e39188ce4e1b452092
 )
 
 FetchContent_MakeAvailable(zero)
@@ -64,6 +64,7 @@ FetchContent_MakeAvailable(json)
 
 add_library(
         aio
+        src/context.cpp
         src/ev/buffer.cpp
         src/ev/pipe.cpp
         src/ev/event.cpp

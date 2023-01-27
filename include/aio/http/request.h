@@ -76,7 +76,8 @@ namespace aio::http {
 
     class Requests : public std::enable_shared_from_this<Requests> {
     public:
-        explicit Requests(const Context &context, Options options = {});
+        explicit Requests(const std::shared_ptr<Context> &context);
+        Requests(const std::shared_ptr<Context> &context, Options options);
         ~Requests();
 
     private:
@@ -356,8 +357,8 @@ namespace aio::http {
 
     private:
         CURLM *mMulti;
-        Context mContext;
         Options mOptions;
+        std::shared_ptr<Context> mContext;
         std::shared_ptr<ev::Timer> mTimer;
     };
 }

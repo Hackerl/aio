@@ -249,6 +249,10 @@ void aio::ev::Buffer::onBufferEvent(short what) {
     if (what & BEV_EVENT_EOF) {
         onClose({0, "buffer is closed"});
     } else if (what & BEV_EVENT_ERROR) {
-        onClose({-1, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+        onClose({-1, getError()});
     }
+}
+
+std::string aio::ev::Buffer::getError() {
+    return evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR());
 }

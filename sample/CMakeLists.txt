@@ -2,8 +2,11 @@ if (NOT AIO_DISABLE_SSL)
     add_executable(aio_ws ws/main.cpp)
     target_link_libraries(aio_ws aio)
 
-    add_executable(aio_ssl ssl/main.cpp)
-    target_link_libraries(aio_ssl aio)
+    add_executable(aio_ssl_client ssl/client.cpp)
+    target_link_libraries(aio_ssl_client aio)
+
+    add_executable(aio_ssl_server ssl/server.cpp)
+    target_link_libraries(aio_ssl_server aio)
 endif ()
 
 add_executable(aio_tcp tcp/main.cpp)

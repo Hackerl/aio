@@ -69,7 +69,7 @@ void aio::http::ws::Header::mask(bool mask) {
     mBytes[1] |= MASK_BIT;
 }
 
-aio::http::ws::WebSocket::WebSocket(const Context &context, std::shared_ptr<ev::IBuffer> buffer)
+aio::http::ws::WebSocket::WebSocket(const std::shared_ptr<aio::Context> &context, std::shared_ptr<ev::IBuffer> buffer)
         : mRef(0), mBuffer(std::move(buffer)), mState(CONNECTED), mEvent(std::make_shared<ev::Event>(context, -1)) {
 
 }
@@ -364,7 +364,7 @@ aio::http::ws::WebSocket::pong(const void *buffer, size_t length) {
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::ws::WebSocket>>>
-aio::http::ws::connect(const Context &context, const URL &url) {
+aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &url) {
     std::string scheme = url.scheme();
     std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<ev::IBuffer>>> promise;
 

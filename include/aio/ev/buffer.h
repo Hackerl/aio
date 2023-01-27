@@ -51,6 +51,9 @@ namespace aio::ev {
         void onBufferWrite();
         void onBufferEvent(short what);
 
+    private:
+        virtual std::string getError();
+
     protected:
         bufferevent *mBev;
 

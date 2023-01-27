@@ -1,8 +1,8 @@
 #include <aio/ev/event.h>
 
-aio::ev::Event::Event(const Context &context, evutil_socket_t fd) {
+aio::ev::Event::Event(const std::shared_ptr<Context> &context, evutil_socket_t fd) {
     mEvent = event_new(
-            context.base,
+            context->base(),
             fd,
             0,
             [](evutil_socket_t fd, short what, void *arg) {

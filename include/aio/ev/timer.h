@@ -8,7 +8,7 @@
 namespace aio::ev {
     class Timer : public std::enable_shared_from_this<Timer> {
     public:
-        explicit Timer(const Context &context);
+        explicit Timer(const std::shared_ptr<Context> &context);
         ~Timer();
 
     public:

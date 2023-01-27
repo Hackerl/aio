@@ -1,6 +1,6 @@
 #include <zero/log.h>
 #include <zero/cmdline.h>
-#include <aio/net/stream.h>
+#include <aio/net/ssl.h>
 #include <unistd.h>
 #include <csignal>
 
@@ -9,13 +9,25 @@ int main(int argc, char **argv) {
 
     zero::Cmdline cmdline;
 
-    cmdline.add<std::string>("host", "remote host");
-    cmdline.add<short>("port", "remote port");
+    cmdline.add<std::string>("host", "listen host");
+    cmdline.add<short>("port", "listen port");
+
+    cmdline.addOptional("insecure", 'k', "skip verify client cert");
+
+    cmdline.addOptional<std::filesystem::path>("ca", '\0', "CA cert path");
+    cmdline.addOptional<std::filesystem::path>("cert", '\0', "cert path");
+    cmdline.addOptional<std::filesystem::path>("key", '\0', "private key path");
 
     cmdline.parse(argc, argv);
 
     auto host = cmdline.get<std::string>("host");
     auto port = cmdline.get<short>("port");
+
+    auto ca = cmdline.getOptional<std::filesystem::path>("ca");
+    auto cert = cmdline.getOptional<std::filesystem::path>("cert");
+    auto privateKey = cmdline.getOptional<std::filesystem::path>("key");
+
+    bool insecure = cmdline.exist("insecure");
 
     signal(SIGPIPE, SIG_IGN);
 
@@ -25,8 +37,25 @@ int main(int argc, char **argv) {
         return -1;
 
     std::shared_ptr input = std::make_shared<aio::ev::Buffer>(bufferevent_socket_new(context->base(), STDIN_FILENO, 0));
+    std::shared_ptr ctx = aio::net::ssl::newContext(
+            aio::net::ssl::Config{
+                    .ca = ca,
+                    .cert = cert,
+                    .privateKey = privateKey,
+                    .insecure = insecure,
+                    .server = true
+            }
+    );
 
-    aio::net::connect(context, host, port)->then([=](const std::shared_ptr<aio::ev::IBuffer> &buffer) {
+    if (!ctx)
+        return -1;
+
+    std::shared_ptr<aio::net::ssl::Listener> listener = aio::net::ssl::listen(context, host, port, ctx);
+
+    if (!listener)
+        return -1;
+
+    listener->accept()->then([=](const std::shared_ptr<aio::ev::IBuffer> &buffer) {
         return zero::async::promise::all(
                 zero::async::promise::loop<void>([=](const auto &loop) {
                     input->read()->then([=](const std::vector<std::byte> &data) {

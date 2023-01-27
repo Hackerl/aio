@@ -9,7 +9,7 @@
 namespace aio::ev {
     class Event : public std::enable_shared_from_this<Event> {
     public:
-        explicit Event(const Context &context, evutil_socket_t fd);
+        explicit Event(const std::shared_ptr<Context> &context, evutil_socket_t fd);
         ~Event();
 
     public:

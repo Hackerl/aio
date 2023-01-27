@@ -8,7 +8,7 @@
 namespace aio::net {
     class Listener : public std::enable_shared_from_this<Listener> {
     public:
-        explicit Listener(const Context &context, evconnlistener *listener);
+        explicit Listener(std::shared_ptr<Context> context, evconnlistener *listener);
         ~Listener();
 
     public:
@@ -16,21 +16,21 @@ namespace aio::net {
         void close();
 
     private:
-        Context mContext;
         evconnlistener *mListener;
+        std::shared_ptr<Context> mContext;
         std::shared_ptr<zero::async::promise::Promise<evutil_socket_t>> mPromise;
     };
 
-    std::shared_ptr<Listener> listen(const Context &context, const std::string &host, short port);
+    std::shared_ptr<Listener> listen(const std::shared_ptr<Context> &context, const std::string &host, short port);
 
     std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<ev::IBuffer>>>
-    connect(const Context &context, const std::string &host, short port);
+    connect(const std::shared_ptr<Context> &context, const std::string &host, short port);
 
 #ifdef __unix__
-    std::shared_ptr<Listener> listen(const Context &context, const std::string &path);
+    std::shared_ptr<Listener> listen(const std::shared_ptr<Context> &context, const std::string &path);
 
     std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<ev::IBuffer>>>
-    connect(const Context &context, const std::string &path);
+    connect(const std::shared_ptr<Context> &context, const std::string &path);
 #endif
 }
 

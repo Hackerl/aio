@@ -1,7 +1,6 @@
 #include <zero/log.h>
 #include <zero/cmdline.h>
 #include <aio/http/request.h>
-#include <event2/dns.h>
 #include <csignal>
 
 int main(int argc, char **argv) {
@@ -27,27 +26,15 @@ int main(int argc, char **argv) {
 
     signal(SIGPIPE, SIG_IGN);
 
-    event_base *base = event_base_new();
+    std::shared_ptr context = aio::newContext();
 
-    if (!base) {
-        LOG_ERROR("new event base failed: %s", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+    if (!context)
         return -1;
-    }
 
-    evdns_base *dnsBase = evdns_base_new(base, EVDNS_BASE_INITIALIZE_NAMESERVERS);
+    aio::http::Options options;
 
-    if (!dnsBase) {
-        LOG_ERROR("new dns base failed: %s", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
-        event_base_free(base);
-        return -1;
-    }
-
-    aio::Context context = {base, dnsBase};
-
-    {
-        aio::http::Options options;
-
-        for (const auto &header: headers) {
+    if (headers) {
+        for (const auto &header: *headers) {
             std::vector<std::string> tokens = zero::strings::split(header, "=");
 
             if (tokens.size() != 2)
@@ -55,18 +42,18 @@ int main(int argc, char **argv) {
 
             options.headers[tokens[0]] = tokens[1];
         }
+    }
 
-        std::shared_ptr requests = std::make_shared<aio::http::Requests>(context);
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>> promise;
+    std::shared_ptr requests = std::make_shared<aio::http::Requests>(context);
+    std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>> promise;
 
-        if (cmdline.getOptional<bool>("json")) {
-            promise = requests->request(method, url, options, nlohmann::json::parse(body));
-        } else if (cmdline.getOptional<bool>("form")) {
-            std::vector<std::string> parts = zero::strings::split(body, ",");
-
+    if (body) {
+        if (cmdline.exist("json")) {
+            promise = requests->request(*method, url, options, nlohmann::json::parse(*body));
+        } else if (cmdline.exist("form")) {
             std::map<std::string, std::variant<std::string, std::filesystem::path>> data;
 
-            for (const auto &part: parts) {
+            for (const auto &part: zero::strings::split(*body, ",")) {
                 std::vector<std::string> tokens = zero::strings::split(part, "=");
 
                 if (tokens.size() != 2)
@@ -79,28 +66,25 @@ int main(int argc, char **argv) {
                 }
             }
 
-            promise = requests->request(method, url, options, data);
-        } else if (!body.empty()) {
-            promise = requests->request(method, url, options, body);
+            promise = requests->request(*method, url, options, data);
         } else {
-            promise = requests->request(method, url, options);
+            promise = requests->request(*method, url, options, *body);
         }
-
-        promise->then([](const std::shared_ptr<aio::http::Response> &response) {
-            return response->string();
-        })->then([](const std::string &content) {
-            LOG_INFO("content: %s", content.c_str());
-        })->fail([](const zero::async::promise::Reason &reason) {
-            LOG_ERROR("%s", reason.message.c_str());
-        })->finally([=]() {
-            event_base_loopbreak(base);
-        });
+    } else {
+        promise = requests->request(*method, url, options);
     }
 
-    event_base_dispatch(base);
+    promise->then([](const std::shared_ptr<aio::http::Response> &response) {
+        return response->string();
+    })->then([](const std::string &content) {
+        LOG_INFO("content: %s", content.c_str());
+    })->fail([](const zero::async::promise::Reason &reason) {
+        LOG_ERROR("%s", reason.message.c_str());
+    })->finally([=]() {
+        context->loopBreak();
+    });
 
-    evdns_base_free(dnsBase, 0);
-    event_base_free(base);
+    context->dispatch();
 
     return 0;
 }

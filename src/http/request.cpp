@@ -2,7 +2,8 @@
 #include <aio/io.h>
 #include <aio/ev/event.h>
 
-aio::http::Response::Response(CURL *easy, std::shared_ptr<ev::IBuffer> buffer) : mEasy(easy), mBuffer(std::move(buffer)) {
+aio::http::Response::Response(CURL *easy, std::shared_ptr<ev::IBuffer> buffer)
+        : mEasy(easy), mBuffer(std::move(buffer)) {
 
 }
 
@@ -85,11 +86,11 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response:
 
     if (length > 0)
         return read(length)->then([](const std::vector<std::byte> &buffer) -> std::string {
-            return {(const char *)buffer.data(), buffer.size()};
+            return {(const char *) buffer.data(), buffer.size()};
         });
 
     return readAll(this)->then([](const std::vector<std::byte> &buffer) -> std::string {
-        return {(const char *)buffer.data(), buffer.size()};
+        return {(const char *) buffer.data(), buffer.size()};
     });
 }
 
@@ -107,16 +108,24 @@ void aio::http::Response::setError(const char *error) {
     mError = error;
 }
 
-aio::http::Requests::Requests(const Context &context, Options options) : mContext(context), mOptions(std::move(options)), mTimer(std::make_shared<ev::Timer>(context)) {
+aio::http::Requests::Requests(const std::shared_ptr<Context> &context) : Requests(context, Options{}) {
+
+}
+
+aio::http::Requests::Requests(const std::shared_ptr<Context> &context, Options options)
+        : mContext(context), mOptions(std::move(options)), mTimer(std::make_shared<ev::Timer>(context)) {
     mMulti = curl_multi_init();
 
     curl_multi_setopt(
             mMulti,
             CURLMOPT_SOCKETFUNCTION,
-            static_cast<int (*)(CURL *, curl_socket_t, int, void *, void *)>([](CURL *easy, curl_socket_t s, int what, void *userdata, void *data) {
-                static_cast<Requests *>(userdata)->onCURLEvent(easy, s, what, data);
-                return 0;
-            })
+            static_cast<int (*)(CURL *, curl_socket_t, int, void *, void *)>(
+                    [](CURL *easy, curl_socket_t s, int what,
+                       void *userdata, void *data) {
+                        static_cast<Requests *>(userdata)->onCURLEvent(easy, s, what, data);
+                        return 0;
+                    }
+            )
     );
 
     curl_multi_setopt(mMulti, CURLMOPT_SOCKETDATA, this);
