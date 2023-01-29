@@ -18,7 +18,7 @@ std::string aio::net::ssl::getError(unsigned long e) {
 }
 
 std::shared_ptr<aio::net::ssl::Context> aio::net::ssl::newContext(const Config &config) {
-    std::shared_ptr ctx = std::shared_ptr<Context>(
+    std::shared_ptr<Context> ctx = std::shared_ptr<Context>(
             SSL_CTX_new(TLS_method()),
             [](Context *context) {
                 SSL_CTX_free(context);

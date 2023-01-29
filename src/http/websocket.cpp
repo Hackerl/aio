@@ -105,7 +105,7 @@ aio::http::ws::WebSocket::readFrame() {
 std::shared_ptr<zero::async::promise::Promise<aio::http::ws::InternalMessage>> aio::http::ws::WebSocket::readMessage() {
     return readFrame()->then([=](const Header &header, const std::vector<std::byte> &buffer) {
         if (!header.final()) {
-            std::shared_ptr fragments = std::make_shared<std::vector<std::byte>>(buffer);
+            std::shared_ptr<std::vector<std::byte>> fragments = std::make_shared<std::vector<std::byte>>(buffer);
 
             return zero::async::promise::loop<InternalMessage>(
                     [opcode = header.opcode(), fragments, this](const auto &loop) {
@@ -176,7 +176,7 @@ aio::http::ws::WebSocket::writeMessage(const InternalMessage &message) {
 
     mBuffer->write(maskingKey, MASKING_KEY_LENGTH);
 
-    std::unique_ptr buffer = std::make_unique<std::byte[]>(length);
+    std::unique_ptr<std::byte[]> buffer = std::make_unique<std::byte[]>(length);
 
     for (size_t i = 0; i < length; i++) {
         buffer[i] = message.data[i] ^ maskingKey[i % 4];
@@ -439,7 +439,7 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
 
             return zero::async::promise::resolve<void>();
         })->then([=]() {
-            std::shared_ptr headers = std::make_shared<std::map<std::string, std::string>>();
+            std::shared_ptr<std::map<std::string, std::string>> headers = std::make_shared<std::map<std::string, std::string>>();
 
             return zero::async::promise::loop<std::shared_ptr<WebSocket>>([=](const auto &loop) {
                 buffer->readLine(EVBUFFER_EOL_CRLF)->then([=](const std::string &line) {

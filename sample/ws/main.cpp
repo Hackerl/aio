@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
 
     signal(SIGPIPE, SIG_IGN);
 
-    std::shared_ptr context = aio::newContext();
+    std::shared_ptr<aio::Context> context = aio::newContext();
 
     if (!context)
         return -1;

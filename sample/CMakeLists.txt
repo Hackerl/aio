@@ -9,8 +9,11 @@ if (NOT AIO_DISABLE_SSL)
     target_link_libraries(aio_ssl_server aio)
 endif ()
 
-add_executable(aio_tcp tcp/main.cpp)
-target_link_libraries(aio_tcp aio)
+add_executable(aio_tcp_client tcp/client.cpp)
+target_link_libraries(aio_tcp_client aio)
+
+add_executable(aio_tcp_server tcp/server.cpp)
+target_link_libraries(aio_tcp_server aio)
 
 add_executable(aio_http http/main.cpp)
 target_link_libraries(aio_http aio)

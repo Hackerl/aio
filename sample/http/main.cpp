@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
 
     signal(SIGPIPE, SIG_IGN);
 
-    std::shared_ptr context = aio::newContext();
+    std::shared_ptr<aio::Context> context = aio::newContext();
 
     if (!context)
         return -1;
@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    std::shared_ptr requests = std::make_shared<aio::http::Requests>(context);
+    std::shared_ptr<aio::http::Requests> requests = std::make_shared<aio::http::Requests>(context);
     std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>> promise;
 
     if (body) {

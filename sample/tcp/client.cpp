@@ -19,12 +19,14 @@ int main(int argc, char **argv) {
 
     signal(SIGPIPE, SIG_IGN);
 
-    std::shared_ptr context = aio::newContext();
+    std::shared_ptr<aio::Context> context = aio::newContext();
 
     if (!context)
         return -1;
 
-    std::shared_ptr input = std::make_shared<aio::ev::Buffer>(bufferevent_socket_new(context->base(), STDIN_FILENO, 0));
+    std::shared_ptr<aio::ev::Buffer> input = std::make_shared<aio::ev::Buffer>(
+            bufferevent_socket_new(context->base(), STDIN_FILENO, 0)
+    );
 
     aio::net::connect(context, host, port)->then([=](const std::shared_ptr<aio::ev::IBuffer> &buffer) {
         return zero::async::promise::all(
