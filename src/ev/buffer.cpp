@@ -1,5 +1,6 @@
 #include <aio/ev/buffer.h>
 #include <zero/log.h>
+#include <optional>
 
 constexpr auto READ = 0;
 constexpr auto DRAIN = 1;
@@ -180,6 +181,28 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::drain() {
     });
 }
 
+void aio::ev::Buffer::setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) {
+    std::optional<timeval> rtv, wtv;
+
+    if (readTimeout != std::chrono::milliseconds::zero())
+        rtv = timeval{
+                readTimeout.count() / 1000,
+                (readTimeout.count() % 1000) * 1000
+        };
+
+    if (writeTimeout != std::chrono::milliseconds::zero())
+        wtv = timeval{
+                writeTimeout.count() / 1000,
+                (writeTimeout.count() % 1000) * 1000
+        };
+
+    bufferevent_set_timeouts(
+            mBev,
+            rtv ? &*rtv : nullptr,
+            wtv ? &*wtv : nullptr
+    );
+}
+
 void aio::ev::Buffer::close() {
     if (mClosed)
         return;
@@ -207,6 +230,7 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::waitClosed
     return zero::async::promise::chain<void>([=](const auto &p) {
         mPromise[WAIT_CLOSED] = p;
         bufferevent_enable(mBev, EV_READ);
+        bufferevent_set_timeouts(mBev, nullptr, nullptr);
     })->finally([self = shared_from_this()]() {
         self->mPromise[WAIT_CLOSED].reset();
     });
@@ -250,6 +274,14 @@ void aio::ev::Buffer::onBufferEvent(short what) {
         onClose({0, "buffer is closed"});
     } else if (what & BEV_EVENT_ERROR) {
         onClose({-1, getError()});
+    } else if (what & BEV_EVENT_TIMEOUT) {
+        if (what & BEV_EVENT_READING) {
+            if (mPromise[READ])
+                std::shared_ptr(mPromise[READ])->reject({-1, "reading timed out"});
+        } else {
+            if (mPromise[DRAIN])
+                std::shared_ptr(mPromise[DRAIN])->reject({-1, "writing timed out"});
+        }
     }
 }
 

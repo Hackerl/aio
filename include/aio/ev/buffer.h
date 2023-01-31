@@ -1,6 +1,7 @@
 #ifndef AIO_BUFFER_H
 #define AIO_BUFFER_H
 
+#include <chrono>
 #include <event.h>
 #include <zero/interface.h>
 #include <zero/async/promise.h>
@@ -16,6 +17,9 @@ namespace aio::ev {
         virtual size_t write(std::string_view str) = 0;
         virtual size_t write(const void *buffer, size_t n) = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> drain() = 0;
+
+    public:
+        virtual void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) = 0;
 
     public:
         virtual void close() = 0;
@@ -37,6 +41,9 @@ namespace aio::ev {
         size_t write(std::string_view str) override;
         size_t write(const void *buffer, size_t n) override;
         std::shared_ptr<zero::async::promise::Promise<void>> drain() override;
+
+    public:
+        void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
 
     public:
         void close() override;
