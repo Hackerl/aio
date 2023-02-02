@@ -9,6 +9,7 @@ namespace aio::http {
     class URL {
     public:
         URL();
+        explicit URL(CURLU *url);
         URL(const char *url);
         URL(const std::string &url);
         URL(const URL &rhs);
@@ -20,23 +21,23 @@ namespace aio::http {
         URL &operator=(URL &&rhs) noexcept;
 
     public:
-        [[nodiscard]] std::string string() const;
-        [[nodiscard]] std::string scheme() const;
-        [[nodiscard]] std::string user() const;
-        [[nodiscard]] std::string password() const;
-        [[nodiscard]] std::string host() const;
-        [[nodiscard]] std::string path() const;
-        [[nodiscard]] std::string query() const;
-        [[nodiscard]] short port() const;
+        [[nodiscard]] std::optional<std::string> string() const;
+        [[nodiscard]] std::optional<std::string> scheme() const;
+        [[nodiscard]] std::optional<std::string> user() const;
+        [[nodiscard]] std::optional<std::string> password() const;
+        [[nodiscard]] std::optional<std::string> host() const;
+        [[nodiscard]] std::optional<std::string> path() const;
+        [[nodiscard]] std::optional<std::string> query() const;
+        [[nodiscard]] std::optional<short> port() const;
 
     public:
-        URL &scheme(const std::string &scheme);
-        URL &user(const std::string &user);
-        URL &password(const std::string &password);
-        URL &host(const std::string &host);
-        URL &path(const std::string &path);
-        URL &query(const std::string &query);
-        URL &port(short port);
+        URL &scheme(const std::optional<std::string> &scheme);
+        URL &user(const std::optional<std::string> &user);
+        URL &password(const std::optional<std::string> &password);
+        URL &host(const std::optional<std::string> &host);
+        URL &path(const std::optional<std::string> &path);
+        URL &query(const std::optional<std::string> &query);
+        URL &port(std::optional<short> port);
 
     public:
         URL &appendQuery(const std::string &query);
@@ -77,7 +78,7 @@ namespace aio::http {
                 static_assert(!sizeof(T *), "path type not supported");
             }
 
-            std::string parent = path();
+            std::string parent = path().value_or("/");
 
             if (parent.back() != '/') {
                 path(parent + '/' + subPath);
@@ -91,6 +92,9 @@ namespace aio::http {
     private:
         CURLU *mURL;
     };
+
+    bool convert(std::string_view input, URL &url);
+    std::optional<URL> parseURL(const std::string &input);
 }
 
 #endif //AIO_URL_H

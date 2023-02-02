@@ -91,6 +91,11 @@ namespace aio::http {
         template<typename ...Ts>
         std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
         request(const std::string &method, const URL &url, const std::optional<Options> &options, Ts ...args) {
+            std::optional<std::string> u = url.string();
+
+            if (!u)
+                return zero::async::promise::reject<std::shared_ptr<Response>>({-1, "invalid url"});
+
             CURL *easy = curl_easy_init();
 
             if (!easy)
@@ -114,7 +119,7 @@ namespace aio::http {
                 curl_easy_setopt(easy, CURLOPT_CUSTOMREQUEST, method.c_str());
             }
 
-            curl_easy_setopt(easy, CURLOPT_URL, url.string().c_str());
+            curl_easy_setopt(easy, CURLOPT_URL, u->c_str());
             curl_easy_setopt(easy, CURLOPT_COOKIEFILE, "");
 
             curl_easy_setopt(

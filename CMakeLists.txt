@@ -4,6 +4,7 @@ project(aio)
 set(CMAKE_CXX_STANDARD 17)
 
 option(AIO_DISABLE_SSL "disable ssl support" OFF)
+option(AIO_DISABLE_TESTS "disable aio unit test" OFF)
 option(AIO_DISABLE_SAMPLES "disable aio samples" OFF)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
@@ -33,7 +34,7 @@ include(FetchContent)
 FetchContent_Declare(
         zero
         GIT_REPOSITORY https://github.com/Hackerl/zero
-        GIT_TAG f303ada29c1db3ba2b832ae547fa244c235b7775
+        GIT_TAG 80a6c7a972bb8f049db1815fe6bbd396be6ca531
 )
 
 FetchContent_MakeAvailable(zero)
@@ -91,4 +92,8 @@ target_link_libraries(
 
 if (NOT AIO_DISABLE_SAMPLES)
     add_subdirectory(sample)
+endif ()
+
+if (NOT AIO_DISABLE_TESTS)
+    add_subdirectory(test)
 endif ()

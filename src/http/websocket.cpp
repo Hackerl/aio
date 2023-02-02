@@ -365,13 +365,19 @@ aio::http::ws::WebSocket::pong(const void *buffer, size_t length) {
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::ws::WebSocket>>>
 aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &url) {
-    std::string scheme = url.scheme();
+    std::optional<std::string> scheme = url.scheme();
+    std::optional<std::string> host = url.host();
+    std::optional<short> port = url.port();
+
+    if (!scheme || !host || !port)
+        return zero::async::promise::reject<std::shared_ptr<WebSocket>>({-1, "invalid url"});
+
     std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<ev::IBuffer>>> promise;
 
-    if (scheme == WS_SCHEME) {
-        promise = net::connect(context, url.host(), url.port());
+    if (*scheme == WS_SCHEME) {
+        promise = net::connect(context, *host, *port);
     } else if (scheme == WS_SECURE_SCHEME) {
-        promise = net::ssl::connect(context, url.host(), url.port());
+        promise = net::ssl::connect(context, *host, *port);
     } else {
         return zero::async::promise::reject<std::shared_ptr<WebSocket>>({-1, "unsupported scheme"});
     }
@@ -386,12 +392,17 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
 
         std::string key = zero::encoding::base64::encode(secret, sizeof(secret));
 
-        buffer->write(zero::strings::format(
-                "GET %s HTTP/1.1\r\n",
-                (url.query().empty() ? url.path().c_str() : (url.path() + "?" + url.query()).c_str())
-        ));
+        std::optional<std::string> path = url.path();
+        std::optional<std::string> query = url.query();
 
-        buffer->write(zero::strings::format("Host: %s:%hd\r\n", url.host().c_str(), url.port()));
+        buffer->write(
+                zero::strings::format(
+                        "GET %s HTTP/1.1\r\n",
+                        (query ? path.value_or("/") : (*path + "?" + *query)).c_str()
+                )
+        );
+
+        buffer->write(zero::strings::format("Host: %s:%hd\r\n", host->c_str(), *port));
         buffer->write("Upgrade: websocket\r\n");
         buffer->write("Connection: upgrade\r\n");
         buffer->write(zero::strings::format(
@@ -402,9 +413,9 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
         buffer->write("Sec-WebSocket-Version: 13\r\n");
         buffer->write(zero::strings::format(
                 "Origin: %s://%s:%hd\r\n",
-                url.scheme().c_str(),
-                url.host().c_str(),
-                url.port()
+                scheme->c_str(),
+                host->c_str(),
+                *port
         ));
 
         buffer->write("\r\n");
