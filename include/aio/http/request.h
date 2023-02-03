@@ -157,8 +157,7 @@ namespace aio::http {
                     easy,
                     CURLOPT_WRITEFUNCTION,
                     static_cast<size_t (*)(char *, size_t, size_t, void *)>(
-                            [](char *buffer, size_t size, size_t n,
-                               void *userdata) -> size_t {
+                            [](char *buffer, size_t size, size_t n, void *userdata) -> size_t {
                                 auto connection = (Connection *) userdata;
 
                                 if (connection->buffer->write(buffer, size * n) < 1024 * 1024)

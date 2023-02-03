@@ -16,10 +16,10 @@ TEST_CASE("buffer pipe", "[pipe]") {
                 buffers[0]->drain()->then([=]() {
                     return buffers[0]->read(11);
                 })->then([](const std::vector<std::byte> &data) {
-                    REQUIRE(std::string{(const char *) data.data(), data.size()} == "world hello");
+                    REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "world hello");
                 }),
                 buffers[1]->read(11)->then([=](const std::vector<std::byte> &data) {
-                    REQUIRE(std::string{(const char *) data.data(), data.size()} == "hello world");
+                    REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "hello world");
                     buffers[1]->write("world hello");
                     return buffers[1]->drain();
                 })
@@ -35,12 +35,12 @@ TEST_CASE("buffer pipe", "[pipe]") {
         buffers[0]->drain()->then([=]() {
             return buffers[0]->read(11);
         })->then([=](const std::vector<std::byte> &data) {
-            REQUIRE(std::string{(const char *) data.data(), data.size()} == "world hello");
+            REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "world hello");
             buffers[0]->close();
         });
 
         buffers[1]->read(11)->then([=](const std::vector<std::byte> &data) {
-            REQUIRE(std::string{(const char *) data.data(), data.size()} == "hello world");
+            REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "hello world");
             buffers[1]->write("world hello");
             return buffers[1]->drain();
         })->then([=]() {
@@ -62,12 +62,12 @@ TEST_CASE("buffer pipe", "[pipe]") {
         buffers[0]->drain()->then([=]() {
             return buffers[0]->read(11);
         })->then([=](const std::vector<std::byte> &data) {
-            REQUIRE(std::string{(const char *) data.data(), data.size()} == "world hello");
+            REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "world hello");
             buffers[0]->throws("error occurred");
         });
 
         buffers[1]->read(11)->then([=](const std::vector<std::byte> &data) {
-            REQUIRE(std::string{(const char *) data.data(), data.size()} == "hello world");
+            REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "hello world");
             buffers[1]->write("world hello");
             return buffers[1]->drain();
         })->then([=]() {

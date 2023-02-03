@@ -392,13 +392,13 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
 
         std::string key = zero::encoding::base64::encode(secret, sizeof(secret));
 
-        std::optional<std::string> path = url.path();
+        std::string path = url.path().value_or("/");
         std::optional<std::string> query = url.query();
 
         buffer->write(
                 zero::strings::format(
                         "GET %s HTTP/1.1\r\n",
-                        (query ? path.value_or("/") : (*path + "?" + *query)).c_str()
+                        (!query ? path : (path + "?" + *query)).c_str()
                 )
         );
 
