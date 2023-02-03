@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
         return zero::async::promise::all(
                 zero::async::promise::loop<void>([=](const auto &loop) {
                     input->read()->then([=](const std::vector<std::byte> &data) {
-                        buffer->write(data.data(), data.size());
+                        buffer->write(data);
                         return buffer->drain();
                     })->then([=]() {
                         P_CONTINUE(loop);

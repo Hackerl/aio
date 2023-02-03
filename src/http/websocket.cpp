@@ -76,8 +76,8 @@ aio::http::ws::WebSocket::WebSocket(const std::shared_ptr<aio::Context> &context
 
 std::shared_ptr<zero::async::promise::Promise<std::tuple<aio::http::ws::Header, std::vector<std::byte>>>>
 aio::http::ws::WebSocket::readFrame() {
-    return mBuffer->read(sizeof(Header))->then([=](const std::vector<std::byte> &buffer) {
-        auto header = *(Header *) buffer.data();
+    return mBuffer->read(sizeof(Header))->then([=](const std::vector<std::byte> &data) {
+        auto header = *(Header *) data.data();
 
         if (header.mask())
             return zero::async::promise::reject<std::tuple<Header, std::vector<std::byte>>>(
@@ -87,30 +87,30 @@ aio::http::ws::WebSocket::readFrame() {
         if (header.length() >= TWO_BYTE_PAYLOAD_LENGTH) {
             size_t extendedBytes = header.length() == EIGHT_BYTE_PAYLOAD_LENGTH ? 8 : 2;
 
-            return mBuffer->read(extendedBytes)->then([=](const std::vector<std::byte> &buffer) {
+            return mBuffer->read(extendedBytes)->then([=](const std::vector<std::byte> &data) {
                 return mBuffer->read(
-                        extendedBytes == 2 ? ntohs(*(uint16_t *) buffer.data()) : be64toh(*(uint64_t *) buffer.data())
+                        extendedBytes == 2 ? ntohs(*(uint16_t *) data.data()) : be64toh(*(uint64_t *) data.data())
                 );
-            })->then([=](const std::vector<std::byte> &buffer) {
-                return std::tuple<Header, std::vector<std::byte>>{header, buffer};
+            })->then([=](const std::vector<std::byte> &data) {
+                return std::tuple<Header, std::vector<std::byte>>{header, data};
             });
         }
 
-        return mBuffer->read(header.length())->then([=](const std::vector<std::byte> &buffer) {
-            return std::tuple<Header, std::vector<std::byte>>{header, buffer};
+        return mBuffer->read(header.length())->then([=](const std::vector<std::byte> &data) {
+            return std::tuple<Header, std::vector<std::byte>>{header, data};
         });
     });
 }
 
 std::shared_ptr<zero::async::promise::Promise<aio::http::ws::InternalMessage>> aio::http::ws::WebSocket::readMessage() {
-    return readFrame()->then([=](const Header &header, const std::vector<std::byte> &buffer) {
+    return readFrame()->then([=](const Header &header, const std::vector<std::byte> &data) {
         if (!header.final()) {
-            std::shared_ptr<std::vector<std::byte>> fragments = std::make_shared<std::vector<std::byte>>(buffer);
+            std::shared_ptr<std::vector<std::byte>> fragments = std::make_shared<std::vector<std::byte>>(data);
 
             return zero::async::promise::loop<InternalMessage>(
                     [opcode = header.opcode(), fragments, this](const auto &loop) {
-                        readFrame()->then([=](const Header &header, const std::vector<std::byte> &buffer) {
-                            fragments->insert(fragments->end(), buffer.begin(), buffer.end());
+                        readFrame()->then([=](const Header &header, const std::vector<std::byte> &data) {
+                            fragments->insert(fragments->end(), data.begin(), data.end());
 
                             if (!header.final()) {
                                 P_CONTINUE(loop);
@@ -124,7 +124,7 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::InternalMessage>> a
                     });
         }
 
-        return zero::async::promise::resolve<InternalMessage>(InternalMessage{header.opcode(), buffer});
+        return zero::async::promise::resolve<InternalMessage>(InternalMessage{header.opcode(), data});
     });
 }
 

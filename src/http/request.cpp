@@ -18,19 +18,20 @@ long aio::http::Response::statusCode() {
     return status;
 }
 
-long aio::http::Response::contentLength() {
+std::optional<long> aio::http::Response::contentLength() {
     curl_off_t length;
-    curl_easy_getinfo(mEasy, CURLINFO_CONTENT_LENGTH_DOWNLOAD_T, &length);
+
+    if (curl_easy_getinfo(mEasy, CURLINFO_CONTENT_LENGTH_DOWNLOAD_T, &length) != CURLE_OK || length < 0)
+        return std::nullopt;
 
     return length;
 }
 
-std::string aio::http::Response::contentType() {
+std::optional<std::string> aio::http::Response::contentType() {
     char *type = nullptr;
-    curl_easy_getinfo(mEasy, CURLINFO_CONTENT_TYPE, &type);
 
-    if (!type)
-        return "";
+    if (curl_easy_getinfo(mEasy, CURLINFO_CONTENT_TYPE, &type) != CURLE_OK || !type)
+        return std::nullopt;
 
     return type;
 }
@@ -55,42 +56,27 @@ std::map<std::string, std::string> &aio::http::Response::headers() {
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::http::Response::read() {
-    return mBuffer->read()->fail([self = shared_from_this()](const zero::async::promise::Reason &reason) {
-        if (self->mError.empty())
-            return zero::async::promise::reject<std::vector<std::byte>>(reason);
-
-        return zero::async::promise::reject<std::vector<std::byte>>({-1, self->mError});
-    });
+    return mBuffer->read();
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::http::Response::read(size_t n) {
-    return mBuffer->read(n)->fail([self = shared_from_this()](const zero::async::promise::Reason &reason) {
-        if (self->mError.empty())
-            return zero::async::promise::reject<std::vector<std::byte>>(reason);
-
-        return zero::async::promise::reject<std::vector<std::byte>>({-1, self->mError});
-    });
+    return mBuffer->read(n);
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::readLine(evbuffer_eol_style style) {
-    return mBuffer->readLine(style)->fail([self = shared_from_this()](const zero::async::promise::Reason &reason) {
-        if (self->mError.empty())
-            return zero::async::promise::reject<std::string>(reason);
-
-        return zero::async::promise::reject<std::string>({-1, self->mError});
-    });
+    return mBuffer->readLine(style);
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::string() {
-    long length = contentLength();
+    std::optional<long> length = contentLength();
 
-    if (length > 0)
-        return read(length)->then([](const std::vector<std::byte> &buffer) -> std::string {
-            return {(const char *) buffer.data(), buffer.size()};
+    if (length)
+        return read(*length)->then([](const std::vector<std::byte> &data) {
+            return std::string{(const char *) data.data(), data.size()};
         });
 
-    return readAll(this)->then([](const std::vector<std::byte> &buffer) -> std::string {
-        return {(const char *) buffer.data(), buffer.size()};
+    return readAll(shared_from_this())->then([](const std::vector<std::byte> &data) {
+        return std::string{(const char *) data.data(), data.size()};
     });
 }
 
@@ -102,10 +88,6 @@ std::shared_ptr<zero::async::promise::Promise<nlohmann::json>> aio::http::Respon
             return zero::async::promise::reject<nlohmann::json>({-1, e.what()});
         }
     });
-}
-
-void aio::http::Response::setError(const char *error) {
-    mError = error;
 }
 
 aio::http::Requests::Requests(const std::shared_ptr<Context> &context) : Requests(context, Options{}) {
@@ -221,8 +203,7 @@ void aio::http::Requests::recycle() {
             if (!connection->transferring) {
                 connection->promise->reject({-1, connection->error});
             } else {
-                connection->response->setError(connection->error);
-                connection->buffer->close();
+                connection->buffer->throws(connection->error);
             }
         } else {
             connection->buffer->close();

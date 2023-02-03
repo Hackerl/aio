@@ -20,8 +20,8 @@ namespace aio::http {
 
     public:
         long statusCode();
-        long contentLength();
-        std::string contentType();
+        std::optional<long> contentLength();
+        std::optional<std::string> contentType();
         std::list<std::string> cookies();
         std::map<std::string, std::string> &headers();
 
@@ -43,12 +43,8 @@ namespace aio::http {
             });
         }
 
-    public:
-        void setError(const char *error);
-
     private:
         CURL *mEasy;
-        std::string mError;
         std::shared_ptr<ev::IBuffer> mBuffer;
         std::map<std::string, std::string> mHeaders;
     };
@@ -61,7 +57,7 @@ namespace aio::http {
 
         CURL *easy;
         std::shared_ptr<Response> response;
-        std::shared_ptr<ev::IBuffer> buffer;
+        std::shared_ptr<ev::IPairedBuffer> buffer;
         std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> promise;
         std::list<std::function<void(void)>> defers;
         char error[CURL_ERROR_SIZE];
@@ -101,7 +97,7 @@ namespace aio::http {
             if (!easy)
                 return zero::async::promise::reject<std::shared_ptr<Response>>({-1, "init easy handle failed"});
 
-            std::array<std::shared_ptr<ev::IBuffer>, 2> buffers = ev::pipe(mContext);
+            std::array<std::shared_ptr<ev::IPairedBuffer>, 2> buffers = ev::pipe(mContext);
 
             auto connection = new Connection{
                     easy,

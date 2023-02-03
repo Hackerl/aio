@@ -15,6 +15,7 @@ namespace aio::ev {
 
     public:
         virtual size_t write(std::string_view str) = 0;
+        virtual size_t write(const std::vector<std::byte> &data) = 0;
         virtual size_t write(const void *buffer, size_t n) = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> drain() = 0;
 
@@ -27,7 +28,7 @@ namespace aio::ev {
         virtual std::shared_ptr<zero::async::promise::Promise<void>> waitClosed() = 0;
     };
 
-    class Buffer : public IBuffer, public std::enable_shared_from_this<Buffer> {
+    class Buffer : public virtual IBuffer, public std::enable_shared_from_this<Buffer> {
     public:
         explicit Buffer(bufferevent *bev);
         ~Buffer() override;
@@ -39,6 +40,7 @@ namespace aio::ev {
 
     public:
         size_t write(std::string_view str) override;
+        size_t write(const std::vector<std::byte> &data) override;
         size_t write(const void *buffer, size_t n) override;
         std::shared_ptr<zero::async::promise::Promise<void>> drain() override;
 
@@ -62,10 +64,10 @@ namespace aio::ev {
         virtual std::string getError();
 
     protected:
+        bool mClosed;
         bufferevent *mBev;
 
     private:
-        bool mClosed{};
         zero::async::promise::Reason mReason;
         std::shared_ptr<zero::async::promise::Promise<void>> mPromise[3];
     };

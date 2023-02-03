@@ -6,7 +6,7 @@ constexpr auto READ = 0;
 constexpr auto DRAIN = 1;
 constexpr auto WAIT_CLOSED = 2;
 
-aio::ev::Buffer::Buffer(bufferevent *bev) : mBev(bev) {
+aio::ev::Buffer::Buffer(bufferevent *bev) : mBev(bev), mClosed(false) {
     bufferevent_setcb(
             mBev,
             [](bufferevent *bev, void *arg) {
@@ -147,6 +147,10 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
 
 size_t aio::ev::Buffer::write(std::string_view str) {
     return write(str.data(), str.length());
+}
+
+size_t aio::ev::Buffer::write(const std::vector<std::byte> &data) {
+    return write(data.data(), data.size());
 }
 
 size_t aio::ev::Buffer::write(const void *buffer, size_t n) {
