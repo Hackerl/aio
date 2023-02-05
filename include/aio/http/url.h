@@ -72,6 +72,7 @@ namespace aio::http {
                 subPath = std::to_string(sub);
             } else if constexpr (
                     std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, std::string> ||
+                    std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, std::string_view> ||
                     (std::is_pointer_v<T> && std::is_same_v<std::remove_const_t<std::remove_pointer_t<T>>, char>)) {
                 subPath = sub;
             } else {
