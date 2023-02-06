@@ -11,6 +11,7 @@ FetchContent_MakeAvailable(catch2)
 add_executable(
         aio_test
         ev/pipe.cpp
+        ev/signal.cpp
         http/url.cpp
 )
 
