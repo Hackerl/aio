@@ -34,7 +34,8 @@ void aio::ev::Event::trigger(short events) {
     event_active(mEvent, events, 0);
 }
 
-std::shared_ptr<zero::async::promise::Promise<short>> aio::ev::Event::on(short events, std::optional<std::chrono::milliseconds> timeout) {
+std::shared_ptr<zero::async::promise::Promise<short>>
+aio::ev::Event::on(short events, std::optional<std::chrono::milliseconds> timeout) {
     if (mPromise)
         return zero::async::promise::reject<short>({-1, "pending event has been set"});
 
@@ -62,7 +63,11 @@ std::shared_ptr<zero::async::promise::Promise<short>> aio::ev::Event::on(short e
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>>
-aio::ev::Event::onPersist(short events, const std::function<bool(short)> &func, std::optional<std::chrono::milliseconds> timeout) {
+aio::ev::Event::onPersist(
+        short events,
+        const std::function<bool(short)> &func,
+        std::optional<std::chrono::milliseconds> timeout
+) {
     return zero::async::promise::loop<void>([=](const auto &loop) {
         on(events, timeout)->then([=](short what) {
             if (!func(what)) {

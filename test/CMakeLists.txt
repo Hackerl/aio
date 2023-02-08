@@ -12,6 +12,7 @@ add_executable(
         aio_test
         ev/pipe.cpp
         ev/signal.cpp
+        sync/channel.cpp
         http/url.cpp
 )
 

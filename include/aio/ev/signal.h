@@ -3,12 +3,11 @@
 
 #include <aio/context.h>
 #include <zero/async/promise.h>
-#include <csignal>
 
 namespace aio::ev {
     class Signal : public std::enable_shared_from_this<Signal> {
     public:
-        explicit Signal(const std::shared_ptr<Context> &context, int sig);
+        Signal(const std::shared_ptr<Context> &context, int sig);
         ~Signal();
 
     public:

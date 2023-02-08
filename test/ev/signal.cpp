@@ -1,6 +1,7 @@
 #include <aio/ev/signal.h>
 #include <aio/ev/timer.h>
 #include <catch2/catch_test_macros.hpp>
+#include <csignal>
 
 TEST_CASE("signal handler", "[signal]") {
     std::shared_ptr<aio::Context> context = aio::newContext();
