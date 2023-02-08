@@ -59,13 +59,13 @@ namespace aio::sync {
                     }
 
                     zero::atomic::Event evt;
-                    std::shared_ptr<ev::Event> event = std::make_shared<ev::Event>(mContext, -1);
+                    std::shared_ptr<ev::Event> event = getEvent();
 
-                    event->on(EV_WRITE)->then([&](short) {
+                    event->on(EV_WRITE)->finally([&]() {
                         evt.notify();
                     });
 
-                    mPending[SENDER].push_back(event);
+                    mPending[SENDER].push_back(std::move(event));
                     mMutex.unlock();
 
                     evt.wait();
@@ -128,7 +128,7 @@ namespace aio::sync {
                         return;
                     }
 
-                    std::shared_ptr<ev::Event> event = std::make_shared<ev::Event>(self->mContext, -1);
+                    std::shared_ptr<ev::Event> event = self->getEvent();
 
                     event->on(EV_WRITE)->then([=](short what) {
                         if (what & EV_CLOSED) {
@@ -139,7 +139,7 @@ namespace aio::sync {
                         P_CONTINUE(loop);
                     });
 
-                    self->mPending[SENDER].push_back(event);
+                    self->mPending[SENDER].push_back(std::move(event));
                     return;
                 }
 
@@ -177,13 +177,13 @@ namespace aio::sync {
                     }
 
                     zero::atomic::Event evt;
-                    std::shared_ptr<ev::Event> event = std::make_shared<ev::Event>(mContext, -1);
+                    std::shared_ptr<ev::Event> event = getEvent();
 
-                    event->on(EV_READ)->then([&](short) {
+                    event->on(EV_READ)->finally([&]() {
                         evt.notify();
                     });
 
-                    mPending[RECEIVER].push_back(event);
+                    mPending[RECEIVER].push_back(std::move(event));
                     mMutex.unlock();
                     evt.wait();
 
@@ -240,13 +240,13 @@ namespace aio::sync {
                         return;
                     }
 
-                    std::shared_ptr<ev::Event> event = std::make_shared<ev::Event>(self->mContext, -1);
+                    std::shared_ptr<ev::Event> event = self->getEvent();
 
-                    event->on(EV_READ)->then([=](short) {
+                    event->on(EV_READ)->finally([=]() {
                         P_CONTINUE(loop);
                     });
 
-                    self->mPending[RECEIVER].push_back(event);
+                    self->mPending[RECEIVER].push_back(std::move(event));
                     return;
                 }
 
@@ -284,10 +284,25 @@ namespace aio::sync {
         }
 
     private:
+        std::shared_ptr<ev::Event> getEvent() {
+            auto it = std::find_if(mEvents.begin(), mEvents.end(), [](const auto &event) {
+                return event.use_count() == 1;
+            });
+
+            if (it == mEvents.end()) {
+                mEvents.push_back(std::make_shared<ev::Event>(mContext, -1));
+                return mEvents.back();
+            }
+
+            return *it;
+        }
+
+    private:
         std::mutex mMutex;
         std::atomic<bool> mClosed;
         std::shared_ptr<Context> mContext;
         zero::atomic::CircularBuffer<T, N> mBuffer;
+        std::list<std::shared_ptr<ev::Event>> mEvents;
         std::list<std::shared_ptr<ev::Event>> mPending[2];
     };
 }
