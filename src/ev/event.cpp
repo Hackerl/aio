@@ -52,8 +52,8 @@ aio::ev::Event::on(short events, std::optional<std::chrono::milliseconds> timeou
         }
 
         timeval tv = {
-                timeout->count() / 1000,
-                (timeout->count() % 1000) * 1000
+                (time_t) (timeout->count() / 1000),
+                (suseconds_t) ((timeout->count() % 1000) * 1000)
         };
 
         event_add(mEvent, &tv);

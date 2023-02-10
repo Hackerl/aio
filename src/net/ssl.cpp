@@ -5,6 +5,8 @@
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
 #include <event2/bufferevent_ssl.h>
+#include <netinet/in.h>
+#include <endian.h>
 
 std::string aio::net::ssl::getError() {
     return getError(ERR_get_error());

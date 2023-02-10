@@ -12,8 +12,8 @@ add_executable(
         aio_test
         ev/pipe.cpp
         ev/signal.cpp
-        sync/channel.cpp
         http/url.cpp
+        $<$<NOT:$<BOOL:${ANDROID}>>:sync/channel.cpp>
 )
 
 target_link_libraries(aio_test aio Catch2::Catch2WithMain)

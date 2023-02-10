@@ -1,6 +1,7 @@
 #include <aio/http/url.h>
 #include <zero/cmdline.h>
 #include <catch2/catch_test_macros.hpp>
+#include <array>
 
 TEST_CASE("parse url", "[url]") {
     REQUIRE(!aio::http::URL(":/qq.com").string());

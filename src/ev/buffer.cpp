@@ -190,14 +190,14 @@ void aio::ev::Buffer::setTimeout(std::chrono::milliseconds readTimeout, std::chr
 
     if (readTimeout != std::chrono::milliseconds::zero())
         rtv = timeval{
-                readTimeout.count() / 1000,
-                (readTimeout.count() % 1000) * 1000
+                (time_t) (readTimeout.count() / 1000),
+                (suseconds_t) ((readTimeout.count() % 1000) * 1000)
         };
 
     if (writeTimeout != std::chrono::milliseconds::zero())
         wtv = timeval{
-                writeTimeout.count() / 1000,
-                (writeTimeout.count() % 1000) * 1000
+                (time_t) (writeTimeout.count() / 1000),
+                (suseconds_t) ((writeTimeout.count() % 1000) * 1000)
         };
 
     bufferevent_set_timeouts(

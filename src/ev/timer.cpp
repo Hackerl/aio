@@ -36,8 +36,8 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Timer::setTimeout(
         mPromise = p;
 
         timeval tv = {
-                delay.count() / 1000,
-                (delay.count() % 1000) * 1000
+                (time_t) (delay.count() / 1000),
+                (suseconds_t) ((delay.count() % 1000) * 1000)
         };
 
         evtimer_add(mEvent, &tv);
