@@ -1,6 +1,7 @@
 #ifndef AIO_BUFFER_H
 #define AIO_BUFFER_H
 
+#include <vector>
 #include <chrono>
 #include <event.h>
 #include <zero/interface.h>
