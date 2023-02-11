@@ -15,6 +15,9 @@ namespace aio {
         evdns_base *dnsBase();
 
     public:
+        bool addNameserver(const char *ip);
+
+    public:
         void dispatch();
         void loopBreak();
 

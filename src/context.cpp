@@ -19,6 +19,10 @@ evdns_base *aio::Context::dnsBase() {
     return mDnsBase;
 }
 
+bool aio::Context::addNameserver(const char *ip) {
+    return evdns_base_nameserver_ip_add(mDnsBase, ip) == 0;
+}
+
 void aio::Context::dispatch() {
     event_base_dispatch(mBase);
 }
@@ -35,7 +39,22 @@ std::shared_ptr<aio::Context> aio::newContext() {
         return nullptr;
     }
 
+#if _WIN32 || __linux__ && !__ANDROID__
     evdns_base *dnsBase = evdns_base_new(base, EVDNS_BASE_INITIALIZE_NAMESERVERS);
+#else
+    evdns_base *dnsBase = evdns_base_new(base, 0);
+
+#ifndef NO_DEFAULT_NAMESERVER
+#ifndef DEFAULT_NAMESERVER
+#define DEFAULT_NAMESERVER "8.8.8.8"
+#endif
+    if (evdns_base_nameserver_ip_add(dnsBase, DEFAULT_NAMESERVER) != 0) {
+        LOG_ERROR("add nameserver failed");
+        event_base_free(base);
+        return nullptr;
+    }
+#endif
+#endif
 
     if (!dnsBase) {
         LOG_ERROR("create dns base failed: %s", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));

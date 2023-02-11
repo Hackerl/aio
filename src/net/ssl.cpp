@@ -8,6 +8,47 @@
 #include <netinet/in.h>
 #include <endian.h>
 
+#ifdef EMBED_CA_CERT
+#include <cacert.h>
+
+bool aio::net::ssl::loadEmbeddedCA(Context *ctx) {
+    BIO *bio = BIO_new_mem_buf(cacert_pem, (int) cacert_pem_len);
+
+    if (!bio)
+        return false;
+
+    STACK_OF(X509_INFO) *info = PEM_X509_INFO_read_bio(bio, nullptr, nullptr, nullptr);
+
+    if (!info) {
+        BIO_free(bio);
+        return false;
+    }
+
+    X509_STORE *store = SSL_CTX_get_cert_store(ctx);
+
+    if (!store) {
+        sk_X509_INFO_pop_free(info, X509_INFO_free);
+        BIO_free(bio);
+        return false;
+    }
+
+    for (int i = 0; i < sk_X509_INFO_num(info); i++) {
+        X509_INFO *item = sk_X509_INFO_value(info, i);
+
+        if (item->x509)
+            X509_STORE_add_cert(store, item->x509);
+
+        if (item->crl)
+            X509_STORE_add_crl(store, item->crl);
+    }
+
+    sk_X509_INFO_pop_free(info, X509_INFO_free);
+    BIO_free(bio);
+
+    return true;
+}
+#endif
+
 std::string aio::net::ssl::getError() {
     return getError(ERR_get_error());
 }
@@ -59,10 +100,17 @@ std::shared_ptr<aio::net::ssl::Context> aio::net::ssl::newContext(const Config &
         return nullptr;
     }
 
+#ifdef EMBED_CA_CERT
+    if (!config.insecure && !config.ca && !config.server && !loadEmbeddedCA(ctx.get())) {
+        LOG_ERROR("load embed CA certificates failed: %s", getError().c_str());
+        return nullptr;
+    }
+#else
     if (!config.insecure && !config.ca && !config.server && !SSL_CTX_set_default_verify_paths(ctx.get())) {
         LOG_ERROR("load system CA certificates failed: %s", getError().c_str());
         return nullptr;
     }
+#endif
 
     SSL_CTX_set_verify(
             ctx.get(),

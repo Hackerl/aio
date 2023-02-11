@@ -4,6 +4,7 @@
 #include "url.h"
 #include <aio/ev/pipe.h>
 #include <aio/ev/timer.h>
+#include <aio/net/ssl.h>
 #include <cstring>
 #include <map>
 #include <variant>
@@ -177,6 +178,24 @@ namespace aio::http {
             curl_easy_setopt(easy, CURLOPT_PRIVATE, connection);
             curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(easy, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
+
+#ifdef EMBED_CA_CERT
+            curl_easy_setopt(easy, CURLOPT_CAINFO, nullptr);
+            curl_easy_setopt(easy, CURLOPT_CAPATH, nullptr);
+
+            curl_easy_setopt(
+                    easy,
+                    CURLOPT_SSL_CTX_FUNCTION,
+                    static_cast<CURLcode (*)(CURL *, void *, void *)>(
+                            [](CURL *curl, void *ctx, void *parm) {
+                                if (!net::ssl::loadEmbeddedCA((net::ssl::Context *) ctx))
+                                    return CURLE_ABORTED_BY_CALLBACK;
+
+                                return CURLE_OK;
+                            }
+                    )
+            );
+#endif
 
             Options opt = options.value_or(mOptions);
 

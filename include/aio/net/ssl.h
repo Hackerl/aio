@@ -11,6 +11,10 @@
 namespace aio::net::ssl {
     using Context = SSL_CTX;
 
+#ifdef EMBED_CA_CERT
+    bool loadEmbeddedCA(Context *ctx);
+#endif
+
     enum Version {
         TLS_VERSION_1 = TLS1_VERSION,
         TLS_VERSION_1_1 = TLS1_1_VERSION,
