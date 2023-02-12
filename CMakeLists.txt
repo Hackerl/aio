@@ -80,7 +80,7 @@ add_library(
 )
 
 if (AIO_EMBED_CA_CERT)
-    target_compile_definitions(aio PRIVATE AIO_EMBED_CA_CERT)
+    target_compile_definitions(aio PUBLIC AIO_EMBED_CA_CERT)
 endif ()
 
 target_include_directories(aio PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
