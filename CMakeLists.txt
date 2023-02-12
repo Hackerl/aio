@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 option(AIO_DISABLE_SSL "disable ssl support" OFF)
 option(AIO_DISABLE_TESTS "disable aio unit test" OFF)
 option(AIO_DISABLE_SAMPLES "disable aio samples" OFF)
+option(AIO_EMBED_CA_CERT "use embedded CA certificates" OFF)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
@@ -34,7 +35,7 @@ include(FetchContent)
 FetchContent_Declare(
         zero
         GIT_REPOSITORY https://github.com/Hackerl/zero
-        GIT_TAG 268ef63f37f5ea5b0733563b7345b816ec28b9ac
+        GIT_TAG dec07f8b2281721867c6e836535aa5708dd367ff
 )
 
 FetchContent_MakeAvailable(zero)
@@ -77,6 +78,10 @@ add_library(
         $<$<NOT:$<BOOL:${AIO_DISABLE_SSL}>>:src/net/ssl.cpp>
         $<$<NOT:$<BOOL:${AIO_DISABLE_SSL}>>:src/http/websocket.cpp>
 )
+
+if (AIO_EMBED_CA_CERT)
+    target_compile_definitions(aio PRIVATE AIO_EMBED_CA_CERT)
+endif ()
 
 target_include_directories(aio PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 

@@ -8,7 +8,7 @@
 #include <netinet/in.h>
 #include <endian.h>
 
-#ifdef EMBED_CA_CERT
+#ifdef AIO_EMBED_CA_CERT
 #include <cacert.h>
 
 bool aio::net::ssl::loadEmbeddedCA(Context *ctx) {
@@ -100,7 +100,7 @@ std::shared_ptr<aio::net::ssl::Context> aio::net::ssl::newContext(const Config &
         return nullptr;
     }
 
-#ifdef EMBED_CA_CERT
+#ifdef AIO_EMBED_CA_CERT
     if (!config.insecure && !config.ca && !config.server && !loadEmbeddedCA(ctx.get())) {
         LOG_ERROR("load embed CA certificates failed: %s", getError().c_str());
         return nullptr;

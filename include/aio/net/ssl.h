@@ -11,7 +11,7 @@
 namespace aio::net::ssl {
     using Context = SSL_CTX;
 
-#ifdef EMBED_CA_CERT
+#ifdef AIO_EMBED_CA_CERT
     bool loadEmbeddedCA(Context *ctx);
 #endif
 

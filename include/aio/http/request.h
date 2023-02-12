@@ -179,7 +179,7 @@ namespace aio::http {
             curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(easy, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
 
-#ifdef EMBED_CA_CERT
+#ifdef AIO_EMBED_CA_CERT
             curl_easy_setopt(easy, CURLOPT_CAINFO, nullptr);
             curl_easy_setopt(easy, CURLOPT_CAPATH, nullptr);
 
