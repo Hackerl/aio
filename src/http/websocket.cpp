@@ -7,7 +7,10 @@
 #include <random>
 #include <map>
 #include <cstddef>
+
+#ifdef __linux__
 #include <endian.h>
+#endif
 
 constexpr auto SWITCHING_PROTOCOLS_STATUS = 101;
 constexpr auto MASKING_KEY_LENGTH = 4;
@@ -89,7 +92,11 @@ aio::http::ws::WebSocket::readFrame() {
 
             return mBuffer->read(extendedBytes)->then([=](const std::vector<std::byte> &data) {
                 return mBuffer->read(
+#if _WIN32
+                        extendedBytes == 2 ? ntohs(*(uint16_t *) data.data()) : ntohll(*(uint64_t *) data.data())
+#else
                         extendedBytes == 2 ? ntohs(*(uint16_t *) data.data()) : be64toh(*(uint64_t *) data.data())
+#endif
                 );
             })->then([=](const std::vector<std::byte> &data) {
                 return std::tuple<Header, std::vector<std::byte>>{header, data};
@@ -144,8 +151,11 @@ aio::http::ws::WebSocket::writeMessage(const InternalMessage &message) {
     if (length > MAX_TWO_BYTE_PAYLOAD_LENGTH) {
         extendedBytes = 8;
         header.length(EIGHT_BYTE_PAYLOAD_LENGTH);
-
+#if _WIN32
+        uint64_t extendedLength = htonll(length);
+#else
         uint64_t extendedLength = htobe64(length);
+#endif
         extended = std::make_unique<std::byte[]>(extendedBytes);
 
         memcpy(extended.get(), &extendedLength, sizeof(uint64_t));

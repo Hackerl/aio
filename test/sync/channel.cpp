@@ -4,7 +4,11 @@
 #include <thread>
 
 TEST_CASE("async channel buffer", "[channel]") {
+#ifdef _WIN32
+    evthread_use_windows_threads();
+#else
     evthread_use_pthreads();
+#endif
 
     std::shared_ptr<aio::Context> context = aio::newContext();
     REQUIRE(context);

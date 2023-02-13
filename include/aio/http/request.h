@@ -21,7 +21,7 @@ namespace aio::http {
 
     public:
         long statusCode();
-        std::optional<long> contentLength();
+        std::optional<curl_off_t> contentLength();
         std::optional<std::string> contentType();
         std::list<std::string> cookies();
         std::map<std::string, std::string> &headers();
@@ -111,7 +111,7 @@ namespace aio::http {
             } else if (method == "GET") {
                 curl_easy_setopt(easy, CURLOPT_HTTPGET, 1L);
             } else if (method == "POST") {
-                curl_easy_setopt(easy, CURLOPT_HTTPPOST, 1L);
+                curl_easy_setopt(easy, CURLOPT_POST, 1L);
             } else {
                 curl_easy_setopt(easy, CURLOPT_CUSTOMREQUEST, method.c_str());
             }

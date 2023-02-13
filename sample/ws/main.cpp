@@ -2,19 +2,25 @@
 #include <zero/cmdline.h>
 #include <zero/encoding/hex.h>
 #include <aio/http/websocket.h>
-#include <csignal>
 
 int main(int argc, char **argv) {
-    INIT_CONSOLE_LOG(zero::INFO);
+    INIT_CONSOLE_LOG(zero::INFO_LEVEL);
 
     zero::Cmdline cmdline;
 
     cmdline.add<std::string>("url", "websocket server url");
     cmdline.parse(argc, argv);
 
-    auto url = cmdline.get<std::string>("url");
+#ifdef _WIN32
+    WSADATA wsaData;
 
-    signal(SIGPIPE, SIG_IGN);
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        LOG_ERROR("WSAStartup failed");
+        return -1;
+    }
+#endif
+
+    auto url = cmdline.get<std::string>("url");
 
     std::shared_ptr<aio::Context> context = aio::newContext();
 
@@ -56,6 +62,10 @@ int main(int argc, char **argv) {
     });
 
     context->dispatch();
+
+#ifdef _WIN32
+    WSACleanup();
+#endif
 
     return 0;
 }

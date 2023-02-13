@@ -35,7 +35,7 @@ include(FetchContent)
 FetchContent_Declare(
         zero
         GIT_REPOSITORY https://github.com/Hackerl/zero
-        GIT_TAG dec07f8b2281721867c6e836535aa5708dd367ff
+        GIT_TAG 93d81f42633beaf98d1535462a64c735ac52183b
 )
 
 FetchContent_MakeAvailable(zero)
@@ -43,7 +43,7 @@ FetchContent_MakeAvailable(zero)
 FetchContent_Declare(
         libcurl
         GIT_REPOSITORY https://github.com/curl/curl
-        GIT_TAG curl-7_85_0
+        GIT_TAG curl-7_87_0
 )
 
 FetchContent_MakeAvailable(libcurl)

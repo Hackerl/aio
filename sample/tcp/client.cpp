@@ -5,7 +5,7 @@
 #include <csignal>
 
 int main(int argc, char **argv) {
-    INIT_CONSOLE_LOG(zero::INFO);
+    INIT_CONSOLE_LOG(zero::INFO_LEVEL);
 
     zero::Cmdline cmdline;
 

@@ -11,8 +11,8 @@ FetchContent_MakeAvailable(catch2)
 add_executable(
         aio_test
         ev/pipe.cpp
-        ev/signal.cpp
         http/url.cpp
+        $<$<NOT:$<BOOL:${WIN32}>>:ev/signal.cpp>
         $<$<NOT:$<BOOL:${ANDROID}>>:sync/channel.cpp>
 )
 

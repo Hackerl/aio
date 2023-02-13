@@ -1,10 +1,9 @@
 #include <zero/log.h>
 #include <zero/cmdline.h>
 #include <aio/http/request.h>
-#include <csignal>
 
 int main(int argc, char **argv) {
-    INIT_CONSOLE_LOG(zero::INFO);
+    INIT_CONSOLE_LOG(zero::INFO_LEVEL);
 
     zero::Cmdline cmdline;
 
@@ -19,12 +18,19 @@ int main(int argc, char **argv) {
 
     cmdline.parse(argc, argv);
 
+#ifdef _WIN32
+    WSADATA wsaData;
+
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        LOG_ERROR("WSAStartup failed");
+        return -1;
+    }
+#endif
+
     auto url = cmdline.get<std::string>("url");
     auto method = cmdline.getOptional<std::string>("method");
     auto headers = cmdline.getOptional<std::vector<std::string>>("headers");
     auto body = cmdline.getOptional<std::string>("body");
-
-    signal(SIGPIPE, SIG_IGN);
 
     std::shared_ptr<aio::Context> context = aio::newContext();
 
@@ -85,6 +91,10 @@ int main(int argc, char **argv) {
     });
 
     context->dispatch();
+
+#ifdef _WIN32
+    WSACleanup();
+#endif
 
     return 0;
 }

@@ -18,7 +18,7 @@ long aio::http::Response::statusCode() {
     return status;
 }
 
-std::optional<long> aio::http::Response::contentLength() {
+std::optional<curl_off_t> aio::http::Response::contentLength() {
     curl_off_t length;
 
     if (curl_easy_getinfo(mEasy, CURLINFO_CONTENT_LENGTH_DOWNLOAD_T, &length) != CURLE_OK || length < 0)
@@ -68,7 +68,7 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response:
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::string() {
-    std::optional<long> length = contentLength();
+    std::optional<curl_off_t> length = contentLength();
 
     if (length)
         return read(*length)->then([](const std::vector<std::byte> &data) {

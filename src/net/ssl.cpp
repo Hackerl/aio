@@ -5,8 +5,12 @@
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
 #include <event2/bufferevent_ssl.h>
+
+#ifdef __linux__
 #include <netinet/in.h>
 #include <endian.h>
+#endif
+
 
 #ifdef AIO_EMBED_CA_CERT
 #include <cacert.h>
