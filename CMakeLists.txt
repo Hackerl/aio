@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 option(AIO_DISABLE_SSL "disable ssl support" OFF)
 option(AIO_DISABLE_TESTS "disable aio unit test" OFF)
 option(AIO_DISABLE_SAMPLES "disable aio samples" OFF)
+option(AIO_DISABLE_THREAD_SUPPORT "disable aio thread support" OFF)
 option(AIO_EMBED_CA_CERT "use embedded CA certificates" OFF)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
@@ -28,6 +29,10 @@ set(JSON_BuildTests OFF CACHE BOOL "disable json library tests")
 if (AIO_DISABLE_SSL)
     set(CURL_ENABLE_SSL OFF CACHE BOOL "disable curl openssl")
     set(EVENT__DISABLE_OPENSSL ON CACHE BOOL "disable event openssl")
+endif ()
+
+if (AIO_DISABLE_THREAD_SUPPORT)
+    set(EVENT__DISABLE_THREAD_SUPPORT ON CACHE BOOL "disable event thread support")
 endif ()
 
 include(FetchContent)
@@ -92,8 +97,8 @@ target_link_libraries(
         nlohmann_json
         event_core_static
         event_extra_static
-        $<$<BOOL:$<PLATFORM_ID:Linux>>:event_pthreads_static>
         $<$<NOT:$<BOOL:${AIO_DISABLE_SSL}>>:event_openssl_static>
+        $<$<AND:$<BOOL:$<PLATFORM_ID:Linux>>,$<NOT:$<BOOL:${AIO_DISABLE_THREAD_SUPPORT}>>>:event_pthreads_static>
 )
 
 if (NOT AIO_DISABLE_SAMPLES)

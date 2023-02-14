@@ -13,7 +13,7 @@
 constexpr auto SENDER = 0;
 constexpr auto RECEIVER = 1;
 
-namespace aio::sync {
+namespace aio {
     template<typename T>
     class IChannel : public zero::Interface {
     public:

@@ -2,6 +2,10 @@
 #include <zero/log.h>
 #include <event2/dns.h>
 
+#ifndef EVENT__DISABLE_THREAD_SUPPORT
+#include <event2/thread.h>
+#endif
+
 aio::Context::Context(event_base *base, evdns_base *dnsBase) : mBase(base), mDnsBase(dnsBase) {
 
 }
@@ -32,6 +36,14 @@ void aio::Context::loopBreak() {
 }
 
 std::shared_ptr<aio::Context> aio::newContext() {
+#ifndef EVENT__DISABLE_THREAD_SUPPORT
+#ifdef _WIN32
+    evthread_use_windows_threads();
+#else
+    evthread_use_pthreads();
+#endif
+#endif
+
     event_base *base = event_base_new();
 
     if (!base) {

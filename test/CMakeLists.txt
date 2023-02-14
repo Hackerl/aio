@@ -10,11 +10,11 @@ FetchContent_MakeAvailable(catch2)
 
 add_executable(
         aio_test
-        thread.cpp
         ev/pipe.cpp
         http/url.cpp
         $<$<NOT:$<BOOL:${WIN32}>>:ev/signal.cpp>
-        $<$<NOT:$<BOOL:${ANDROID}>>:sync/channel.cpp>
+        $<$<NOT:$<BOOL:${AIO_DISABLE_THREAD_SUPPORT}>>:thread.cpp>
+        $<$<NOT:$<BOOL:${AIO_DISABLE_THREAD_SUPPORT}>>:channel.cpp>
 )
 
 target_link_libraries(aio_test aio Catch2::Catch2WithMain)

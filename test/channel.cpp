@@ -1,20 +1,13 @@
-#include <aio/sync/channel.h>
+#include <aio/channel.h>
 #include <catch2/catch_test_macros.hpp>
-#include <event2/thread.h>
 #include <thread>
 
 TEST_CASE("async channel buffer", "[channel]") {
-#ifdef _WIN32
-    evthread_use_windows_threads();
-#else
-    evthread_use_pthreads();
-#endif
-
     std::shared_ptr<aio::Context> context = aio::newContext();
     REQUIRE(context);
 
     std::shared_ptr<int> counters[2] = {std::make_shared<int>(), std::make_shared<int>()};
-    std::shared_ptr<aio::sync::IChannel<int>> channel = std::make_shared<aio::sync::Channel<int, 100>>(context);
+    std::shared_ptr<aio::IChannel<int>> channel = std::make_shared<aio::Channel<int, 100>>(context);
 
     SECTION("async sender/async receiver") {
         zero::async::promise::all(
