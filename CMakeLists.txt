@@ -40,7 +40,7 @@ include(FetchContent)
 FetchContent_Declare(
         zero
         GIT_REPOSITORY https://github.com/Hackerl/zero
-        GIT_TAG 93d81f42633beaf98d1535462a64c735ac52183b
+        GIT_TAG df739d44cacc95cf10251c0dbede56bc1f0b18bb
 )
 
 FetchContent_MakeAvailable(zero)
@@ -98,7 +98,7 @@ target_link_libraries(
         event_core_static
         event_extra_static
         $<$<NOT:$<BOOL:${AIO_DISABLE_SSL}>>:event_openssl_static>
-        $<$<AND:$<BOOL:$<PLATFORM_ID:Linux>>,$<NOT:$<BOOL:${AIO_DISABLE_THREAD_SUPPORT}>>>:event_pthreads_static>
+        $<$<AND:$<PLATFORM_ID:Linux>,$<NOT:$<BOOL:${AIO_DISABLE_THREAD_SUPPORT}>>>:event_pthreads_static>
 )
 
 if (NOT AIO_DISABLE_SAMPLES)

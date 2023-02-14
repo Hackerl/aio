@@ -12,7 +12,7 @@ add_executable(
         aio_test
         ev/pipe.cpp
         http/url.cpp
-        $<$<NOT:$<BOOL:${WIN32}>>:ev/signal.cpp>
+        $<$<PLATFORM_ID:Linux,Android>:ev/signal.cpp>
         $<$<NOT:$<BOOL:${AIO_DISABLE_THREAD_SUPPORT}>>:thread.cpp>
         $<$<NOT:$<BOOL:${AIO_DISABLE_THREAD_SUPPORT}>>:channel.cpp>
 )
