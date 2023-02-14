@@ -10,6 +10,7 @@ FetchContent_MakeAvailable(catch2)
 
 add_executable(
         aio_test
+        thread.cpp
         ev/pipe.cpp
         http/url.cpp
         $<$<NOT:$<BOOL:${WIN32}>>:ev/signal.cpp>
