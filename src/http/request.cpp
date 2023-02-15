@@ -134,6 +134,9 @@ void aio::http::Requests::onCURLTimer(long timeout) {
         return;
     }
 
+    if (mTimer->pending())
+        mTimer->cancel();
+
     mTimer->setTimeout(std::chrono::milliseconds{timeout})->then([self = shared_from_this()]() {
         int n = 0;
         curl_multi_socket_action(self->mMulti, CURL_SOCKET_TIMEOUT, 0, &n);
@@ -149,8 +152,9 @@ void aio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what, voi
             return;
 
         *context->first = true;
-        delete context;
+        context->second->cancel();
 
+        delete context;
         return;
     }
 
