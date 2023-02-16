@@ -4,7 +4,6 @@
 #include "url.h"
 #include <aio/ev/pipe.h>
 #include <aio/ev/timer.h>
-#include <aio/net/ssl.h>
 #include <cstring>
 #include <map>
 #include <variant>
@@ -12,6 +11,10 @@
 #include <algorithm>
 #include <zero/strings/strings.h>
 #include <nlohmann/json.hpp>
+
+#ifdef AIO_EMBED_CA_CERT
+#include <aio/net/ssl.h>
+#endif
 
 namespace aio::http {
     class Response : public std::enable_shared_from_this<Response> {
