@@ -16,7 +16,7 @@ aio::ev::Buffer::Buffer(bufferevent *bev) : mBev(bev), mClosed(false) {
                 static_cast<Buffer *>(arg)->onBufferWrite();
             },
             [](bufferevent *bev, short what, void *arg) {
-                static_cast<Buffer *>(arg)->onBufferEvent(what);
+                static_cast<Buffer *>(arg)->shared_from_this()->onBufferEvent(what);
             },
             this
     );
@@ -244,14 +244,16 @@ void aio::ev::Buffer::onClose(const zero::async::promise::Reason &reason) {
     mClosed = true;
     mReason = reason;
 
-    if (mPromise[READ])
-        std::shared_ptr(mPromise[READ])->reject(mReason);
+    const auto [read, drain, waitClosed] = mPromise;
 
-    if (mPromise[DRAIN])
-        std::shared_ptr(mPromise[DRAIN])->reject(mReason);
+    if (read)
+        read->reject(mReason);
 
-    if (mPromise[WAIT_CLOSED])
-        std::shared_ptr(mPromise[WAIT_CLOSED])->resolve();
+    if (drain)
+        drain->reject(mReason);
+
+    if (waitClosed)
+        waitClosed->resolve();
 }
 
 void aio::ev::Buffer::onBufferRead() {
