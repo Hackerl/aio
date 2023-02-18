@@ -164,10 +164,15 @@ namespace aio::http {
                             [](char *buffer, size_t size, size_t n, void *userdata) -> size_t {
                                 auto connection = (Connection *) userdata;
 
-                                if (connection->buffer->write(buffer, size * n) < 1024 * 1024)
+                                size_t length = connection->buffer->write(buffer, size * n);
+
+                                if (length == -1)
+                                    return CURL_WRITEFUNC_ERROR;
+
+                                if (length < 1024 * 1024)
                                     return size * n;
 
-                                connection->buffer->drain()->then([=]() {
+                                connection->buffer->drain()->finally([=]() {
                                     curl_easy_pause(connection->easy, CURLPAUSE_CONT);
                                 });
 
