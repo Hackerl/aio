@@ -48,7 +48,7 @@ FetchContent_MakeAvailable(zero)
 FetchContent_Declare(
         libcurl
         GIT_REPOSITORY https://github.com/curl/curl
-        GIT_TAG curl-7_87_0
+        GIT_TAG curl-7_88_0
 )
 
 FetchContent_MakeAvailable(libcurl)
