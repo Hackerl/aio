@@ -186,6 +186,7 @@ namespace aio::http {
             curl_easy_setopt(easy, CURLOPT_PRIVATE, connection);
             curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(easy, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
+            curl_easy_setopt(easy, CURLOPT_CONNECTTIMEOUT, 30L);
             curl_easy_setopt(easy, CURLOPT_USERAGENT, "asyncio requests");
 
 #ifdef AIO_EMBED_CA_CERT
