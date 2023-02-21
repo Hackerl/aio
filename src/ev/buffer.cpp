@@ -1,4 +1,5 @@
 #include <aio/ev/buffer.h>
+#include <aio/error.h>
 #include <zero/log.h>
 #include <optional>
 
@@ -34,10 +35,10 @@ aio::ev::Buffer::~Buffer() {
 
 std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::Buffer::read() {
     if (!mBev)
-        return zero::async::promise::reject<std::vector<std::byte>>({-1, "buffer destroyed"});
+        return zero::async::promise::reject<std::vector<std::byte>>({IO_ERROR, "buffer destroyed"});
 
     if (mPromise[READ])
-        return zero::async::promise::reject<std::vector<std::byte>>({-1, "pending request not completed"});
+        return zero::async::promise::reject<std::vector<std::byte>>({IO_ERROR, "pending request not completed"});
 
     evbuffer *input = bufferevent_get_input(mBev);
 
@@ -71,10 +72,10 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
 
 std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::Buffer::read(size_t n) {
     if (!mBev)
-        return zero::async::promise::reject<std::vector<std::byte>>({-1, "buffer destroyed"});
+        return zero::async::promise::reject<std::vector<std::byte>>({IO_ERROR, "buffer destroyed"});
 
     if (mPromise[READ])
-        return zero::async::promise::reject<std::vector<std::byte>>({-1, "pending request not completed"});
+        return zero::async::promise::reject<std::vector<std::byte>>({IO_ERROR, "pending request not completed"});
 
     evbuffer *input = bufferevent_get_input(mBev);
 
@@ -109,10 +110,10 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
 
 std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::readLine(evbuffer_eol_style style) {
     if (!mBev)
-        return zero::async::promise::reject<std::string>({-1, "buffer destroyed"});
+        return zero::async::promise::reject<std::string>({IO_ERROR, "buffer destroyed"});
 
     if (mPromise[READ])
-        return zero::async::promise::reject<std::string>({-1, "pending request not completed"});
+        return zero::async::promise::reject<std::string>({IO_ERROR, "pending request not completed"});
 
     char *ptr = evbuffer_readln(bufferevent_get_input(mBev), nullptr, style);
 
@@ -165,10 +166,10 @@ size_t aio::ev::Buffer::write(const void *buffer, size_t n) {
 
 std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::drain() {
     if (!mBev)
-        return zero::async::promise::reject<void>({-1, "buffer destroyed"});
+        return zero::async::promise::reject<void>({IO_ERROR, "buffer destroyed"});
 
     if (mPromise[DRAIN])
-        return zero::async::promise::reject<void>({-1, "pending request not completed"});
+        return zero::async::promise::reject<void>({IO_ERROR, "pending request not completed"});
 
     if (mClosed)
         return zero::async::promise::reject<void>(mReason);
@@ -211,7 +212,7 @@ void aio::ev::Buffer::close() {
     if (mClosed)
         return;
 
-    onClose({0, "buffer will be closed"});
+    onClose({IO_EOF, "buffer will be closed"});
 
     bufferevent_free(mBev);
     mBev = nullptr;
@@ -223,10 +224,10 @@ bool aio::ev::Buffer::closed() {
 
 std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::waitClosed() {
     if (!mBev)
-        return zero::async::promise::reject<void>({-1, "buffer destroyed"});
+        return zero::async::promise::reject<void>({IO_ERROR, "buffer destroyed"});
 
     if (mPromise[WAIT_CLOSED])
-        return zero::async::promise::reject<void>({-1, "pending request not completed"});
+        return zero::async::promise::reject<void>({IO_ERROR, "pending request not completed"});
 
     if (mClosed)
         return zero::async::promise::resolve<void>();
@@ -277,16 +278,16 @@ void aio::ev::Buffer::onBufferWrite() {
 
 void aio::ev::Buffer::onBufferEvent(short what) {
     if (what & BEV_EVENT_EOF) {
-        onClose({0, "buffer is closed"});
+        onClose({IO_EOF, "buffer is closed"});
     } else if (what & BEV_EVENT_ERROR) {
-        onClose({-1, getError()});
+        onClose({IO_ERROR, getError()});
     } else if (what & BEV_EVENT_TIMEOUT) {
         if (what & BEV_EVENT_READING) {
             if (mPromise[READ])
-                std::shared_ptr(mPromise[READ])->reject({-1, "reading timed out"});
+                std::shared_ptr(mPromise[READ])->reject({IO_TIMEOUT, "reading timed out"});
         } else {
             if (mPromise[DRAIN])
-                std::shared_ptr(mPromise[DRAIN])->reject({-1, "writing timed out"});
+                std::shared_ptr(mPromise[DRAIN])->reject({IO_TIMEOUT, "writing timed out"});
         }
     }
 }

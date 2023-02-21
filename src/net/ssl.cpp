@@ -1,4 +1,5 @@
 #include <aio/net/ssl.h>
+#include <aio/error.h>
 #include <zero/log.h>
 #include <zero/strings/strings.h>
 #include <cstring>
@@ -162,7 +163,7 @@ aio::net::ssl::Listener::Listener(std::shared_ptr<aio::Context> context, std::sh
             mListener,
             [](evconnlistener *listener, void *arg) {
                 std::shared_ptr(static_cast<Listener *>(arg)->mPromise)->reject(
-                        {-1, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())}
+                        {IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())}
                 );
             }
     );
@@ -177,10 +178,10 @@ aio::net::ssl::Listener::~Listener() {
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::ev::IBuffer>>> aio::net::ssl::Listener::accept() {
     if (!mListener)
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "listener destroyed"});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({IO_ERROR, "listener destroyed"});
 
     if (mPromise)
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "pending request not completed"});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({IO_ERROR, "pending request not completed"});
 
     return zero::async::promise::chain<evutil_socket_t>([=](const auto &p) {
         mPromise = p;
@@ -206,7 +207,7 @@ void aio::net::ssl::Listener::close() {
         return;
 
     if (mPromise)
-        std::shared_ptr(mPromise)->reject({0, "listener will be closed"});
+        std::shared_ptr(mPromise)->reject({IO_EOF, "listener will be closed"});
 
     evconnlistener_free(mListener);
     mListener = nullptr;
@@ -248,7 +249,7 @@ aio::net::ssl::connect(const std::shared_ptr<aio::Context> &context, const std::
     static std::shared_ptr<Context> ctx = newContext({});
 
     if (!ctx)
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "invalid default SSL context"});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({SSL_ERROR, "invalid default SSL context"});
 
     return connect(context, host, port, ctx);
 }
@@ -263,14 +264,14 @@ aio::net::ssl::connect(
     SSL *ssl = SSL_new(ctx.get());
 
     if (!ssl)
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, getError()});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({SSL_ERROR, getError()});
 
     SSL_set_tlsext_host_name(ssl, host.c_str());
     SSL_set_hostflags(ssl, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
 
     if (!SSL_set1_host(ssl, host.c_str())) {
         SSL_free(ssl);
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, getError()});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({SSL_ERROR, getError()});
     }
 
     bufferevent *bev = bufferevent_openssl_socket_new(
@@ -282,7 +283,7 @@ aio::net::ssl::connect(
     );
 
     if (!bev)
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "new buffer failed"});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({SSL_ERROR, "new buffer failed"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         auto ctx = new std::shared_ptr(p);
@@ -308,7 +309,7 @@ aio::net::ssl::connect(
 
                         p->operator*().reject(
                                 {
-                                        -1,
+                                        SSL_ERROR,
                                         zero::strings::format(
                                                 "socket[%s] ssl[%s]",
                                                 evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()),
@@ -329,7 +330,7 @@ aio::net::ssl::connect(
 
         if (bufferevent_socket_connect_hostname(bev, context->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
             delete ctx;
-            p->reject({-1, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+            p->reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
         }
     })->then([=]() -> std::shared_ptr<ev::IBuffer> {
         return std::make_shared<Buffer>(bev);

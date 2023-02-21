@@ -2,6 +2,7 @@
 #define AIO_REQUEST_H
 
 #include "url.h"
+#include <aio/error.h>
 #include <aio/ev/pipe.h>
 #include <aio/ev/timer.h>
 #include <cstring>
@@ -42,7 +43,7 @@ namespace aio::http {
                 try {
                     return zero::async::promise::resolve<T>(j.get<T>());
                 } catch (const nlohmann::json::exception &e) {
-                    return zero::async::promise::reject<T>({-1, e.what()});
+                    return zero::async::promise::reject<T>({JSON_ERROR, e.what()});
                 }
             });
         }
@@ -94,12 +95,12 @@ namespace aio::http {
             std::optional<std::string> u = url.string();
 
             if (!u)
-                return zero::async::promise::reject<std::shared_ptr<Response>>({-1, "invalid url"});
+                return zero::async::promise::reject<std::shared_ptr<Response>>({HTTP_ERROR, "invalid url"});
 
             CURL *easy = curl_easy_init();
 
             if (!easy)
-                return zero::async::promise::reject<std::shared_ptr<Response>>({-1, "init easy handle failed"});
+                return zero::async::promise::reject<std::shared_ptr<Response>>({HTTP_ERROR, "init easy handle failed"});
 
             std::array<std::shared_ptr<ev::IPairedBuffer>, 2> buffers = ev::pipe(mContext);
 
@@ -271,7 +272,7 @@ namespace aio::http {
                             curl_mime_free(form);
                             curl_slist_free_all(headers);
                             delete connection;
-                            return zero::async::promise::reject<std::shared_ptr<Response>>({-1, curl_easy_strerror(c)});
+                            return zero::async::promise::reject<std::shared_ptr<Response>>({HTTP_ERROR, curl_easy_strerror(c)});
                         }
                     }
 
@@ -297,7 +298,7 @@ namespace aio::http {
                                 curl_slist_free_all(headers);
                                 delete connection;
                                 return zero::async::promise::reject<std::shared_ptr<Response>>(
-                                        {-1, curl_easy_strerror(c)}
+                                        {HTTP_ERROR, curl_easy_strerror(c)}
                                 );
                             }
                         }
@@ -343,7 +344,7 @@ namespace aio::http {
 
                 if (c != CURLM_OK) {
                     delete connection;
-                    p->reject({-1, "add easy handle failed"});
+                    p->reject({HTTP_ERROR, "add easy handle failed"});
                 }
             });
         }

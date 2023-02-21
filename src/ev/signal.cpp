@@ -1,4 +1,5 @@
 #include <aio/ev/signal.h>
+#include <aio/error.h>
 
 aio::ev::Signal::Signal(const std::shared_ptr<Context> &context, int sig) {
     mEvent = evsignal_new(
@@ -20,7 +21,7 @@ bool aio::ev::Signal::cancel() {
         return false;
 
     evsignal_del(mEvent);
-    std::shared_ptr(mPromise)->reject({});
+    std::shared_ptr(mPromise)->reject({IO_CANCEL, "promise canceled"});
 
     return true;
 }
@@ -31,7 +32,7 @@ bool aio::ev::Signal::pending() {
 
 std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Signal::on() {
     if (mPromise)
-        return zero::async::promise::reject<void>({-1, "pending signal has been set"});
+        return zero::async::promise::reject<void>({IO_ERROR, "pending signal has been set"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         mPromise = p;

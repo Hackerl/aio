@@ -1,7 +1,7 @@
 #ifndef AIO_IO_H
 #define AIO_IO_H
 
-#include "ev/buffer.h"
+#include "error.h"
 
 namespace aio {
     template<typename T>
@@ -13,7 +13,7 @@ namespace aio {
                 buffer->insert(buffer->end(), data.begin(), data.end());
                 P_CONTINUE(loop);
             })->fail([=](const zero::async::promise::Reason &reason) {
-                if (reason.code < 0) {
+                if (reason.code != IO_EOF) {
                     P_BREAK_E(loop, reason);
                     return;
                 }
@@ -32,13 +32,13 @@ namespace aio {
                     P_CONTINUE(loop);
                 });
             })->fail([=](const zero::async::promise::Reason &reason) {
-                if (reason.code < 0) {
+                if (reason.code != IO_EOF) {
                     P_BREAK_E(loop, reason);
                     return;
                 }
 
                 if (dst->closed()) {
-                    P_BREAK_E(loop, { -1, "writer is closed" });
+                    P_BREAK_E(loop, { IO_ERROR, "writer is closed" });
                     return;
                 }
 
@@ -57,7 +57,7 @@ namespace aio {
                             P_CONTINUE(loop);
                         });
                     })->fail([=](const zero::async::promise::Reason &reason) {
-                        if (reason.code < 0) {
+                        if (reason.code != IO_EOF) {
                             P_BREAK_E(loop, reason);
                             return;
                         }
@@ -72,7 +72,7 @@ namespace aio {
                             P_CONTINUE(loop);
                         });
                     })->fail([=](const zero::async::promise::Reason &reason) {
-                        if (reason.code < 0) {
+                        if (reason.code != IO_EOF) {
                             P_BREAK_E(loop, reason);
                             return;
                         }

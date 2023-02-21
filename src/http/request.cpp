@@ -85,7 +85,7 @@ std::shared_ptr<zero::async::promise::Promise<nlohmann::json>> aio::http::Respon
         try {
             return zero::async::promise::resolve<nlohmann::json>(nlohmann::json::parse(content));
         } catch (const nlohmann::json::parse_error &e) {
-            return zero::async::promise::reject<nlohmann::json>({-1, e.what()});
+            return zero::async::promise::reject<nlohmann::json>({JSON_ERROR, e.what()});
         }
     });
 }
@@ -205,7 +205,7 @@ void aio::http::Requests::recycle() {
 
         if (msg->data.result != CURLE_OK) {
             if (!connection->transferring) {
-                connection->promise->reject({-1, connection->error});
+                connection->promise->reject({HTTP_ERROR, connection->error});
             } else {
                 connection->buffer->throws(connection->error);
             }

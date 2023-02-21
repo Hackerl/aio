@@ -1,4 +1,5 @@
 #include <aio/net/stream.h>
+#include <aio/error.h>
 #include <zero/strings/strings.h>
 #include <cstring>
 
@@ -25,7 +26,7 @@ aio::net::Listener::Listener(std::shared_ptr<Context> context, evconnlistener *l
             mListener,
             [](evconnlistener *listener, void *arg) {
                 std::shared_ptr(static_cast<Listener *>(arg)->mPromise)->reject(
-                        {-1, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())}
+                        {IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())}
                 );
             }
     );
@@ -40,10 +41,10 @@ aio::net::Listener::~Listener() {
 
 std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::ev::IBuffer>>> aio::net::Listener::accept() {
     if (!mListener)
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "listener destroyed"});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({IO_ERROR, "listener destroyed"});
 
     if (mPromise)
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "pending request not completed"});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({IO_ERROR, "pending request not completed"});
 
     return zero::async::promise::chain<evutil_socket_t>([=](const auto &p) {
         mPromise = p;
@@ -61,7 +62,7 @@ void aio::net::Listener::close() {
         return;
 
     if (mPromise)
-        std::shared_ptr(mPromise)->reject({0, "listener will be closed"});
+        std::shared_ptr(mPromise)->reject({IO_EOF, "listener will be closed"});
 
     evconnlistener_free(mListener);
     mListener = nullptr;
@@ -98,7 +99,7 @@ aio::net::connect(const std::shared_ptr<Context> &context, const std::string &ho
     bufferevent *bev = bufferevent_socket_new(context->base(), -1, BEV_OPT_CLOSE_ON_FREE);
 
     if (!bev)
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "new buffer failed"});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({IO_ERROR, "new buffer failed"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         auto ctx = new std::shared_ptr(p);
@@ -111,7 +112,7 @@ aio::net::connect(const std::shared_ptr<Context> &context, const std::string &ho
                     auto p = static_cast<std::shared_ptr<zero::async::promise::Promise<void>> *>(arg);
 
                     if ((what & BEV_EVENT_CONNECTED) == 0) {
-                        p->operator*().reject({-1, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+                        p->operator*().reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
                         delete p;
                         return;
                     }
@@ -124,7 +125,7 @@ aio::net::connect(const std::shared_ptr<Context> &context, const std::string &ho
 
         if (bufferevent_socket_connect_hostname(bev, context->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
             delete ctx;
-            p->reject({-1, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+            p->reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
         }
     })->then([=]() -> std::shared_ptr<ev::IBuffer> {
         return std::make_shared<ev::Buffer>(bev);
@@ -167,7 +168,7 @@ aio::net::connect(const std::shared_ptr<Context> &context, const std::string &pa
     bufferevent *bev = bufferevent_socket_new(context->base(), -1, BEV_OPT_CLOSE_ON_FREE);
 
     if (!bev)
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({-1, "new buffer failed"});
+        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({IO_ERROR, "new buffer failed"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         auto ctx = new std::shared_ptr(p);
@@ -180,7 +181,7 @@ aio::net::connect(const std::shared_ptr<Context> &context, const std::string &pa
                     auto p = static_cast<std::shared_ptr<zero::async::promise::Promise<void>> *>(arg);
 
                     if ((what & BEV_EVENT_CONNECTED) == 0) {
-                        p->operator*().reject({-1, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+                        p->operator*().reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
                         delete p;
                         return;
                     }
@@ -193,7 +194,7 @@ aio::net::connect(const std::shared_ptr<Context> &context, const std::string &pa
 
         if (bufferevent_socket_connect(bev, (sockaddr *) &sa, sizeof(sa)) < 0) {
             delete ctx;
-            p->reject({-1, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+            p->reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
         }
     })->then([=]() -> std::shared_ptr<ev::IBuffer> {
         return std::make_shared<ev::Buffer>(bev);

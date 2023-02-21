@@ -3,6 +3,7 @@
 
 #include <list>
 #include <mutex>
+#include <aio/error.h>
 #include <aio/context.h>
 #include <aio/ev/event.h>
 #include <zero/interface.h>
@@ -110,7 +111,7 @@ namespace aio {
 
         std::shared_ptr<zero::async::promise::Promise<void>> send(const T &element) override {
             if (mClosed)
-                return zero::async::promise::reject<void>({-1, "buffer closed"});
+                return zero::async::promise::reject<void>({IO_ERROR, "buffer closed"});
 
             return zero::async::promise::loop<void>([element, self = this->shared_from_this()](const auto &loop) {
                 std::optional<size_t> index = self->mBuffer.reserve();
@@ -119,7 +120,7 @@ namespace aio {
                     std::lock_guard<std::mutex> guard(self->mMutex);
 
                     if (self->mClosed) {
-                        P_BREAK_E(loop, { -1, "buffer closed" });
+                        P_BREAK_E(loop, { IO_EOF, "buffer closed" });
                         return;
                     }
 
@@ -132,7 +133,7 @@ namespace aio {
 
                     event->on(EV_WRITE)->then([=](short what) {
                         if (what & EV_CLOSED) {
-                            P_BREAK_E(loop, { 0, "channel is closed" });
+                            P_BREAK_E(loop, { IO_EOF, "channel is closed" });
                             return;
                         }
 
@@ -231,7 +232,7 @@ namespace aio {
                     std::lock_guard<std::mutex> guard(self->mMutex);
 
                     if (self->mClosed) {
-                        P_BREAK_E(loop, { -1, "buffer closed" });
+                        P_BREAK_E(loop, { IO_EOF, "buffer closed" });
                         return;
                     }
 

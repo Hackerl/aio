@@ -1,4 +1,5 @@
 #include <aio/ev/event.h>
+#include <aio/error.h>
 
 aio::ev::Event::Event(const std::shared_ptr<Context> &context, evutil_socket_t fd) {
     mEvent = event_new(
@@ -21,7 +22,7 @@ bool aio::ev::Event::cancel() {
         return false;
 
     event_del(mEvent);
-    std::shared_ptr(mPromise)->reject({});
+    std::shared_ptr(mPromise)->reject({IO_CANCEL, "promise canceled"});
 
     return true;
 }
@@ -37,10 +38,10 @@ void aio::ev::Event::trigger(short events) {
 std::shared_ptr<zero::async::promise::Promise<short>>
 aio::ev::Event::on(short events, std::optional<std::chrono::milliseconds> timeout) {
     if (mPromise)
-        return zero::async::promise::reject<short>({-1, "pending event has been set"});
+        return zero::async::promise::reject<short>({IO_ERROR, "pending event has been set"});
 
     if (events & EV_PERSIST)
-        return zero::async::promise::reject<short>({-1, "persistent flag should not be used"});
+        return zero::async::promise::reject<short>({IO_ERROR, "persistent flag should not be used"});
 
     return zero::async::promise::chain<short>([=](const auto &p) {
         mPromise = p;

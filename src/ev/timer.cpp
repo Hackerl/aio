@@ -1,4 +1,5 @@
 #include <aio/ev/timer.h>
+#include <aio/error.h>
 
 aio::ev::Timer::Timer(const std::shared_ptr<Context> &context) {
     mEvent = evtimer_new(
@@ -19,7 +20,7 @@ bool aio::ev::Timer::cancel() {
         return false;
 
     evtimer_del(mEvent);
-    std::shared_ptr(mPromise)->reject({});
+    std::shared_ptr(mPromise)->reject({IO_CANCEL, "promise canceled"});
 
     return true;
 }
@@ -30,7 +31,7 @@ bool aio::ev::Timer::pending() {
 
 std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Timer::setTimeout(std::chrono::milliseconds delay) {
     if (mPromise)
-        return zero::async::promise::reject<void>({-1, "pending timer has been set"});
+        return zero::async::promise::reject<void>({IO_ERROR, "pending timer has been set"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         mPromise = p;
