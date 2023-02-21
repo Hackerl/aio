@@ -68,7 +68,7 @@ namespace aio::http::ws {
 
     class WebSocket : public std::enable_shared_from_this<WebSocket> {
     public:
-        explicit WebSocket(const std::shared_ptr<aio::Context> &context, std::shared_ptr<ev::IBuffer> buffer);
+        WebSocket(const std::shared_ptr<aio::Context> &context, std::shared_ptr<ev::IBuffer> buffer);
 
     private:
         std::shared_ptr<zero::async::promise::Promise<std::tuple<Header, std::vector<std::byte>>>> readFrame();
@@ -90,6 +90,7 @@ namespace aio::http::ws {
 
     private:
         int mRef;
+        bool mTimeout;
         State mState;
         std::shared_ptr<ev::Event> mEvent;
         std::shared_ptr<ev::IBuffer> mBuffer;
