@@ -90,10 +90,10 @@ namespace aio::http::ws {
 
     private:
         int mRef;
-        bool mTimeout;
         State mState;
         std::shared_ptr<ev::Event> mEvent;
         std::shared_ptr<ev::IBuffer> mBuffer;
+        std::optional<unsigned int> mHeartbeat;
     };
 
     std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<WebSocket>>>

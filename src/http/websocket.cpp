@@ -76,8 +76,7 @@ void aio::http::ws::Header::mask(bool mask) {
 }
 
 aio::http::ws::WebSocket::WebSocket(const std::shared_ptr<aio::Context> &context, std::shared_ptr<ev::IBuffer> buffer)
-        : mRef(0), mTimeout(false), mBuffer(std::move(buffer)), mState(CONNECTED),
-          mEvent(std::make_shared<ev::Event>(context, -1)) {
+        : mRef(0), mBuffer(std::move(buffer)), mState(CONNECTED), mEvent(std::make_shared<ev::Event>(context, -1)) {
     mBuffer->setTimeout(1min, 1min);
 }
 
@@ -211,8 +210,6 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
         }
 
         readMessage()->then([=](const InternalMessage &message) {
-            mTimeout = false;
-
             switch (message.opcode) {
                 case CONTINUATION:
                     P_BREAK_E(loop, { WS_ERROR, "unexpected continuation message" });
@@ -229,6 +226,23 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
                     break;
 
                 case PONG:
+                    if (!mHeartbeat) {
+                        P_BREAK_V(loop, Message{message.opcode, message.data});
+                        break;
+                    }
+
+                    if (message.data.size() != sizeof(unsigned int) ||
+                        *(unsigned int *) message.data.data() != *mHeartbeat) {
+                        mHeartbeat.reset();
+                        P_BREAK_V(loop, Message{message.opcode, message.data});
+                        break;
+                    }
+
+                    mHeartbeat.reset();
+                    P_CONTINUE(loop);
+
+                    break;
+
                 case BINARY:
                     P_BREAK_V(loop, Message{message.opcode, message.data});
                     break;
@@ -269,11 +283,10 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
                     P_BREAK_E(loop, { WS_ERROR, "unknown opcode" });
             }
         })->fail([=](const zero::async::promise::Reason &reason) {
-            if (reason.code == IO_TIMEOUT && !mTimeout) {
-                mTimeout = true;
-                unsigned int key = std::random_device{}();
+            if (reason.code == IO_TIMEOUT && !mHeartbeat) {
+                mHeartbeat = std::random_device{}();
 
-                ping(&key, sizeof(unsigned int))->then([=]() {
+                ping(&*mHeartbeat, sizeof(unsigned int))->then([=]() {
                     P_CONTINUE(loop);
                 }, [=](const zero::async::promise::Reason &reason) {
                     P_BREAK_E(loop, reason);
