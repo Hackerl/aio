@@ -1,6 +1,7 @@
 #include <aio/http/request.h>
 #include <aio/io.h>
 #include <aio/ev/event.h>
+#include <fstream>
 
 aio::http::Response::Response(CURL *easy, std::shared_ptr<ev::IBuffer> buffer)
         : mEasy(easy), mBuffer(std::move(buffer)) {
@@ -65,6 +66,28 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::http
 
 std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::readLine(evbuffer_eol_style style) {
     return mBuffer->readLine(style);
+}
+
+std::shared_ptr<zero::async::promise::Promise<void>> aio::http::Response::output(const std::filesystem::path &path) {
+    std::shared_ptr<std::ofstream> stream = std::make_shared<std::ofstream>(path);
+
+    if (!stream->is_open())
+        return zero::async::promise::reject<void>({-1, "create file output stream failed"});
+
+    return zero::async::promise::loop<void>([=](const auto &loop) {
+        read()->then([=](const std::vector<std::byte> &data) {
+            stream->write((const char *) data.data(), (std::streamsize) data.size());
+        })->then([=]() {
+            P_CONTINUE(loop);
+        }, [=](const zero::async::promise::Reason &reason) {
+            if (reason.code != IO_EOF) {
+                P_BREAK_E(loop, reason);
+                return;
+            }
+
+            P_BREAK(loop);
+        });
+    });
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::string() {

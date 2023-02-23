@@ -12,6 +12,7 @@ int main(int argc, char **argv) {
     cmdline.addOptional<std::string>("method", 'm', "http request method", "GET");
     cmdline.addOptional<std::vector<std::string>>("headers", 'h', "http request headers");
     cmdline.addOptional<std::string>("body", '\0', "http request body");
+    cmdline.addOptional<std::filesystem::path>("output", '\0', "output file path");
 
     cmdline.addOptional("json", '\0', "http body with json");
     cmdline.addOptional("form", '\0', "http body with form");
@@ -31,6 +32,7 @@ int main(int argc, char **argv) {
     auto method = cmdline.getOptional<std::string>("method");
     auto headers = cmdline.getOptional<std::vector<std::string>>("headers");
     auto body = cmdline.getOptional<std::string>("body");
+    auto output = cmdline.getOptional<std::filesystem::path>("output");
 
     std::shared_ptr<aio::Context> context = aio::newContext();
 
@@ -80,10 +82,13 @@ int main(int argc, char **argv) {
         promise = requests->request(*method, url, options);
     }
 
-    promise->then([](const std::shared_ptr<aio::http::Response> &response) {
-        return response->string();
-    })->then([](const std::string &content) {
-        LOG_INFO("content: %s", content.c_str());
+    promise->then([=](const std::shared_ptr<aio::http::Response> &response) {
+        if (output)
+            return response->output(*output);
+
+        return response->string()->then([](const std::string &content) {
+            LOG_INFO("content: %s", content.c_str());
+        });
     })->fail([](const zero::async::promise::Reason &reason) {
         LOG_ERROR("%s", reason.message.c_str());
     })->finally([=]() {

@@ -35,6 +35,7 @@ namespace aio::http {
         std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read(size_t n);
         std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(evbuffer_eol_style style);
         std::shared_ptr<zero::async::promise::Promise<std::string>> string();
+        std::shared_ptr<zero::async::promise::Promise<void>> output(const std::filesystem::path &path);
         std::shared_ptr<zero::async::promise::Promise<nlohmann::json>> json();
 
         template<typename T>
