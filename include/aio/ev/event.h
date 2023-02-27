@@ -12,6 +12,9 @@ namespace aio::ev {
         Event(const std::shared_ptr<Context> &context, evutil_socket_t fd);
         ~Event();
 
+    private:
+        void setEvents(short events);
+
     public:
         bool cancel();
         bool pending();
