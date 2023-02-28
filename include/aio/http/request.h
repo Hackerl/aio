@@ -18,6 +18,8 @@
 #endif
 
 namespace aio::http {
+    using namespace std::chrono_literals;
+
     class Response : public std::enable_shared_from_this<Response> {
     public:
         explicit Response(CURL *easy, std::shared_ptr<ev::IBuffer> buffer);
@@ -71,9 +73,11 @@ namespace aio::http {
     };
 
     struct Options {
-        std::string proxy;
+        std::optional<std::string> proxy;
         std::map<std::string, std::string> headers;
         std::map<std::string, std::string> cookies;
+        std::optional<std::chrono::seconds> timeout;
+        std::optional<std::string> userAgent;
     };
 
     class Requests : public std::enable_shared_from_this<Requests> {
@@ -110,6 +114,8 @@ namespace aio::http {
                     std::make_shared<Response>(easy, buffers[1]),
                     buffers[0]
             };
+
+            Options opt = options.value_or(mOptions);
 
             if (method == "HEAD") {
                 curl_easy_setopt(easy, CURLOPT_NOBODY, 1L);
@@ -188,8 +194,8 @@ namespace aio::http {
             curl_easy_setopt(easy, CURLOPT_PRIVATE, connection);
             curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(easy, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
-            curl_easy_setopt(easy, CURLOPT_CONNECTTIMEOUT, 30L);
-            curl_easy_setopt(easy, CURLOPT_USERAGENT, "asyncio requests");
+            curl_easy_setopt(easy, CURLOPT_CONNECTTIMEOUT, (long) opt.timeout.value_or(30s).count());
+            curl_easy_setopt(easy, CURLOPT_USERAGENT, opt.userAgent.value_or("asyncio requests").c_str());
 
 #ifdef AIO_EMBED_CA_CERT
             curl_easy_setopt(easy, CURLOPT_CAINFO, nullptr);
@@ -209,10 +215,8 @@ namespace aio::http {
             );
 #endif
 
-            Options opt = options.value_or(mOptions);
-
-            if (!opt.proxy.empty())
-                curl_easy_setopt(easy, CURLOPT_PROXY, opt.proxy.c_str());
+            if (opt.proxy)
+                curl_easy_setopt(easy, CURLOPT_PROXY, opt.proxy->c_str());
 
             if (!opt.cookies.empty()) {
                 std::list<std::string> cookies;
