@@ -4,7 +4,7 @@
 #include <cstring>
 
 #ifdef __linux__
-#include <linux/in.h>
+#include <netinet/in.h>
 #include <endian.h>
 #endif
 
