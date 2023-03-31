@@ -1,7 +1,7 @@
+#include <aio/http/websocket.h>
 #include <zero/log.h>
 #include <zero/cmdline.h>
 #include <zero/encoding/hex.h>
-#include <aio/http/websocket.h>
 
 int main(int argc, char **argv) {
     INIT_CONSOLE_LOG(zero::INFO_LEVEL);

@@ -1,6 +1,6 @@
+#include <aio/http/request.h>
 #include <zero/log.h>
 #include <zero/cmdline.h>
-#include <aio/http/request.h>
 
 int main(int argc, char **argv) {
     INIT_CONSOLE_LOG(zero::INFO_LEVEL);
