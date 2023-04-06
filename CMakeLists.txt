@@ -56,8 +56,8 @@ target_link_libraries(
         CURL::libcurl
         libevent::core
         libevent::extra
-        libevent::pthreads
         nlohmann_json::nlohmann_json
+        $<$<PLATFORM_ID:Linux>:libevent::pthreads>
         $<$<NOT:$<BOOL:${AIO_DISABLE_SSL}>>:libevent::openssl>
 )
 
