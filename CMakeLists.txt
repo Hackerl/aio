@@ -6,68 +6,22 @@ set(CMAKE_CXX_STANDARD 17)
 option(AIO_DISABLE_SSL "disable ssl support" OFF)
 option(AIO_DISABLE_TESTS "disable aio unit test" OFF)
 option(AIO_DISABLE_SAMPLES "disable aio samples" OFF)
-option(AIO_DISABLE_THREAD_SUPPORT "disable aio thread support" OFF)
 option(AIO_EMBED_CA_CERT "use embedded CA certificates" OFF)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/lib)
 
-set(EVENT__LIBRARY_TYPE STATIC CACHE STRING "disable shared library")
-set(EVENT__DISABLE_TESTS ON CACHE BOOL "disable event tests")
-set(EVENT__DISABLE_SAMPLES ON CACHE BOOL "disable event samples")
-set(EVENT__DISABLE_BENCHMARK ON CACHE BOOL "disable event benchmark")
+set(AIO_VERSION 0.0.1)
 
-set(CURL_DISABLE_TESTS ON CACHE BOOL "disable curl tests")
-set(BUILD_CURL_EXE OFF CACHE BOOL "disable curl executable")
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "disable curl shared library")
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
-set(JSON_BuildTests OFF CACHE BOOL "disable json library tests")
-
-if (AIO_DISABLE_SSL)
-    set(CURL_ENABLE_SSL OFF CACHE BOOL "disable curl openssl")
-    set(EVENT__DISABLE_OPENSSL ON CACHE BOOL "disable event openssl")
-endif ()
-
-if (AIO_DISABLE_THREAD_SUPPORT)
-    set(EVENT__DISABLE_THREAD_SUPPORT ON CACHE BOOL "disable event thread support")
-endif ()
-
-include(FetchContent)
-
-FetchContent_Declare(
-        zero
-        GIT_REPOSITORY https://github.com/Hackerl/zero
-        GIT_TAG 63f28f491b4d87fddfbb2e0aee98cab1473f7c4c
-)
-
-FetchContent_MakeAvailable(zero)
-
-FetchContent_Declare(
-        libcurl
-        GIT_REPOSITORY https://github.com/curl/curl
-        GIT_TAG curl-7_88_0
-)
-
-FetchContent_MakeAvailable(libcurl)
-
-FetchContent_Declare(
-        libevent
-        GIT_REPOSITORY https://github.com/libevent/libevent
-        GIT_TAG release-2.1.12-stable
-)
-
-FetchContent_MakeAvailable(libevent)
-
-FetchContent_Declare(
-        json
-        GIT_REPOSITORY https://github.com/nlohmann/json
-        GIT_TAG v3.11.2
-)
-
-FetchContent_MakeAvailable(json)
+find_package(zero 0.0.2 EXACT CONFIG REQUIRED)
+find_package(CURL CONFIG REQUIRED)
+find_package(Libevent CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 
 add_library(
         aio
@@ -88,17 +42,70 @@ if (AIO_EMBED_CA_CERT)
     target_compile_definitions(aio PUBLIC AIO_EMBED_CA_CERT)
 endif ()
 
-target_include_directories(aio PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(
+        aio
+        PUBLIC
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
 
 target_link_libraries(
         aio
-        zero
-        libcurl
-        nlohmann_json
-        event_core_static
-        event_extra_static
-        $<$<NOT:$<BOOL:${AIO_DISABLE_SSL}>>:event_openssl_static>
-        $<$<AND:$<PLATFORM_ID:Linux>,$<NOT:$<BOOL:${AIO_DISABLE_THREAD_SUPPORT}>>>:event_pthreads_static>
+        PUBLIC
+        zero::zero
+        CURL::libcurl
+        libevent::core
+        libevent::extra
+        libevent::pthreads
+        nlohmann_json::nlohmann_json
+        $<$<NOT:$<BOOL:${AIO_DISABLE_SSL}>>:libevent::openssl>
+)
+
+if (AIO_DISABLE_SSL)
+    set(
+            EXCLUDE_HEADERS
+            ${EXCLUDE_HEADERS}
+            PATTERN "net/ssl.h" EXCLUDE
+            PATTERN "http/websocket.h" EXCLUDE
+    )
+endif ()
+
+install(
+        DIRECTORY
+        include/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        ${EXCLUDE_HEADERS}
+)
+
+install(
+        TARGETS aio
+        EXPORT ${PROJECT_NAME}Targets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+install(
+        EXPORT ${PROJECT_NAME}Targets
+        NAMESPACE aio::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+)
+
+configure_package_config_file(
+        cmake/${PROJECT_NAME}-config.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+)
+
+write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
+        VERSION ${AIO_VERSION}
+        COMPATIBILITY SameMajorVersion
+)
+
+install(
+        FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
 
 if (NOT AIO_DISABLE_SAMPLES)
