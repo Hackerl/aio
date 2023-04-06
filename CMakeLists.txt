@@ -25,6 +25,7 @@ find_package(nlohmann_json CONFIG REQUIRED)
 
 add_library(
         aio
+        STATIC
         src/context.cpp
         src/ev/buffer.cpp
         src/ev/pipe.cpp
