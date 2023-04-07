@@ -13,12 +13,12 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/lib)
 
-set(AIO_VERSION 0.0.1)
+set(AIO_VERSION 1.0.0)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-find_package(zero 0.0.2 EXACT CONFIG REQUIRED)
+find_package(zero CONFIG REQUIRED)
 find_package(CURL CONFIG REQUIRED)
 find_package(Libevent CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
