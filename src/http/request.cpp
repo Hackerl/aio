@@ -194,13 +194,13 @@ void aio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what, voi
         context->second->cancel();
 
     context->second->onPersist(
-            (short) (((what & CURL_POLL_IN) ? EV_READ : 0) | ((what & CURL_POLL_OUT) ? EV_WRITE : 0)),
+            (short) (((what & CURL_POLL_IN) ? ev::READ : 0) | ((what & CURL_POLL_OUT) ? ev::WRITE : 0)),
             [s, stopped = context->first, self = shared_from_this()](short what) {
                 int n = 0;
                 curl_multi_socket_action(
                         self->mMulti,
                         s,
-                        ((what & EV_READ) ? CURL_CSELECT_IN : 0) | ((what & EV_WRITE) ? CURL_CSELECT_OUT : 0),
+                        ((what & ev::READ) ? CURL_CSELECT_IN : 0) | ((what & ev::WRITE) ? CURL_CSELECT_OUT : 0),
                         &n
                 );
 

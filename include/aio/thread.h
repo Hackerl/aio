@@ -11,30 +11,68 @@ namespace aio {
             std::shared_ptr<ev::Event> event = std::make_shared<ev::Event>(context, -1);
 
             if constexpr (std::is_same_v<T, void>) {
-                std::shared_ptr<std::thread> thread = std::make_shared<std::thread>(
-                        [=, f = std::move(f)]() {
-                            f();
-                            event->trigger(EV_READ);
-                        }
-                );
+                if constexpr (std::is_same_v<nonstd::expected<void, zero::async::promise::Reason>, std::invoke_result_t<F>>) {
+                    std::shared_ptr<nonstd::expected<void, zero::async::promise::Reason>> result = std::make_shared<nonstd::expected<void, zero::async::promise::Reason>>();
+                    std::shared_ptr<std::thread> thread = std::make_shared<std::thread>(
+                            [=, f = std::move(f)]() {
+                                *result = f();
+                                event->trigger(ev::READ);
+                            }
+                    );
 
-                event->on(EV_READ)->then([=, thread = std::move(thread)](short) {
-                    thread->join();
-                    p->resolve();
-                });
+                    event->on(ev::READ)->then([=, thread = std::move(thread)](short) {
+                        thread->join();
+
+                        if (*result)
+                            p->resolve();
+                        else
+                            p->reject(std::move(result->error()));
+                    });
+                } else {
+                    std::shared_ptr<std::thread> thread = std::make_shared<std::thread>(
+                            [=, f = std::move(f)]() {
+                                f();
+                                event->trigger(ev::READ);
+                            }
+                    );
+
+                    event->on(ev::READ)->then([=, thread = std::move(thread)](short) {
+                        thread->join();
+                        p->resolve();
+                    });
+                }
             } else {
-                std::shared_ptr<T> result = std::make_shared<T>();
-                std::shared_ptr<std::thread> thread = std::make_shared<std::thread>(
-                        [=, f = std::move(f)]() {
-                            *result = f();
-                            event->trigger(EV_READ);
-                        }
-                );
+                if constexpr (std::is_same_v<nonstd::expected<T, zero::async::promise::Reason>, std::invoke_result_t<F>>) {
+                    std::shared_ptr<nonstd::expected<T, zero::async::promise::Reason>> result = std::make_shared<nonstd::expected<T, zero::async::promise::Reason>>();
+                    std::shared_ptr<std::thread> thread = std::make_shared<std::thread>(
+                            [=, f = std::move(f)]() {
+                                *result = f();
+                                event->trigger(ev::READ);
+                            }
+                    );
 
-                event->on(EV_READ)->then([=, thread = std::move(thread)](short) {
-                    thread->join();
-                    p->resolve(*result);
-                });
+                    event->on(ev::READ)->then([=, thread = std::move(thread)](short) {
+                        thread->join();
+
+                        if (*result)
+                            p->resolve(std::move(result->value()));
+                        else
+                            p->reject(std::move(result->error()));
+                    });
+                } else {
+                    std::shared_ptr<T> result = std::make_shared<T>();
+                    std::shared_ptr<std::thread> thread = std::make_shared<std::thread>(
+                            [=, f = std::move(f)]() {
+                                *result = f();
+                                event->trigger(ev::READ);
+                            }
+                    );
+
+                    event->on(ev::READ)->then([=, thread = std::move(thread)](short) {
+                        thread->join();
+                        p->resolve(std::move(*result));
+                    });
+                }
             }
         });
     }

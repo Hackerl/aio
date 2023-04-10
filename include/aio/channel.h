@@ -28,6 +28,11 @@ namespace aio {
         virtual std::shared_ptr<zero::async::promise::Promise<void>> send(const T &element) = 0;
 
     public:
+        virtual bool sendSync(T &&element) = 0;
+        virtual bool sendNoWait(T &&element) = 0;
+        virtual std::shared_ptr<zero::async::promise::Promise<void>> send(T &&element) = 0;
+
+    public:
         virtual void close() = 0;
     };
 
@@ -62,7 +67,7 @@ namespace aio {
                     zero::atomic::Event evt;
                     std::shared_ptr<ev::Event> event = getEvent();
 
-                    event->on(EV_WRITE)->finally([&]() {
+                    event->on(ev::WRITE)->finally([&]() {
                         evt.notify();
                     });
 
@@ -79,7 +84,7 @@ namespace aio {
                 std::lock_guard<std::mutex> guard(mMutex);
 
                 for (const auto &event: mPending[RECEIVER])
-                    event->trigger(EV_READ);
+                    event->trigger(ev::READ);
 
                 mPending[RECEIVER].clear();
                 break;
@@ -103,7 +108,7 @@ namespace aio {
             std::lock_guard<std::mutex> guard(mMutex);
 
             for (const auto &event: mPending[RECEIVER])
-                event->trigger(EV_READ);
+                event->trigger(ev::READ);
 
             mPending[RECEIVER].clear();
             return true;
@@ -131,8 +136,8 @@ namespace aio {
 
                     std::shared_ptr<ev::Event> event = self->getEvent();
 
-                    event->on(EV_WRITE)->then([=](short what) {
-                        if (what & EV_CLOSED) {
+                    event->on(ev::WRITE)->then([=](short what) {
+                        if (what & ev::CLOSED) {
                             P_BREAK_E(loop, { IO_EOF, "channel is closed" });
                             return;
                         }
@@ -150,11 +155,132 @@ namespace aio {
                 std::lock_guard<std::mutex> guard(self->mMutex);
 
                 for (const auto &event: self->mPending[RECEIVER])
-                    event->trigger(EV_READ);
+                    event->trigger(ev::READ);
 
                 self->mPending[RECEIVER].clear();
                 P_BREAK(loop);
             });
+        }
+
+    public:
+        bool sendSync(T &&element) override {
+            if (mClosed)
+                return false;
+
+            while (true) {
+                std::optional<size_t> index = mBuffer.reserve();
+
+                if (!index) {
+                    mMutex.lock();
+
+                    if (mClosed) {
+                        mMutex.unlock();
+                        return false;
+                    }
+
+                    if (!mBuffer.full()) {
+                        mMutex.unlock();
+                        continue;
+                    }
+
+                    zero::atomic::Event evt;
+                    std::shared_ptr<ev::Event> event = getEvent();
+
+                    event->on(ev::WRITE)->finally([&]() {
+                        evt.notify();
+                    });
+
+                    mPending[SENDER].push_back(std::move(event));
+                    mMutex.unlock();
+
+                    evt.wait();
+                    continue;
+                }
+
+                mBuffer[*index] = std::move(element);
+                mBuffer.commit(*index);
+
+                std::lock_guard<std::mutex> guard(mMutex);
+
+                for (const auto &event: mPending[RECEIVER])
+                    event->trigger(ev::READ);
+
+                mPending[RECEIVER].clear();
+                break;
+            }
+
+            return true;
+        }
+
+        bool sendNoWait(T &&element) override {
+            if (mClosed)
+                return false;
+
+            std::optional<size_t> index = mBuffer.reserve();
+
+            if (!index)
+                return false;
+
+            mBuffer[*index] = std::move(element);
+            mBuffer.commit(*index);
+
+            std::lock_guard<std::mutex> guard(mMutex);
+
+            for (const auto &event: mPending[RECEIVER])
+                event->trigger(ev::READ);
+
+            mPending[RECEIVER].clear();
+            return true;
+        }
+
+        std::shared_ptr<zero::async::promise::Promise<void>> send(T &&element) override {
+            if (mClosed)
+                return zero::async::promise::reject<void>({IO_ERROR, "buffer closed"});
+
+            return zero::async::promise::loop<void>(
+                    [element = std::move(element), self = this->shared_from_this()](const auto &loop) {
+                        std::optional<size_t> index = self->mBuffer.reserve();
+
+                        if (!index) {
+                            std::lock_guard<std::mutex> guard(self->mMutex);
+
+                            if (self->mClosed) {
+                                P_BREAK_E(loop, { IO_EOF, "buffer closed" });
+                                return;
+                            }
+
+                            if (!self->mBuffer.full()) {
+                                P_CONTINUE(loop);
+                                return;
+                            }
+
+                            std::shared_ptr<ev::Event> event = self->getEvent();
+
+                            event->on(ev::WRITE)->then([=](short what) {
+                                if (what & ev::CLOSED) {
+                                    P_BREAK_E(loop, { IO_EOF, "channel is closed" });
+                                    return;
+                                }
+
+                                P_CONTINUE(loop);
+                            });
+
+                            self->mPending[SENDER].push_back(std::move(event));
+                            return;
+                        }
+
+                        self->mBuffer[*index] = std::move(element);
+                        self->mBuffer.commit(*index);
+
+                        std::lock_guard<std::mutex> guard(self->mMutex);
+
+                        for (const auto &event: self->mPending[RECEIVER])
+                            event->trigger(ev::READ);
+
+                        self->mPending[RECEIVER].clear();
+                        P_BREAK(loop);
+                    }
+            );
         }
 
     public:
@@ -180,7 +306,7 @@ namespace aio {
                     zero::atomic::Event evt;
                     std::shared_ptr<ev::Event> event = getEvent();
 
-                    event->on(EV_READ)->finally([&]() {
+                    event->on(ev::READ)->finally([&]() {
                         evt.notify();
                     });
 
@@ -191,13 +317,13 @@ namespace aio {
                     continue;
                 }
 
-                element = mBuffer[*index];
+                element = std::move(mBuffer[*index]);
                 mBuffer.release(*index);
 
                 std::lock_guard<std::mutex> guard(mMutex);
 
                 for (const auto &event: mPending[SENDER])
-                    event->trigger(EV_WRITE);
+                    event->trigger(ev::WRITE);
 
                 mPending[SENDER].clear();
                 break;
@@ -212,13 +338,13 @@ namespace aio {
             if (!index)
                 return std::nullopt;
 
-            T element = mBuffer[*index];
+            T element = std::move(mBuffer[*index]);
             mBuffer.release(*index);
 
             std::lock_guard<std::mutex> guard(mMutex);
 
             for (const auto &event: mPending[SENDER])
-                event->trigger(EV_WRITE);
+                event->trigger(ev::WRITE);
 
             mPending[SENDER].clear();
             return element;
@@ -243,7 +369,7 @@ namespace aio {
 
                     std::shared_ptr<ev::Event> event = self->getEvent();
 
-                    event->on(EV_READ)->finally([=]() {
+                    event->on(ev::READ)->finally([=]() {
                         P_CONTINUE(loop);
                     });
 
@@ -251,13 +377,13 @@ namespace aio {
                     return;
                 }
 
-                T element = self->mBuffer[*index];
+                T element = std::move(self->mBuffer[*index]);
                 self->mBuffer.release(*index);
 
                 std::lock_guard<std::mutex> guard(self->mMutex);
 
                 for (const auto &event: self->mPending[SENDER])
-                    event->trigger(EV_WRITE);
+                    event->trigger(ev::WRITE);
 
                 self->mPending[SENDER].clear();
                 P_BREAK_V(loop, element);
@@ -274,12 +400,12 @@ namespace aio {
             mClosed = true;
 
             for (const auto &event: mPending[SENDER])
-                event->trigger(EV_CLOSED);
+                event->trigger(ev::CLOSED);
 
             mPending[SENDER].clear();
 
             for (const auto &event: mPending[RECEIVER])
-                event->trigger(EV_CLOSED);
+                event->trigger(ev::CLOSED);
 
             mPending[RECEIVER].clear();
         }

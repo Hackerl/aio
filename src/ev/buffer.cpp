@@ -1,7 +1,7 @@
 #include <aio/ev/buffer.h>
 #include <aio/error.h>
-#include <zero/log.h>
 #include <optional>
+#include <cstring>
 
 constexpr auto READ = 0;
 constexpr auto DRAIN = 1;
@@ -147,19 +147,15 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
 }
 
 size_t aio::ev::Buffer::write(std::string_view str) {
-    return write(str.data(), str.length());
+    return write({(const std::byte *) str.data(), str.length()});
 }
 
-size_t aio::ev::Buffer::write(const std::vector<std::byte> &data) {
-    return write(data.data(), data.size());
-}
-
-size_t aio::ev::Buffer::write(const void *buffer, size_t n) {
+size_t aio::ev::Buffer::write(nonstd::span<const std::byte> buffer) {
     if (mClosed)
         return -1;
 
     evbuffer *output = bufferevent_get_output(mBev);
-    evbuffer_add(output, buffer, n);
+    evbuffer_add(output, buffer.data(), buffer.size());
 
     return evbuffer_get_length(output);
 }

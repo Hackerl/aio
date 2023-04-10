@@ -17,33 +17,18 @@ aio::ev::Event::~Event() {
     event_free(mEvent);
 }
 
-void aio::ev::Event::setEvents(short events) {
-    event_base *base;
-    evutil_socket_t fd;
-    event_callback_fn callback;
-    void *arg;
-
-    event_get_assignment(mEvent, &base, &fd, nullptr, &callback, &arg);
-    event_assign(mEvent, base, fd, events, callback, arg);
-}
-
 bool aio::ev::Event::cancel() {
     if (!pending())
         return false;
 
     event_del(mEvent);
-    std::shared_ptr<zero::async::promise::Promise<short>> promise = mPromise;
-
-    if (!promise)
-        return true;
-
-    promise->reject({IO_CANCEL, "promise canceled"});
+    std::shared_ptr(mPromise)->reject({IO_CANCEL, "promise canceled"});
 
     return true;
 }
 
 bool aio::ev::Event::pending() {
-    return mPromise.operator bool() || event_pending(mEvent, EV_READ | EV_WRITE | EV_CLOSED, nullptr);
+    return mPromise.operator bool();
 }
 
 void aio::ev::Event::trigger(short events) {
@@ -52,7 +37,7 @@ void aio::ev::Event::trigger(short events) {
 
 std::shared_ptr<zero::async::promise::Promise<short>>
 aio::ev::Event::on(short events, std::optional<std::chrono::milliseconds> timeout) {
-    if (pending())
+    if (mPromise)
         return zero::async::promise::reject<short>({IO_ERROR, "pending event has been set"});
 
     if (events & EV_PERSIST)
@@ -60,9 +45,7 @@ aio::ev::Event::on(short events, std::optional<std::chrono::milliseconds> timeou
 
     return zero::async::promise::chain<short>([=](const auto &p) {
         mPromise = p;
-
-        if (mEvent->ev_events != events)
-            setEvents(events);
+        mEvent->ev_events = events;
 
         if (!timeout) {
             event_add(mEvent, nullptr);
@@ -86,30 +69,8 @@ aio::ev::Event::onPersist(
         const std::function<bool(short)> &func,
         std::optional<std::chrono::milliseconds> timeout
 ) {
-    if (pending())
-        return zero::async::promise::reject<void>({IO_ERROR, "pending event has been set"});
-
-    std::optional<timeval> tv;
-
-    if (timeout)
-        tv = {
-                (long) (timeout->count() / 1000),
-                (long) ((timeout->count() % 1000) * 1000)
-        };
-
-    events |= EV_PERSIST;
-
-    if (mEvent->ev_events != events)
-        setEvents(events);
-
-    event_add(mEvent, tv ? &*tv : nullptr);
-
     return zero::async::promise::loop<void>([=](const auto &loop) {
-        zero::async::promise::chain<short>([=](const auto p) {
-            mPromise = p;
-        })->finally([=]() {
-            mPromise.reset();
-        })->then([=](short what) {
+        on(events, timeout)->then([=](short what) {
             if (!func(what)) {
                 P_BREAK(loop);
                 return;
@@ -119,7 +80,5 @@ aio::ev::Event::onPersist(
         }, [=](const zero::async::promise::Reason &) {
             P_BREAK(loop);
         });
-    })->finally([self = shared_from_this()]() {
-        event_del(self->mEvent);
     });
 }

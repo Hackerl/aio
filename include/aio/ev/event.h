@@ -7,13 +7,17 @@
 #include <zero/async/promise.h>
 
 namespace aio::ev {
+    enum What : short {
+        TIMEOUT = EV_TIMEOUT,
+        READ = EV_READ,
+        WRITE = EV_WRITE,
+        CLOSED = EV_CLOSED
+    };
+
     class Event : public std::enable_shared_from_this<Event> {
     public:
         Event(const std::shared_ptr<Context> &context, evutil_socket_t fd);
         ~Event();
-
-    private:
-        void setEvents(short events);
 
     public:
         bool cancel();

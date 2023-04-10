@@ -7,6 +7,7 @@ add_executable(
         ev/pipe.cpp
         http/url.cpp
         $<$<PLATFORM_ID:Linux>:ev/signal.cpp>
+        $<$<PLATFORM_ID:Windows>:main.cpp>
 )
 
-target_link_libraries(aio_test PRIVATE aio Catch2::Catch2WithMain)
+target_link_libraries(aio_test PRIVATE aio $<IF:$<PLATFORM_ID:Windows>,Catch2::Catch2,Catch2::Catch2WithMain>)

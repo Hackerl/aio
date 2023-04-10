@@ -6,6 +6,7 @@
 #include <variant>
 #include <aio/ev/event.h>
 #include <aio/net/stream.h>
+#include <nonstd/span.hpp>
 
 namespace aio::http::ws {
     enum State {
@@ -83,10 +84,10 @@ namespace aio::http::ws {
 
     public:
         std::shared_ptr<zero::async::promise::Promise<void>> sendText(std::string_view text);
-        std::shared_ptr<zero::async::promise::Promise<void>> sendBinary(const void *buffer, size_t length);
+        std::shared_ptr<zero::async::promise::Promise<void>> sendBinary(nonstd::span<const std::byte> buffer);
         std::shared_ptr<zero::async::promise::Promise<void>> close(CloseCode code, std::string_view reason = {});
-        std::shared_ptr<zero::async::promise::Promise<void>> ping(const void *buffer, size_t length);
-        std::shared_ptr<zero::async::promise::Promise<void>> pong(const void *buffer, size_t length);
+        std::shared_ptr<zero::async::promise::Promise<void>> ping(nonstd::span<const std::byte> buffer);
+        std::shared_ptr<zero::async::promise::Promise<void>> pong(nonstd::span<const std::byte> buffer);
 
     private:
         int mRef;

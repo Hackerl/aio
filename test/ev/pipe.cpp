@@ -1,4 +1,5 @@
 #include <aio/ev/pipe.h>
+#include <aio/error.h>
 #include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("buffer pipe", "[pipe]") {
@@ -48,7 +49,7 @@ TEST_CASE("buffer pipe", "[pipe]") {
         })->then([](const std::vector<std::byte> &) {
             FAIL();
         }, [](const zero::async::promise::Reason &reason) {
-            REQUIRE(reason.code == 0);
+            REQUIRE(reason.code == aio::IO_EOF);
             REQUIRE(reason.message == "buffer is closed");
         })->finally([=]() {
             context->loopBreak();
@@ -75,7 +76,7 @@ TEST_CASE("buffer pipe", "[pipe]") {
         })->then([](const std::vector<std::byte> &) {
             FAIL();
         }, [](const zero::async::promise::Reason &reason) {
-            REQUIRE(reason.code < 0);
+            REQUIRE(reason.code == aio::IO_ERROR);
             REQUIRE(reason.message == "error occurred");
         })->finally([=]() {
             context->loopBreak();

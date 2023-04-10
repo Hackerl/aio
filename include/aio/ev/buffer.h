@@ -6,6 +6,7 @@
 #include <event.h>
 #include <zero/interface.h>
 #include <zero/async/promise.h>
+#include <nonstd/span.hpp>
 
 namespace aio::ev {
     class IBuffer : public zero::Interface {
@@ -16,8 +17,7 @@ namespace aio::ev {
 
     public:
         virtual size_t write(std::string_view str) = 0;
-        virtual size_t write(const std::vector<std::byte> &data) = 0;
-        virtual size_t write(const void *buffer, size_t n) = 0;
+        virtual size_t write(nonstd::span<const std::byte> buffer) = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> drain() = 0;
 
     public:
@@ -41,8 +41,7 @@ namespace aio::ev {
 
     public:
         size_t write(std::string_view str) override;
-        size_t write(const std::vector<std::byte> &data) override;
-        size_t write(const void *buffer, size_t n) override;
+        size_t write(nonstd::span<const std::byte> buffer) override;
         std::shared_ptr<zero::async::promise::Promise<void>> drain() override;
 
     public:

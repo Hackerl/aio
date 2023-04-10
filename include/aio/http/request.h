@@ -172,7 +172,7 @@ namespace aio::http {
                             [](char *buffer, size_t size, size_t n, void *userdata) -> size_t {
                                 auto connection = (Connection *) userdata;
 
-                                size_t length = connection->buffer->write(buffer, size * n);
+                                size_t length = connection->buffer->write({buffer, size * n});
 
                                 if (length == -1)
                                     return CURL_WRITEFUNC_ERROR;

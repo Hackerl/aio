@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
                         const auto &binary = std::get<std::vector<std::byte>>(message.data);
                         LOG_INFO(
                                 "receive binary message: %s",
-                                zero::encoding::hex::encode(binary.data(), binary.size()).c_str()
+                                zero::encoding::hex::encode(binary).c_str()
                         );
                         break;
                     }
