@@ -16,10 +16,10 @@ TEST_CASE("buffer pipe", "[pipe]") {
         zero::async::promise::all(
                 buffers[0]->drain()->then([=]() {
                     return buffers[0]->read(11);
-                })->then([](const std::vector<std::byte> &data) {
+                })->then([](nonstd::span<const std::byte> data) {
                     REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "world hello");
                 }),
-                buffers[1]->read(11)->then([=](const std::vector<std::byte> &data) {
+                buffers[1]->read(11)->then([=](nonstd::span<const std::byte> data) {
                     REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "hello world");
                     buffers[1]->write("world hello");
                     return buffers[1]->drain();
@@ -35,18 +35,18 @@ TEST_CASE("buffer pipe", "[pipe]") {
         buffers[0]->write("hello world");
         buffers[0]->drain()->then([=]() {
             return buffers[0]->read(11);
-        })->then([=](const std::vector<std::byte> &data) {
+        })->then([=](nonstd::span<const std::byte> data) {
             REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "world hello");
             buffers[0]->close();
         });
 
-        buffers[1]->read(11)->then([=](const std::vector<std::byte> &data) {
+        buffers[1]->read(11)->then([=](nonstd::span<const std::byte> data) {
             REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "hello world");
             buffers[1]->write("world hello");
             return buffers[1]->drain();
         })->then([=]() {
             return buffers[1]->read();
-        })->then([](const std::vector<std::byte> &) {
+        })->then([](nonstd::span<const std::byte>) {
             FAIL();
         }, [](const zero::async::promise::Reason &reason) {
             REQUIRE(reason.code == aio::IO_EOF);
@@ -62,18 +62,18 @@ TEST_CASE("buffer pipe", "[pipe]") {
         buffers[0]->write("hello world");
         buffers[0]->drain()->then([=]() {
             return buffers[0]->read(11);
-        })->then([=](const std::vector<std::byte> &data) {
+        })->then([=](nonstd::span<const std::byte> data) {
             REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "world hello");
             buffers[0]->throws("error occurred");
         });
 
-        buffers[1]->read(11)->then([=](const std::vector<std::byte> &data) {
+        buffers[1]->read(11)->then([=](nonstd::span<const std::byte> data) {
             REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "hello world");
             buffers[1]->write("world hello");
             return buffers[1]->drain();
         })->then([=]() {
             return buffers[1]->read();
-        })->then([](const std::vector<std::byte> &) {
+        })->then([](nonstd::span<const std::byte>) {
             FAIL();
         }, [](const zero::async::promise::Reason &reason) {
             REQUIRE(reason.code == aio::IO_ERROR);

@@ -9,7 +9,7 @@ namespace aio {
         std::shared_ptr<std::vector<std::byte>> buffer = std::make_shared<std::vector<std::byte>>();
 
         return zero::async::promise::loop<std::vector<std::byte>>([=](const auto &loop) {
-            reader->read()->then([=](const std::vector<std::byte> &data) {
+            reader->read()->then([=](nonstd::span<const std::byte> data) {
                 buffer->insert(buffer->end(), data.begin(), data.end());
                 P_CONTINUE(loop);
             })->fail([=](const zero::async::promise::Reason &reason) {
@@ -26,7 +26,7 @@ namespace aio {
     template<typename Reader, typename Writer>
     std::shared_ptr<zero::async::promise::Promise<void>> copy(const Reader &src, const Writer &dst) {
         return zero::async::promise::loop<void>([=](const auto &loop) {
-            src->read()->then([=](const std::vector<std::byte> &data) {
+            src->read()->then([=](nonstd::span<const std::byte> data) {
                 dst->write(data);
                 return dst->drain()->then([=]() {
                     P_CONTINUE(loop);
@@ -51,7 +51,7 @@ namespace aio {
     std::shared_ptr<zero::async::promise::Promise<void>> tunnel(const First &first, const Second &second) {
         return zero::async::promise::race(
                 zero::async::promise::loop<void>([=](const auto &loop) {
-                    first->read()->then([=](const std::vector<std::byte> &data) {
+                    first->read()->then([=](nonstd::span<const std::byte> data) {
                         second->write(data);
                         return second->drain()->then([=]() {
                             P_CONTINUE(loop);
@@ -66,7 +66,7 @@ namespace aio {
                     });
                 }),
                 zero::async::promise::loop<void>([=](const auto &loop) {
-                    second->read()->then([=](const std::vector<std::byte> &data) {
+                    second->read()->then([=](nonstd::span<const std::byte> data) {
                         first->write(data);
                         return first->drain()->then([=]() {
                             P_CONTINUE(loop);

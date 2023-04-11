@@ -75,7 +75,7 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::http::Response::output
         return zero::async::promise::reject<void>({-1, "create file output stream failed"});
 
     return zero::async::promise::loop<void>([=](const auto &loop) {
-        read()->then([=](const std::vector<std::byte> &data) -> nonstd::expected<void, zero::async::promise::Reason> {
+        read()->then([=](nonstd::span<const std::byte> data) -> nonstd::expected<void, zero::async::promise::Reason> {
             stream->write((const char *) data.data(), (std::streamsize) data.size());
 
             if (!stream->good())
@@ -99,11 +99,11 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response:
     std::optional<curl_off_t> length = contentLength();
 
     if (length)
-        return read(*length)->then([](const std::vector<std::byte> &data) {
+        return read(*length)->then([](nonstd::span<const std::byte> data) {
             return std::string{(const char *) data.data(), data.size()};
         });
 
-    return readAll(shared_from_this())->then([](const std::vector<std::byte> &data) {
+    return readAll(shared_from_this())->then([](nonstd::span<const std::byte> data) {
         return std::string{(const char *) data.data(), data.size()};
     });
 }

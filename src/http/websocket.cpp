@@ -82,7 +82,7 @@ aio::http::ws::WebSocket::WebSocket(const std::shared_ptr<aio::Context> &context
 
 std::shared_ptr<zero::async::promise::Promise<std::tuple<aio::http::ws::Header, std::vector<std::byte>>>>
 aio::http::ws::WebSocket::readFrame() {
-    return mBuffer->read(sizeof(Header))->then([=](const std::vector<std::byte> &data) {
+    return mBuffer->read(sizeof(Header))->then([=](nonstd::span<const std::byte> data) {
         auto header = *(Header *) data.data();
 
         if (header.mask())
@@ -93,7 +93,7 @@ aio::http::ws::WebSocket::readFrame() {
         if (header.length() >= TWO_BYTE_PAYLOAD_LENGTH) {
             size_t extendedBytes = header.length() == EIGHT_BYTE_PAYLOAD_LENGTH ? 8 : 2;
 
-            return mBuffer->read(extendedBytes)->then([=](const std::vector<std::byte> &data) {
+            return mBuffer->read(extendedBytes)->then([=](nonstd::span<const std::byte> data) {
                 return mBuffer->read(
 #if _WIN32
                         extendedBytes == 2 ? ntohs(*(uint16_t *) data.data()) : ntohll(*(uint64_t *) data.data())

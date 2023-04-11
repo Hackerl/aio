@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
     listener->accept()->then([=](const std::shared_ptr<aio::ev::IBuffer> &buffer) {
         return zero::async::promise::all(
                 zero::async::promise::loop<void>([=](const auto &loop) {
-                    input->read()->then([=](const std::vector<std::byte> &data) {
+                    input->read()->then([=](nonstd::span<const std::byte> data) {
                         buffer->write(data);
                         return buffer->drain();
                     })->then([=]() {
@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
                     });
                 }),
                 zero::async::promise::loop<void>([=](const auto &loop) {
-                    buffer->read()->then([=](const std::vector<std::byte> &data) {
+                    buffer->read()->then([=](nonstd::span<const std::byte> data) {
                         LOG_INFO("receive: %.*s", data.size(), data.data());
                     })->then([=]() {
                         P_CONTINUE(loop);
