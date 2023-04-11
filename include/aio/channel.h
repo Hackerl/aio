@@ -388,7 +388,7 @@ namespace aio {
                     event->trigger(ev::WRITE);
 
                 self->mPending[SENDER].clear();
-                P_BREAK_V(loop, element);
+                P_BREAK_V(loop, std::move(element));
             });
         }
 

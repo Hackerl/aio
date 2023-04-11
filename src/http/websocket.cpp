@@ -127,7 +127,7 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::InternalMessage>> a
                                 return;
                             }
 
-                            P_BREAK_V(loop, InternalMessage{opcode, *fragments});
+                            P_BREAK_V(loop, InternalMessage{opcode, std::move(*fragments)});
                         })->fail([=](const zero::async::promise::Reason &reason) {
                             P_BREAK_E(loop, reason);
                         });

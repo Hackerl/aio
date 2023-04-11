@@ -18,7 +18,7 @@ namespace aio {
                     return;
                 }
 
-                P_BREAK_V(loop, *buffer);
+                P_BREAK_V(loop, std::move(*buffer));
             });
         });
     }
