@@ -463,13 +463,16 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
 
         return buffer->drain()->then([=]() {
             return buffer->readLine(EVBUFFER_EOL_CRLF);
-        })->then([=](const std::string &line) {
+        })->then([=](const std::string &line) -> nonstd::expected<void, zero::async::promise::Reason> {
             std::vector<std::string> tokens = zero::strings::split(line, " ");
 
             if (tokens.size() < 2) {
                 buffer->close();
-                return zero::async::promise::reject<void>(
-                        {WS_ERROR, zero::strings::format("bad response: %s", line.c_str())}
+                return nonstd::make_unexpected(
+                        zero::async::promise::Reason{
+                                WS_ERROR,
+                                zero::strings::format("bad response: %s", line.c_str())
+                        }
                 );
             }
 
@@ -477,19 +480,25 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
 
             if (!code) {
                 buffer->close();
-                return zero::async::promise::reject<void>(
-                        {WS_ERROR, zero::strings::format("parse status code failed: %s", tokens[1].c_str())}
+                return nonstd::make_unexpected(
+                        zero::async::promise::Reason{
+                                WS_ERROR,
+                                zero::strings::format("parse status code failed: %s", tokens[1].c_str())
+                        }
                 );
             }
 
             if (code != SWITCHING_PROTOCOLS_STATUS) {
                 buffer->close();
-                return zero::async::promise::reject<void>(
-                        {WS_ERROR, zero::strings::format("bad response status code: %d", code)}
+                return nonstd::make_unexpected(
+                        zero::async::promise::Reason{
+                                WS_ERROR,
+                                zero::strings::format("bad response status code: %d", code)
+                        }
                 );
             }
 
-            return zero::async::promise::resolve<void>();
+            return {};
         })->then([=]() {
             std::shared_ptr<std::map<std::string, std::string>> headers = std::make_shared<std::map<std::string, std::string>>();
 

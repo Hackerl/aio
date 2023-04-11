@@ -42,11 +42,11 @@ namespace aio::http {
 
         template<typename T>
         std::shared_ptr<zero::async::promise::Promise<T>> json() {
-            return json()->then([](const nlohmann::json &j) {
+            return json()->then([](const nlohmann::json &j) -> nonstd::expected<T, zero::async::promise::Reason> {
                 try {
-                    return zero::async::promise::resolve<T>(j.get<T>());
+                    return j.get<T>();
                 } catch (const nlohmann::json::exception &e) {
-                    return zero::async::promise::reject<T>({JSON_ERROR, e.what()});
+                    return nonstd::make_unexpected(zero::async::promise::Reason{JSON_ERROR, e.what()});
                 }
             });
         }

@@ -7,7 +7,7 @@
 namespace aio {
     template<typename T, typename F>
     std::shared_ptr<zero::async::promise::Promise<T>> toThread(const std::shared_ptr<Context> &context, F &&f) {
-        return zero::async::promise::chain<T>([=, f = std::forward<F>(f)](const auto &p) {
+        return zero::async::promise::chain<T>([=, f = std::forward<F>(f)](const auto &p) mutable {
             std::shared_ptr<ev::Event> event = std::make_shared<ev::Event>(context, -1);
 
             if constexpr (std::is_same_v<T, void>) {

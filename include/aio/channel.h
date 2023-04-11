@@ -118,48 +118,50 @@ namespace aio {
             if (mClosed)
                 return zero::async::promise::reject<void>({IO_ERROR, "buffer closed"});
 
-            return zero::async::promise::loop<void>([element, self = this->shared_from_this()](const auto &loop) {
-                std::optional<size_t> index = self->mBuffer.reserve();
+            return zero::async::promise::loop<void>(
+                    [element, self = this->shared_from_this()](const auto &loop) mutable {
+                        std::optional<size_t> index = self->mBuffer.reserve();
 
-                if (!index) {
-                    std::lock_guard<std::mutex> guard(self->mMutex);
+                        if (!index) {
+                            std::lock_guard<std::mutex> guard(self->mMutex);
 
-                    if (self->mClosed) {
-                        P_BREAK_E(loop, { IO_EOF, "buffer closed" });
-                        return;
-                    }
+                            if (self->mClosed) {
+                                P_BREAK_E(loop, { IO_EOF, "buffer closed" });
+                                return;
+                            }
 
-                    if (!self->mBuffer.full()) {
-                        P_CONTINUE(loop);
-                        return;
-                    }
+                            if (!self->mBuffer.full()) {
+                                P_CONTINUE(loop);
+                                return;
+                            }
 
-                    std::shared_ptr<ev::Event> event = self->getEvent();
+                            std::shared_ptr<ev::Event> event = self->getEvent();
 
-                    event->on(ev::WRITE)->then([=](short what) {
-                        if (what & ev::CLOSED) {
-                            P_BREAK_E(loop, { IO_EOF, "channel is closed" });
+                            event->on(ev::WRITE)->then([=](short what) {
+                                if (what & ev::CLOSED) {
+                                    P_BREAK_E(loop, { IO_EOF, "channel is closed" });
+                                    return;
+                                }
+
+                                P_CONTINUE(loop);
+                            });
+
+                            self->mPending[SENDER].push_back(std::move(event));
                             return;
                         }
 
-                        P_CONTINUE(loop);
-                    });
+                        self->mBuffer[*index] = std::move(element);
+                        self->mBuffer.commit(*index);
 
-                    self->mPending[SENDER].push_back(std::move(event));
-                    return;
-                }
+                        std::lock_guard<std::mutex> guard(self->mMutex);
 
-                self->mBuffer[*index] = element;
-                self->mBuffer.commit(*index);
+                        for (const auto &event: self->mPending[RECEIVER])
+                            event->trigger(ev::READ);
 
-                std::lock_guard<std::mutex> guard(self->mMutex);
-
-                for (const auto &event: self->mPending[RECEIVER])
-                    event->trigger(ev::READ);
-
-                self->mPending[RECEIVER].clear();
-                P_BREAK(loop);
-            });
+                        self->mPending[RECEIVER].clear();
+                        P_BREAK(loop);
+                    }
+            );
         }
 
     public:
@@ -238,7 +240,7 @@ namespace aio {
                 return zero::async::promise::reject<void>({IO_ERROR, "buffer closed"});
 
             return zero::async::promise::loop<void>(
-                    [element = std::move(element), self = this->shared_from_this()](const auto &loop) {
+                    [element = std::move(element), self = this->shared_from_this()](const auto &loop) mutable {
                         std::optional<size_t> index = self->mBuffer.reserve();
 
                         if (!index) {

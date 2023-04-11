@@ -75,8 +75,13 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::http::Response::output
         return zero::async::promise::reject<void>({-1, "create file output stream failed"});
 
     return zero::async::promise::loop<void>([=](const auto &loop) {
-        read()->then([=](const std::vector<std::byte> &data) {
+        read()->then([=](const std::vector<std::byte> &data) -> nonstd::expected<void, zero::async::promise::Reason> {
             stream->write((const char *) data.data(), (std::streamsize) data.size());
+
+            if (!stream->good())
+                return nonstd::make_unexpected(zero::async::promise::Reason{IO_ERROR, "write failed"});
+
+            return {};
         })->then([=]() {
             P_CONTINUE(loop);
         }, [=](const zero::async::promise::Reason &reason) {
@@ -104,13 +109,15 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response:
 }
 
 std::shared_ptr<zero::async::promise::Promise<nlohmann::json>> aio::http::Response::json() {
-    return string()->then([](const std::string &content) {
-        try {
-            return zero::async::promise::resolve<nlohmann::json>(nlohmann::json::parse(content));
-        } catch (const nlohmann::json::parse_error &e) {
-            return zero::async::promise::reject<nlohmann::json>({JSON_ERROR, e.what()});
-        }
-    });
+    return string()->then(
+            [](const std::string &content) -> nonstd::expected<nlohmann::json, zero::async::promise::Reason> {
+                try {
+                    return nlohmann::json::parse(content);
+                } catch (const nlohmann::json::parse_error &e) {
+                    return nonstd::make_unexpected(zero::async::promise::Reason{JSON_ERROR, e.what()});
+                }
+            }
+    );
 }
 
 aio::http::Requests::Requests(const std::shared_ptr<Context> &context) : Requests(context, Options{}) {
