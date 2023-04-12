@@ -16,12 +16,7 @@ constexpr auto RECEIVER = 1;
 
 namespace aio {
     template<typename T>
-    class IChannel : public zero::Interface {
-    public:
-        virtual std::optional<T> receiveSync() = 0;
-        virtual std::optional<T> receiveNoWait() = 0;
-        virtual std::shared_ptr<zero::async::promise::Promise<T>> receive() = 0;
-
+    class ISender : public zero::Interface {
     public:
         virtual bool sendSync(const T &element) = 0;
         virtual bool sendNoWait(const T &element) = 0;
@@ -34,6 +29,19 @@ namespace aio {
 
     public:
         virtual void close() = 0;
+    };
+
+    template<typename T>
+    class IReceiver : public zero::Interface {
+    public:
+        virtual std::optional<T> receiveSync() = 0;
+        virtual std::optional<T> receiveNoWait() = 0;
+        virtual std::shared_ptr<zero::async::promise::Promise<T>> receive() = 0;
+    };
+
+    template<typename T>
+    class IChannel : public virtual ISender<T>, public virtual IReceiver<T> {
+
     };
 
     template<typename T, size_t N>
