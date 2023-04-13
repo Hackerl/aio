@@ -19,12 +19,12 @@ namespace aio {
     class ISender : public zero::Interface {
     public:
         virtual bool sendSync(const T &element) = 0;
-        virtual bool sendNoWait(const T &element) = 0;
+        virtual nonstd::expected<void, Error> sendNoWait(const T &element) = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> send(const T &element) = 0;
 
     public:
         virtual bool sendSync(T &&element) = 0;
-        virtual bool sendNoWait(T &&element) = 0;
+        virtual nonstd::expected<void, Error> sendNoWait(T &&element) = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> send(T &&element) = 0;
 
     public:
@@ -35,12 +35,12 @@ namespace aio {
     class IReceiver : public zero::Interface {
     public:
         virtual std::optional<T> receiveSync() = 0;
-        virtual std::optional<T> receiveNoWait() = 0;
+        virtual nonstd::expected<T, Error> receiveNoWait() = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<T>> receive() = 0;
     };
 
     template<typename T>
-    class IChannel : public virtual ISender<T>, public virtual IReceiver<T> {
+    class IChannel : public ISender<T>, public IReceiver<T> {
 
     };
 
@@ -101,14 +101,14 @@ namespace aio {
             return true;
         }
 
-        bool sendNoWait(const T &element) override {
+        nonstd::expected<void, Error> sendNoWait(const T &element) override {
             if (mClosed)
-                return false;
+                return nonstd::make_unexpected(IO_EOF);
 
             std::optional<size_t> index = mBuffer.reserve();
 
             if (!index)
-                return false;
+                return nonstd::make_unexpected(IO_AGAIN);
 
             mBuffer[*index] = element;
             mBuffer.commit(*index);
@@ -119,7 +119,7 @@ namespace aio {
                 event->trigger(ev::READ);
 
             mPending[RECEIVER].clear();
-            return true;
+            return {};
         }
 
         std::shared_ptr<zero::async::promise::Promise<void>> send(const T &element) override {
@@ -222,14 +222,14 @@ namespace aio {
             return true;
         }
 
-        bool sendNoWait(T &&element) override {
+        nonstd::expected<void, Error> sendNoWait(T &&element) override {
             if (mClosed)
-                return false;
+                return nonstd::make_unexpected(IO_EOF);
 
             std::optional<size_t> index = mBuffer.reserve();
 
             if (!index)
-                return false;
+                return nonstd::make_unexpected(IO_AGAIN);
 
             mBuffer[*index] = std::move(element);
             mBuffer.commit(*index);
@@ -240,7 +240,7 @@ namespace aio {
                 event->trigger(ev::READ);
 
             mPending[RECEIVER].clear();
-            return true;
+            return {};
         }
 
         std::shared_ptr<zero::async::promise::Promise<void>> send(T &&element) override {
@@ -342,11 +342,11 @@ namespace aio {
             return element;
         }
 
-        std::optional<T> receiveNoWait() override {
+        nonstd::expected<T, Error> receiveNoWait() override {
             std::optional<size_t> index = mBuffer.acquire();
 
             if (!index)
-                return std::nullopt;
+                return nonstd::make_unexpected(mClosed ? IO_EOF : IO_AGAIN);
 
             T element = std::move(mBuffer[*index]);
             mBuffer.release(*index);

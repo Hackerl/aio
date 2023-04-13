@@ -7,6 +7,7 @@ namespace aio {
         IO_TIMEOUT,
         IO_ERROR,
         IO_CANCEL,
+        IO_AGAIN,
         SSL_ERROR,
         JSON_ERROR,
         HTTP_ERROR,
