@@ -12,12 +12,11 @@
 #include <endian.h>
 #endif
 
-
 #ifdef AIO_EMBED_CA_CERT
 #include <cacert.h>
 
 bool aio::net::ssl::loadEmbeddedCA(Context *ctx) {
-    BIO *bio = BIO_new_mem_buf(cacert_pem, (int) cacert_pem_len);
+    BIO *bio = BIO_new_mem_buf(CA_CERT, (int) sizeof(CA_CERT));
 
     if (!bio)
         return false;

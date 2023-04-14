@@ -40,6 +40,20 @@ add_library(
 )
 
 if (AIO_EMBED_CA_CERT)
+    set(CA_CERT_FILE ${CMAKE_CURRENT_BINARY_DIR}/cacert.pem)
+    set(CA_CERT_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/include/cacert.h)
+
+    if (NOT EXISTS ${CA_CERT_FILE})
+        file(DOWNLOAD https://curl.se/ca/cacert.pem ${CA_CERT_FILE})
+    endif ()
+
+    if (NOT EXISTS ${CA_CERT_HEADER})
+        file(READ ${CA_CERT_FILE} content HEX)
+        string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," content ${content})
+        file(WRITE ${CA_CERT_HEADER} "constexpr unsigned char CA_CERT[] = {${content}};")
+    endif ()
+
+    set(EXCLUDE_HEADERS ${EXCLUDE_HEADERS} PATTERN "cacert.h" EXCLUDE)
     target_compile_definitions(aio PUBLIC AIO_EMBED_CA_CERT)
 endif ()
 
