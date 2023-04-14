@@ -58,7 +58,7 @@ target_link_libraries(
         libevent::core
         libevent::extra
         nlohmann_json::nlohmann_json
-        $<$<PLATFORM_ID:Linux>:libevent::pthreads>
+        $<$<PLATFORM_ID:Linux,Android>:libevent::pthreads>
         $<$<NOT:$<BOOL:${AIO_DISABLE_SSL}>>:libevent::openssl>
 )
 

@@ -1,0 +1,55 @@
+{
+  "name": "aio",
+  "version": "1.0.3",
+  "builtin-baseline": "69efe9cc2df0015f0bb2d37d55acde4a75c9a25b",
+  "dependencies": [
+    "catch2",
+    {
+      "name": "curl",
+      "default-features": false
+    },
+    "libevent",
+    "nlohmann-json",
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    },
+    {
+      "name": "zero",
+      "version>=": "1.0.2"
+    }
+  ],
+  "default-features": [
+    "openssl"
+  ],
+  "features": {
+    "openssl": {
+      "description": "Support for openssl",
+      "dependencies": [
+        {
+          "name": "curl",
+          "default-features": false,
+          "features": [
+            "openssl"
+          ]
+        },
+        {
+          "name": "libevent",
+          "features": [
+            "openssl"
+          ]
+        }
+      ]
+    },
+    "tests": {
+      "description": "Build Tests",
+      "dependencies": [
+        "catch2"
+      ]
+    }
+  }
+}

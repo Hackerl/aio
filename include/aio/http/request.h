@@ -196,6 +196,7 @@ namespace aio::http {
             curl_easy_setopt(easy, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
             curl_easy_setopt(easy, CURLOPT_CONNECTTIMEOUT, (long) opt.timeout.value_or(30s).count());
             curl_easy_setopt(easy, CURLOPT_USERAGENT, opt.userAgent.value_or("asyncio requests").c_str());
+            curl_easy_setopt(easy, CURLOPT_ACCEPT_ENCODING, "");
 
 #ifdef AIO_EMBED_CA_CERT
             curl_easy_setopt(easy, CURLOPT_CAINFO, nullptr);
