@@ -2,6 +2,8 @@
 #define AIO_IO_H
 
 #include "error.h"
+#include <vector>
+#include <zero/async/promise.h>
 
 namespace aio {
     template<typename T>
