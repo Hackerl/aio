@@ -13,7 +13,7 @@ namespace aio::ev {
 
     class PairedBuffer : public Buffer, public IPairedBuffer {
     public:
-        explicit PairedBuffer(bufferevent *bev);
+        PairedBuffer(bufferevent *bev, std::shared_ptr<std::string> error);
         ~PairedBuffer() override;
 
     public:
@@ -24,13 +24,10 @@ namespace aio::ev {
         void throws(std::string_view error) override;
 
     private:
-        std::string mError;
-        std::weak_ptr<PairedBuffer> mPartner;
-
-        friend std::array<std::shared_ptr<IPairedBuffer>, 2> pipe(const std::shared_ptr<Context> &context);
+        std::shared_ptr<std::string> mError;
     };
 
-    std::array<std::shared_ptr<IPairedBuffer>, 2> pipe(const std::shared_ptr<Context> &context);
+    std::array<zero::ptr::RefPtr<aio::ev::IPairedBuffer>, 2> pipe(const std::shared_ptr<Context> &context);
 }
 
 #endif //AIO_PIPE_H

@@ -6,7 +6,7 @@ TEST_CASE("buffer pipe", "[pipe]") {
     std::shared_ptr<aio::Context> context = aio::newContext();
     REQUIRE(context);
 
-    std::array<std::shared_ptr<aio::ev::IPairedBuffer>, 2> buffers = aio::ev::pipe(context);
+    std::array<zero::ptr::RefPtr<aio::ev::IPairedBuffer>, 2> buffers = aio::ev::pipe(context);
     REQUIRE(buffers[0]);
     REQUIRE(buffers[1]);
 

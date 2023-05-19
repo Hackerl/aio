@@ -153,7 +153,10 @@ aio::net::ssl::Listener::Listener(std::shared_ptr<aio::Context> context, std::sh
     evconnlistener_set_cb(
             mListener,
             [](evconnlistener *listener, evutil_socket_t fd, sockaddr *addr, int socklen, void *arg) {
-                std::shared_ptr(static_cast<Listener *>(arg)->mPromise)->resolve(fd);
+                zero::ptr::RefPtr<Listener> ptr((Listener *) arg);
+
+                auto p = std::move(ptr->mPromise);
+                p->resolve(fd);
             },
             this
     );
@@ -161,9 +164,10 @@ aio::net::ssl::Listener::Listener(std::shared_ptr<aio::Context> context, std::sh
     evconnlistener_set_error_cb(
             mListener,
             [](evconnlistener *listener, void *arg) {
-                std::shared_ptr(static_cast<Listener *>(arg)->mPromise)->reject(
-                        {IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())}
-                );
+                zero::ptr::RefPtr<Listener> ptr((Listener *) arg);
+
+                auto p = std::move(ptr->mPromise);
+                p->reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
             }
     );
 }
@@ -175,18 +179,19 @@ aio::net::ssl::Listener::~Listener() {
     }
 }
 
-std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::ev::IBuffer>>> aio::net::ssl::Listener::accept() {
+std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::ev::IBuffer>>> aio::net::ssl::Listener::accept() {
     if (!mListener)
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({IO_ERROR, "listener destroyed"});
+        return zero::async::promise::reject<zero::ptr::RefPtr<ev::IBuffer>>({IO_ERROR, "listener destroyed"});
 
     if (mPromise)
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({IO_ERROR, "pending request not completed"});
+        return zero::async::promise::reject<zero::ptr::RefPtr<ev::IBuffer>>({IO_ERROR, "pending request not completed"});
 
     return zero::async::promise::chain<evutil_socket_t>([=](const auto &p) {
+        addRef();
         mPromise = p;
         evconnlistener_enable(mListener);
-    })->then([=](evutil_socket_t fd) -> std::shared_ptr<ev::IBuffer> {
-        return std::make_shared<Buffer>(
+    })->then([=](evutil_socket_t fd) -> zero::ptr::RefPtr<ev::IBuffer> {
+        return zero::ptr::makeRef<Buffer>(
                 bufferevent_openssl_socket_new(
                         mContext->base(),
                         fd,
@@ -195,9 +200,9 @@ std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::ev::IBuffer>>
                         BEV_OPT_CLOSE_ON_FREE
                 )
         );
-    })->finally([self = shared_from_this()]() {
-        evconnlistener_disable(self->mListener);
-        self->mPromise.reset();
+    })->finally([=]() {
+        evconnlistener_disable(mListener);
+        release();
     });
 }
 
@@ -205,14 +210,16 @@ void aio::net::ssl::Listener::close() {
     if (!mListener)
         return;
 
-    if (mPromise)
-        std::shared_ptr(mPromise)->reject({IO_EOF, "listener will be closed"});
+    auto p = std::move(mPromise);
+
+    if (p)
+        p->reject({IO_EOF, "listener will be closed"});
 
     evconnlistener_free(mListener);
     mListener = nullptr;
 }
 
-std::shared_ptr<aio::net::ssl::Listener>
+zero::ptr::RefPtr<aio::net::ssl::Listener>
 aio::net::ssl::listen(
         const std::shared_ptr<aio::Context> &context,
         const std::string &host,
@@ -240,20 +247,20 @@ aio::net::ssl::listen(
     if (!listener)
         return nullptr;
 
-    return std::make_shared<Listener>(context, ctx, listener);
+    return zero::ptr::makeRef<Listener>(context, ctx, listener);
 }
 
-std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::ev::IBuffer>>>
+std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::ev::IBuffer>>>
 aio::net::ssl::connect(const std::shared_ptr<aio::Context> &context, const std::string &host, short port) {
     static std::shared_ptr<Context> ctx = newContext({});
 
     if (!ctx)
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({SSL_ERROR, "invalid default SSL context"});
+        return zero::async::promise::reject<zero::ptr::RefPtr<ev::IBuffer>>({SSL_ERROR, "invalid default SSL context"});
 
     return connect(context, host, port, ctx);
 }
 
-std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::ev::IBuffer>>>
+std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::ev::IBuffer>>>
 aio::net::ssl::connect(
         const std::shared_ptr<aio::Context> &context,
         const std::string &host,
@@ -263,14 +270,14 @@ aio::net::ssl::connect(
     SSL *ssl = SSL_new(ctx.get());
 
     if (!ssl)
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({SSL_ERROR, getError()});
+        return zero::async::promise::reject<zero::ptr::RefPtr<ev::IBuffer>>({SSL_ERROR, getError()});
 
     SSL_set_tlsext_host_name(ssl, host.c_str());
     SSL_set_hostflags(ssl, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
 
     if (!SSL_set1_host(ssl, host.c_str())) {
         SSL_free(ssl);
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({SSL_ERROR, getError()});
+        return zero::async::promise::reject<zero::ptr::RefPtr<ev::IBuffer>>({SSL_ERROR, getError()});
     }
 
     bufferevent *bev = bufferevent_openssl_socket_new(
@@ -282,7 +289,7 @@ aio::net::ssl::connect(
     );
 
     if (!bev)
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>({SSL_ERROR, "new buffer failed"});
+        return zero::async::promise::reject<zero::ptr::RefPtr<ev::IBuffer>>({SSL_ERROR, "new buffer failed"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         auto ctx = new std::shared_ptr(p);
@@ -331,10 +338,10 @@ aio::net::ssl::connect(
             delete ctx;
             p->reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
         }
-    })->then([=]() -> std::shared_ptr<ev::IBuffer> {
-        return std::make_shared<Buffer>(bev);
+    })->then([=]() -> zero::ptr::RefPtr<ev::IBuffer> {
+        return zero::ptr::makeRef<Buffer>(bev);
     })->fail([=](const zero::async::promise::Reason &reason) {
         bufferevent_free(bev);
-        return zero::async::promise::reject<std::shared_ptr<ev::IBuffer>>(reason);
+        return zero::async::promise::reject<zero::ptr::RefPtr<ev::IBuffer>>(reason);
     });
 }

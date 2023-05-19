@@ -6,10 +6,11 @@
 #include <event.h>
 #include <zero/interface.h>
 #include <zero/async/promise.h>
+#include <zero/ptr/ref.h>
 #include <nonstd/span.hpp>
 
 namespace aio::ev {
-    class IBuffer : public zero::Interface {
+    class IBuffer : public zero::ptr::RefCounter {
     public:
         virtual std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read() = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read(size_t n) = 0;
@@ -29,7 +30,7 @@ namespace aio::ev {
         virtual std::shared_ptr<zero::async::promise::Promise<void>> waitClosed() = 0;
     };
 
-    class Buffer : public virtual IBuffer, public std::enable_shared_from_this<Buffer> {
+    class Buffer : public virtual IBuffer {
     public:
         explicit Buffer(bufferevent *bev);
         ~Buffer() override;

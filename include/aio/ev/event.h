@@ -5,6 +5,7 @@
 #include <optional>
 #include <aio/context.h>
 #include <zero/async/promise.h>
+#include <zero/ptr/ref.h>
 
 namespace aio::ev {
     enum What : short {
@@ -14,10 +15,10 @@ namespace aio::ev {
         CLOSED = EV_CLOSED
     };
 
-    class Event : public std::enable_shared_from_this<Event> {
+    class Event : public zero::ptr::RefCounter {
     public:
         Event(const std::shared_ptr<Context> &context, evutil_socket_t fd);
-        ~Event();
+        ~Event() override;
 
     public:
         bool cancel();

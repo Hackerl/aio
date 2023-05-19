@@ -11,13 +11,13 @@ aio::ev::Buffer::Buffer(bufferevent *bev) : mBev(bev), mClosed(false) {
     bufferevent_setcb(
             mBev,
             [](bufferevent *bev, void *arg) {
-                static_cast<Buffer *>(arg)->onBufferRead();
+                zero::ptr::RefPtr<Buffer>((Buffer *) arg)->onBufferRead();
             },
             [](bufferevent *bev, void *arg) {
-                static_cast<Buffer *>(arg)->onBufferWrite();
+                zero::ptr::RefPtr<Buffer>((Buffer *) arg)->onBufferWrite();
             },
             [](bufferevent *bev, short what, void *arg) {
-                static_cast<Buffer *>(arg)->shared_from_this()->onBufferEvent(what);
+                zero::ptr::RefPtr<Buffer>((Buffer *) arg)->onBufferEvent(what);
             },
             this
     );
@@ -55,6 +55,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
         return zero::async::promise::reject<std::vector<std::byte>>(mReason);
 
     return zero::async::promise::chain<void>([=](const auto &p) {
+        addRef();
         mPromise[READ] = p;
 
         bufferevent_setwatermark(mBev, EV_READ, 0, 0);
@@ -65,8 +66,8 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
 
         evbuffer_remove(input, buffer.data(), buffer.size());
         return buffer;
-    })->finally([self = shared_from_this()]() {
-        self->mPromise[READ].reset();
+    })->finally([=]() {
+        release();
     });
 }
 
@@ -92,6 +93,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
         return zero::async::promise::reject<std::vector<std::byte>>(mReason);
 
     return zero::async::promise::chain<void>([=](const auto &p) {
+        addRef();
         mPromise[READ] = p;
 
         bufferevent_setwatermark(mBev, EV_READ, n, 0);
@@ -102,9 +104,9 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
 
         evbuffer_remove(input, buffer.data(), buffer.size());
         return buffer;
-    })->finally([self = shared_from_this()]() {
-        bufferevent_setwatermark(self->mBev, EV_READ, 0, 0);
-        self->mPromise[READ].reset();
+    })->finally([=]() {
+        bufferevent_setwatermark(mBev, EV_READ, 0, 0);
+        release();
     });
 }
 
@@ -125,12 +127,13 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
 
     return zero::async::promise::loop<std::string>([style, this](const auto &loop) {
         zero::async::promise::chain<void>([=](const auto &p) {
+            addRef();
             mPromise[READ] = p;
 
             bufferevent_setwatermark(mBev, EV_READ, 0, 0);
             bufferevent_enable(mBev, EV_READ);
-        })->finally([self = shared_from_this()]() {
-            self->mPromise[READ].reset();
+        })->finally([=]() {
+            release();
         })->then([=]() {
             char *ptr = evbuffer_readln(bufferevent_get_input(mBev), nullptr, style);
 
@@ -176,9 +179,10 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::drain() {
         return zero::async::promise::resolve<void>();
 
     return zero::async::promise::chain<void>([=](const auto &p) {
+        addRef();
         mPromise[DRAIN] = p;
-    })->finally([self = shared_from_this()]() {
-        self->mPromise[DRAIN].reset();
+    })->finally([=]() {
+        release();
     });
 }
 
@@ -229,11 +233,13 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::waitClosed
         return zero::async::promise::resolve<void>();
 
     return zero::async::promise::chain<void>([=](const auto &p) {
+        addRef();
         mPromise[WAIT_CLOSED] = p;
+
         bufferevent_enable(mBev, EV_READ);
         bufferevent_set_timeouts(mBev, nullptr, nullptr);
-    })->finally([self = shared_from_this()]() {
-        self->mPromise[WAIT_CLOSED].reset();
+    })->finally([=]() {
+        release();
     });
 }
 
@@ -241,7 +247,7 @@ void aio::ev::Buffer::onClose(const zero::async::promise::Reason &reason) {
     mClosed = true;
     mReason = reason;
 
-    const auto [read, drain, waitClosed] = mPromise;
+    auto [read, drain, waitClosed] = std::move(mPromise);
 
     if (read)
         read->reject(mReason);
@@ -257,19 +263,23 @@ void aio::ev::Buffer::onBufferRead() {
     if (mPromise[WAIT_CLOSED])
         return;
 
-    if (!mPromise[READ]) {
+    auto p = std::move(mPromise[READ]);
+
+    if (!p) {
         bufferevent_disable(mBev, EV_READ);
         return;
     }
 
-    std::shared_ptr(mPromise[READ])->resolve();
+    p->resolve();
 }
 
 void aio::ev::Buffer::onBufferWrite() {
-    if (!mPromise[DRAIN])
+    auto p = std::move(mPromise[DRAIN]);
+
+    if (!p)
         return;
 
-    std::shared_ptr(mPromise[DRAIN])->resolve();
+    p->resolve();
 }
 
 void aio::ev::Buffer::onBufferEvent(short what) {
@@ -279,11 +289,19 @@ void aio::ev::Buffer::onBufferEvent(short what) {
         onClose({IO_ERROR, getError()});
     } else if (what & BEV_EVENT_TIMEOUT) {
         if (what & BEV_EVENT_READING) {
-            if (mPromise[READ])
-                std::shared_ptr(mPromise[READ])->reject({IO_TIMEOUT, "reading timed out"});
+            auto p = std::move(mPromise[READ]);
+
+            if (!p)
+                return;
+
+            p->reject({IO_TIMEOUT, "reading timed out"});
         } else {
-            if (mPromise[DRAIN])
-                std::shared_ptr(mPromise[DRAIN])->reject({IO_TIMEOUT, "writing timed out"});
+            auto p = std::move(mPromise[DRAIN]);
+
+            if (!p)
+                return;
+
+            p->reject({IO_TIMEOUT, "writing timed out"});
         }
     }
 }

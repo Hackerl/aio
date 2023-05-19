@@ -3,8 +3,7 @@
 #include <aio/ev/event.h>
 #include <fstream>
 
-aio::http::Response::Response(CURL *easy, std::shared_ptr<ev::IBuffer> buffer)
-        : mEasy(easy), mBuffer(std::move(buffer)) {
+aio::http::Response::Response(CURL *easy, zero::ptr::RefPtr<ev::IBuffer> buffer) : mEasy(easy), mBuffer(std::move(buffer)) {
 
 }
 
@@ -103,8 +102,12 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response:
             return std::string{(const char *) data.data(), data.size()};
         });
 
-    return readAll(shared_from_this())->then([](nonstd::span<const std::byte> data) {
+    addRef();
+
+    return readAll(this)->then([](nonstd::span<const std::byte> data) {
         return std::string{(const char *) data.data(), data.size()};
+    })->finally([=]() {
+        release();
     });
 }
 
@@ -125,7 +128,7 @@ aio::http::Requests::Requests(const std::shared_ptr<Context> &context) : Request
 }
 
 aio::http::Requests::Requests(const std::shared_ptr<Context> &context, Options options)
-        : mContext(context), mOptions(std::move(options)), mTimer(std::make_shared<ev::Timer>(context)) {
+        : mContext(context), mOptions(std::move(options)), mTimer(zero::ptr::makeRef<ev::Timer>(context)) {
     mMulti = curl_multi_init();
 
     curl_multi_setopt(
@@ -167,15 +170,19 @@ void aio::http::Requests::onCURLTimer(long timeout) {
     if (mTimer->pending())
         mTimer->cancel();
 
-    mTimer->setTimeout(std::chrono::milliseconds{timeout})->then([self = shared_from_this()]() {
+    addRef();
+
+    mTimer->setTimeout(std::chrono::milliseconds{timeout})->then([=]() {
         int n = 0;
-        curl_multi_socket_action(self->mMulti, CURL_SOCKET_TIMEOUT, 0, &n);
-        self->recycle();
+        curl_multi_socket_action(mMulti, CURL_SOCKET_TIMEOUT, 0, &n);
+        recycle();
+    })->finally([=]() {
+        release();
     });
 }
 
 void aio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what, void *data) {
-    auto context = (std::pair<std::shared_ptr<bool>, std::shared_ptr<ev::Event>> *) data;
+    auto context = (std::pair<std::shared_ptr<bool>, zero::ptr::RefPtr<ev::Event>> *) data;
 
     if (what == CURL_POLL_REMOVE) {
         if (!context)
@@ -189,10 +196,10 @@ void aio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what, voi
     }
 
     if (!context) {
-        context = new std::pair<std::shared_ptr<bool>, std::shared_ptr<ev::Event>>();
+        context = new std::pair<std::shared_ptr<bool>, zero::ptr::RefPtr<ev::Event>>();
 
         context->first = std::make_shared<bool>();
-        context->second = std::make_shared<ev::Event>(mContext, s);
+        context->second = zero::ptr::makeRef<ev::Event>(mContext, s);
 
         curl_multi_assign(mMulti, s, context);
     }
@@ -200,27 +207,31 @@ void aio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what, voi
     if (context->second->pending())
         context->second->cancel();
 
+    addRef();
+
     context->second->onPersist(
             (short) (((what & CURL_POLL_IN) ? ev::READ : 0) | ((what & CURL_POLL_OUT) ? ev::WRITE : 0)),
-            [s, stopped = context->first, self = shared_from_this()](short what) {
+            [=, stopped = context->first](short what) {
                 int n = 0;
                 curl_multi_socket_action(
-                        self->mMulti,
+                        mMulti,
                         s,
                         ((what & ev::READ) ? CURL_CSELECT_IN : 0) | ((what & ev::WRITE) ? CURL_CSELECT_OUT : 0),
                         &n
                 );
 
-                self->recycle();
+                recycle();
 
-                if (n > 0 || !self->mTimer->pending())
+                if (n > 0 || !mTimer->pending())
                     return !*stopped;
 
-                self->mTimer->cancel();
+                mTimer->cancel();
 
                 return !*stopped;
             }
-    );
+    )->finally([=]() {
+        release();
+    });
 }
 
 void aio::http::Requests::recycle() {

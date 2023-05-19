@@ -3,15 +3,17 @@
 #include <catch2/catch_test_macros.hpp>
 #include <csignal>
 
+using namespace std::chrono_literals;
+
 TEST_CASE("signal handler", "[signal]") {
     std::shared_ptr<aio::Context> context = aio::newContext();
     REQUIRE(context);
 
-    std::make_shared<aio::ev::Signal>(context, SIGUSR1)->on()->then([=]() {
+    zero::ptr::makeRef<aio::ev::Signal>(context, SIGUSR1)->on()->then([=]() {
         context->loopBreak();
     });
 
-    std::make_shared<aio::ev::Timer>(context)->setTimeout(std::chrono::milliseconds{500})->then([]() {
+    zero::ptr::makeRef<aio::ev::Timer>(context)->setTimeout(500ms)->then([]() {
         raise(SIGUSR1);
     });
 

@@ -7,7 +7,10 @@ aio::ev::Event::Event(const std::shared_ptr<Context> &context, evutil_socket_t f
             fd,
             0,
             [](evutil_socket_t fd, short what, void *arg) {
-                std::shared_ptr(static_cast<Event *>(arg)->mPromise)->resolve(what);
+                zero::ptr::RefPtr<Event> event((Event *) arg);
+
+                auto p = std::move(event->mPromise);
+                p->resolve(what);
             },
             this
     );
@@ -22,7 +25,9 @@ bool aio::ev::Event::cancel() {
         return false;
 
     event_del(mEvent);
-    std::shared_ptr(mPromise)->reject({IO_CANCEL, "promise canceled"});
+
+    auto p = std::move(mPromise);
+    p->reject({IO_CANCEL, "promise canceled"});
 
     return true;
 }
@@ -44,6 +49,8 @@ aio::ev::Event::on(short events, std::optional<std::chrono::milliseconds> timeou
         return zero::async::promise::reject<short>({IO_ERROR, "persistent flag should not be used"});
 
     return zero::async::promise::chain<short>([=](const auto &p) {
+        addRef();
+
         mPromise = p;
         mEvent->ev_events = events;
 
@@ -58,8 +65,8 @@ aio::ev::Event::on(short events, std::optional<std::chrono::milliseconds> timeou
         };
 
         event_add(mEvent, &tv);
-    })->finally([self = shared_from_this()]() {
-        self->mPromise.reset();
+    })->finally([=]() {
+        release();
     });
 }
 

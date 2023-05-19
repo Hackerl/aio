@@ -52,8 +52,8 @@ int main(int argc, char **argv) {
         }
     }
 
-    std::shared_ptr<aio::http::Requests> requests = std::make_shared<aio::http::Requests>(context);
-    std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<aio::http::Response>>> promise;
+    zero::ptr::RefPtr<aio::http::Requests> requests = zero::ptr::makeRef<aio::http::Requests>(context);
+    std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::http::Response>>> promise;
 
     if (body) {
         if (cmdline.exist("json")) {
@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
         promise = requests->request(*method, url, options);
     }
 
-    promise->then([=](const std::shared_ptr<aio::http::Response> &response) {
+    promise->then([=](const zero::ptr::RefPtr<aio::http::Response> &response) {
         if (output)
             return response->output(*output);
 

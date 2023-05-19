@@ -6,7 +6,10 @@ aio::ev::Signal::Signal(const std::shared_ptr<Context> &context, int sig) {
             context->base(),
             sig,
             [](evutil_socket_t fd, short event, void *arg) {
-                std::shared_ptr(static_cast<Signal *>(arg)->mPromise)->resolve();
+                zero::ptr::RefPtr<Signal> signal((Signal *) arg);
+
+                auto p = std::move(signal->mPromise);
+                p->resolve();
             },
             this
     );
@@ -21,7 +24,9 @@ bool aio::ev::Signal::cancel() {
         return false;
 
     evsignal_del(mEvent);
-    std::shared_ptr(mPromise)->reject({IO_CANCEL, "promise canceled"});
+
+    auto p = std::move(mPromise);
+    p->reject({IO_CANCEL, "promise canceled"});
 
     return true;
 }
@@ -35,10 +40,11 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Signal::on() {
         return zero::async::promise::reject<void>({IO_ERROR, "pending signal has been set"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
+        addRef();
         mPromise = p;
         evsignal_add(mEvent, nullptr);
-    })->finally([self = shared_from_this()]() {
-        self->mPromise.reset();
+    })->finally([=]() {
+        release();
     });
 }
 

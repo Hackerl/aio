@@ -7,7 +7,7 @@ TEST_CASE("async channel buffer", "[channel]") {
     REQUIRE(context);
 
     std::shared_ptr<int> counters[2] = {std::make_shared<int>(), std::make_shared<int>()};
-    std::shared_ptr<aio::IChannel<int>> channel = std::make_shared<aio::Channel<int, 100>>(context);
+    zero::ptr::RefPtr<aio::IChannel<int>> channel = zero::ptr::makeRef<aio::Channel<int, 100>>(context);
 
     SECTION("async sender/async receiver") {
         zero::async::promise::all(
@@ -59,7 +59,7 @@ TEST_CASE("async channel buffer", "[channel]") {
                     });
                 })
         )->fail([=](const zero::async::promise::Reason &reason) {
-            REQUIRE(reason.message == "buffer closed");
+            REQUIRE(reason.message == "channel closed");
             REQUIRE(*counters[0] == *counters[1]);
         })->finally([=]() {
             context->loopBreak();
@@ -98,7 +98,7 @@ TEST_CASE("async channel buffer", "[channel]") {
                     });
                 })
         )->fail([=](const zero::async::promise::Reason &reason) {
-            REQUIRE(reason.message == "buffer closed");
+            REQUIRE(reason.message == "channel closed");
             REQUIRE(*counters[0] == *counters[1]);
         })->finally([=]() {
             context->loopBreak();

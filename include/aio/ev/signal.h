@@ -3,12 +3,13 @@
 
 #include <aio/context.h>
 #include <zero/async/promise.h>
+#include <zero/ptr/ref.h>
 
 namespace aio::ev {
-    class Signal : public std::enable_shared_from_this<Signal> {
+    class Signal : public zero::ptr::RefCounter {
     public:
         Signal(const std::shared_ptr<Context> &context, int sig);
-        ~Signal();
+        ~Signal() override;
 
     public:
         bool cancel();

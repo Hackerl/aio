@@ -4,12 +4,13 @@
 #include <chrono>
 #include <aio/context.h>
 #include <zero/async/promise.h>
+#include <zero/ptr/ref.h>
 
 namespace aio::ev {
-    class Timer : public std::enable_shared_from_this<Timer> {
+    class Timer : public zero::ptr::RefCounter {
     public:
         explicit Timer(const std::shared_ptr<Context> &context);
-        ~Timer();
+        ~Timer() override;
 
     public:
         bool cancel();

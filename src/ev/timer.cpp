@@ -5,7 +5,10 @@ aio::ev::Timer::Timer(const std::shared_ptr<Context> &context) {
     mEvent = evtimer_new(
             context->base(),
             [](evutil_socket_t fd, short what, void *arg) {
-                std::shared_ptr(static_cast<Timer *>(arg)->mPromise)->resolve();
+                zero::ptr::RefPtr<Timer> timer((Timer *) arg);
+
+                auto p = std::move(timer->mPromise);
+                p->resolve();
             },
             this
     );
@@ -20,7 +23,9 @@ bool aio::ev::Timer::cancel() {
         return false;
 
     evtimer_del(mEvent);
-    std::shared_ptr(mPromise)->reject({IO_CANCEL, "promise canceled"});
+
+    auto p = std::move(mPromise);
+    p->reject({IO_CANCEL, "promise canceled"});
 
     return true;
 }
@@ -34,6 +39,7 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Timer::setTimeout(
         return zero::async::promise::reject<void>({IO_ERROR, "pending timer has been set"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
+        addRef();
         mPromise = p;
 
         timeval tv = {
@@ -42,8 +48,8 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Timer::setTimeout(
         };
 
         evtimer_add(mEvent, &tv);
-    })->finally([self = shared_from_this()]() {
-        self->mPromise.reset();
+    })->finally([=]() {
+        release();
     });
 }
 

@@ -20,10 +20,10 @@
 namespace aio::http {
     using namespace std::chrono_literals;
 
-    class Response : public std::enable_shared_from_this<Response> {
+    class Response : public zero::ptr::RefCounter {
     public:
-        explicit Response(CURL *easy, std::shared_ptr<ev::IBuffer> buffer);
-        ~Response();
+        Response(CURL *easy, zero::ptr::RefPtr<ev::IBuffer> buffer);
+        ~Response() override;
 
     public:
         long statusCode();
@@ -53,7 +53,7 @@ namespace aio::http {
 
     private:
         CURL *mEasy;
-        std::shared_ptr<ev::IBuffer> mBuffer;
+        zero::ptr::RefPtr<ev::IBuffer> mBuffer;
         std::map<std::string, std::string> mHeaders;
     };
 
@@ -64,9 +64,9 @@ namespace aio::http {
         }
 
         CURL *easy;
-        std::shared_ptr<Response> response;
-        std::shared_ptr<ev::IPairedBuffer> buffer;
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>> promise;
+        zero::ptr::RefPtr<Response> response;
+        zero::ptr::RefPtr<ev::IPairedBuffer> buffer;
+        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<Response>>> promise;
         std::list<std::function<void(void)>> defers;
         char error[CURL_ERROR_SIZE];
         bool transferring;
@@ -80,11 +80,11 @@ namespace aio::http {
         std::optional<std::string> userAgent;
     };
 
-    class Requests : public std::enable_shared_from_this<Requests> {
+    class Requests : public zero::ptr::RefCounter {
     public:
         explicit Requests(const std::shared_ptr<Context> &context);
         Requests(const std::shared_ptr<Context> &context, Options options);
-        ~Requests();
+        ~Requests() override;
 
     private:
         void onCURLTimer(long timeout);
@@ -95,23 +95,23 @@ namespace aio::http {
 
     public:
         template<typename ...Ts>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
-        request(const std::string &method, const URL &url, const std::optional<Options> &options, Ts ...args) {
+        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<Response>>>
+        request(const std::string &method, const URL &url, const std::optional<Options> &options, Ts &&...args) {
             std::optional<std::string> u = url.string();
 
             if (!u)
-                return zero::async::promise::reject<std::shared_ptr<Response>>({HTTP_ERROR, "invalid url"});
+                return zero::async::promise::reject<zero::ptr::RefPtr<Response>>({HTTP_ERROR, "invalid url"});
 
             CURL *easy = curl_easy_init();
 
             if (!easy)
-                return zero::async::promise::reject<std::shared_ptr<Response>>({HTTP_ERROR, "init easy handle failed"});
+                return zero::async::promise::reject<zero::ptr::RefPtr<Response>>({HTTP_ERROR, "init easy handle failed"});
 
-            std::array<std::shared_ptr<ev::IPairedBuffer>, 2> buffers = ev::pipe(mContext);
+            std::array<zero::ptr::RefPtr<ev::IPairedBuffer>, 2> buffers = ev::pipe(mContext);
 
             auto connection = new Connection{
                     easy,
-                    std::make_shared<Response>(easy, buffers[1]),
+                    zero::ptr::makeRef<Response>(easy, buffers[1]),
                     buffers[0]
             };
 
@@ -244,7 +244,7 @@ namespace aio::http {
                 static_assert(sizeof...(args) == 1);
 
                 using T = std::remove_cv_t<std::remove_reference_t<std::tuple_element_t<0, std::tuple<Ts...>>>>;
-                auto &payload = (args, ...);
+                const auto &payload = (std::forward<Ts>(args), ...);
 
                 if constexpr (std::is_pointer_v<T> &&
                               std::is_same_v<std::remove_const_t<std::remove_pointer_t<T>>, char>) {
@@ -278,7 +278,7 @@ namespace aio::http {
                             curl_mime_free(form);
                             curl_slist_free_all(headers);
                             delete connection;
-                            return zero::async::promise::reject<std::shared_ptr<Response>>({HTTP_ERROR, curl_easy_strerror(c)});
+                            return zero::async::promise::reject<zero::ptr::RefPtr<Response>>({HTTP_ERROR, curl_easy_strerror(c)});
                         }
                     }
 
@@ -303,7 +303,7 @@ namespace aio::http {
                                 curl_mime_free(form);
                                 curl_slist_free_all(headers);
                                 delete connection;
-                                return zero::async::promise::reject<std::shared_ptr<Response>>(
+                                return zero::async::promise::reject<zero::ptr::RefPtr<Response>>(
                                         {HTTP_ERROR, curl_easy_strerror(c)}
                                 );
                             }
@@ -344,7 +344,7 @@ namespace aio::http {
                 });
             }
 
-            return zero::async::promise::chain<std::shared_ptr<Response>>([=](const auto &p) {
+            return zero::async::promise::chain<zero::ptr::RefPtr<Response>>([=](const auto &p) {
                 connection->promise = p;
                 CURLMcode c = curl_multi_add_handle(mMulti, connection->easy);
 
@@ -355,37 +355,37 @@ namespace aio::http {
             });
         }
 
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
+        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<Response>>>
         get(const URL &url, const std::optional<Options> &options = std::nullopt) {
             return request("GET", url, options);
         }
 
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
+        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<Response>>>
         head(const URL &url, const std::optional<Options> &options = std::nullopt) {
             return request("HEAD", url, options);
         }
 
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
+        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<Response>>>
         del(const URL &url, const std::optional<Options> &options = std::nullopt) {
             return request("DELETE", url, options);
         }
 
         template<typename T>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
-        post(const URL &url, T payload, const std::optional<Options> &options = std::nullopt) {
-            return request("POST", url, options, payload);
+        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<Response>>>
+        post(const URL &url, T &&payload, const std::optional<Options> &options = std::nullopt) {
+            return request("POST", url, options, std::forward<T>(payload));
         }
 
         template<typename T>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
-        put(const URL &url, T payload, const std::optional<Options> &options = std::nullopt) {
-            return request("PUT", url, options, payload);
+        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<Response>>>
+        put(const URL &url, T &&payload, const std::optional<Options> &options = std::nullopt) {
+            return request("PUT", url, options, std::forward<T>(payload));
         }
 
         template<typename T>
-        std::shared_ptr<zero::async::promise::Promise<std::shared_ptr<Response>>>
-        patch(const URL &url, T payload, const std::optional<Options> &options = std::nullopt) {
-            return request("PATCH", url, options, payload);
+        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<Response>>>
+        patch(const URL &url, T &&payload, const std::optional<Options> &options = std::nullopt) {
+            return request("PATCH", url, options, std::forward<T>(payload));
         }
 
     public:
@@ -394,8 +394,8 @@ namespace aio::http {
     private:
         CURLM *mMulti;
         Options mOptions;
+        zero::ptr::RefPtr<ev::Timer> mTimer;
         std::shared_ptr<Context> mContext;
-        std::shared_ptr<ev::Timer> mTimer;
     };
 }
 

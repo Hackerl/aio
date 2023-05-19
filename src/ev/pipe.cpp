@@ -1,6 +1,7 @@
 #include <aio/ev/pipe.h>
 
-aio::ev::PairedBuffer::PairedBuffer(bufferevent *bev) : Buffer(bev) {
+aio::ev::PairedBuffer::PairedBuffer(bufferevent *bev, std::shared_ptr<std::string> error)
+        : Buffer(bev), mError(std::move(error)) {
 
 }
 
@@ -17,29 +18,29 @@ void aio::ev::PairedBuffer::close() {
 }
 
 std::string aio::ev::PairedBuffer::getError() {
-    return mError;
+    return *mError;
 }
 
 void aio::ev::PairedBuffer::throws(std::string_view error) {
-    mError = error;
+    *mError = error;
 
-    if (std::shared_ptr<PairedBuffer> buffer = mPartner.lock()) {
-        buffer->mError = error;
-        bufferevent_trigger_event(buffer->mBev, BEV_EVENT_ERROR, BEV_OPT_DEFER_CALLBACKS);
-    }
+    if (bufferevent *buffer = bufferevent_pair_get_partner(mBev))
+        bufferevent_trigger_event(buffer, BEV_EVENT_ERROR, BEV_OPT_DEFER_CALLBACKS);
 
     bufferevent_trigger_event(mBev, BEV_EVENT_ERROR, 0);
 }
 
-std::array<std::shared_ptr<aio::ev::IPairedBuffer>, 2> aio::ev::pipe(const std::shared_ptr<Context> &context) {
+std::array<zero::ptr::RefPtr<aio::ev::IPairedBuffer>, 2> aio::ev::pipe(const std::shared_ptr<Context> &context) {
     bufferevent *pair[2];
 
     if (bufferevent_pair_new(context->base(), BEV_OPT_DEFER_CALLBACKS, pair) < 0)
         return {nullptr, nullptr};
 
-    std::shared_ptr<aio::ev::PairedBuffer> buffers[2] = {
-            std::make_shared<PairedBuffer>(pair[0]),
-            std::make_shared<PairedBuffer>(pair[1])
+    std::shared_ptr<std::string> error = std::make_shared<std::string>();
+
+    zero::ptr::RefPtr<aio::ev::PairedBuffer> buffers[2] = {
+            zero::ptr::makeRef<PairedBuffer>(pair[0], error),
+            zero::ptr::makeRef<PairedBuffer>(pair[1], error)
     };
 
     /*
@@ -49,9 +50,6 @@ std::array<std::shared_ptr<aio::ev::IPairedBuffer>, 2> aio::ev::pipe(const std::
      * */
     evbuffer_defer_callbacks(bufferevent_get_output(pair[0]), context->base());
     evbuffer_defer_callbacks(bufferevent_get_output(pair[1]), context->base());
-
-    buffers[0]->mPartner = buffers[1];
-    buffers[1]->mPartner = buffers[0];
 
     return {buffers[0], buffers[1]};
 }

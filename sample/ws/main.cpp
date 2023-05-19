@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
     if (!context)
         return -1;
 
-    aio::http::ws::connect(context, url)->then([](const std::shared_ptr<aio::http::ws::WebSocket> &ws) {
+    aio::http::ws::connect(context, url)->then([](const zero::ptr::RefPtr<aio::http::ws::WebSocket> &ws) {
         return zero::async::promise::loop<void>([=](const auto &loop) {
             ws->read()->then([=](const aio::http::ws::Message &message) {
                 switch (message.opcode) {

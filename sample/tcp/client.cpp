@@ -24,11 +24,11 @@ int main(int argc, char **argv) {
     if (!context)
         return -1;
 
-    std::shared_ptr<aio::ev::Buffer> input = std::make_shared<aio::ev::Buffer>(
+    zero::ptr::RefPtr<aio::ev::Buffer> input = zero::ptr::makeRef<aio::ev::Buffer>(
             bufferevent_socket_new(context->base(), STDIN_FILENO, 0)
     );
 
-    aio::net::connect(context, host, port)->then([=](const std::shared_ptr<aio::ev::IBuffer> &buffer) {
+    aio::net::connect(context, host, port)->then([=](const zero::ptr::RefPtr<aio::ev::IBuffer> &buffer) {
         return zero::async::promise::all(
                 zero::async::promise::loop<void>([=](const auto &loop) {
                     input->read()->then([=](nonstd::span<const std::byte> data) {
