@@ -68,7 +68,7 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response:
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>> aio::http::Response::output(const std::filesystem::path &path) {
-    std::shared_ptr<std::ofstream> stream = std::make_shared<std::ofstream>(path);
+    std::shared_ptr<std::ofstream> stream = std::make_shared<std::ofstream>(path, std::ios::binary);
 
     if (!stream->is_open())
         return zero::async::promise::reject<void>({-1, "create file output stream failed"});

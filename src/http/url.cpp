@@ -176,17 +176,6 @@ aio::http::URL &aio::http::URL::appendQuery(const std::string &query) {
     return *this;
 }
 
-bool aio::http::convert(std::string_view input, URL &url) {
-    std::optional<URL> u = parseURL(std::string{input});
-
-    if (!u)
-        return false;
-
-    url = std::move(*u);
-
-    return true;
-}
-
 std::optional<aio::http::URL> aio::http::parseURL(const std::string &input) {
     CURLU *url = curl_url();
 
@@ -197,4 +186,9 @@ std::optional<aio::http::URL> aio::http::parseURL(const std::string &input) {
         return std::nullopt;
 
     return URL(url);
+}
+
+template<>
+std::optional<aio::http::URL> zero::convert<aio::http::URL>(std::string_view str) {
+    return aio::http::parseURL(std::string{str});
 }

@@ -1,9 +1,10 @@
 #ifndef AIO_URL_H
 #define AIO_URL_H
 
+#include <string>
 #include <optional>
 #include <curl/curl.h>
-#include <string>
+#include <zero/cmdline.h>
 
 namespace aio::http {
     class URL {
@@ -94,8 +95,10 @@ namespace aio::http {
         CURLU *mURL;
     };
 
-    bool convert(std::string_view input, URL &url);
     std::optional<URL> parseURL(const std::string &input);
 }
+
+template<>
+std::optional<aio::http::URL> zero::convert<aio::http::URL>(std::string_view str);
 
 #endif //AIO_URL_H

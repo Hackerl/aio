@@ -17,11 +17,12 @@ namespace aio::ev {
         virtual std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(evbuffer_eol_style style) = 0;
 
     public:
-        virtual size_t write(std::string_view str) = 0;
-        virtual size_t write(nonstd::span<const std::byte> buffer) = 0;
+        virtual bool write(std::string_view str) = 0;
+        virtual bool write(nonstd::span<const std::byte> buffer) = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> drain() = 0;
 
     public:
+        virtual size_t pending() = 0;
         virtual void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) = 0;
 
     public:
@@ -41,11 +42,12 @@ namespace aio::ev {
         std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(evbuffer_eol_style style) override;
 
     public:
-        size_t write(std::string_view str) override;
-        size_t write(nonstd::span<const std::byte> buffer) override;
+        bool write(std::string_view str) override;
+        bool write(nonstd::span<const std::byte> buffer) override;
         std::shared_ptr<zero::async::promise::Promise<void>> drain() override;
 
     public:
+        size_t pending() override;
         void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
 
     public:

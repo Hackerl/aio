@@ -149,18 +149,16 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
     });
 }
 
-size_t aio::ev::Buffer::write(std::string_view str) {
+bool aio::ev::Buffer::write(std::string_view str) {
     return write({(const std::byte *) str.data(), str.length()});
 }
 
-size_t aio::ev::Buffer::write(nonstd::span<const std::byte> buffer) {
+bool aio::ev::Buffer::write(nonstd::span<const std::byte> buffer) {
     if (mClosed)
-        return -1;
+        return false;
 
-    evbuffer *output = bufferevent_get_output(mBev);
-    evbuffer_add(output, buffer.data(), buffer.size());
-
-    return evbuffer_get_length(output);
+    bufferevent_write(mBev, buffer.data(), buffer.size());
+    return true;
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::drain() {
@@ -184,6 +182,10 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::drain() {
     })->finally([=]() {
         release();
     });
+}
+
+size_t aio::ev::Buffer::pending() {
+    return evbuffer_get_length(bufferevent_get_output(mBev));
 }
 
 void aio::ev::Buffer::setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) {
