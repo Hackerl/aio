@@ -1,13 +1,15 @@
 #ifndef AIO_CONTEXT_H
 #define AIO_CONTEXT_H
 
+#include "worker.h"
+#include <queue>
 #include <event.h>
-#include <memory>
+#include <zero/async/promise.h>
 
 namespace aio {
     class Context {
     public:
-        Context(event_base *base, evdns_base *dnsBase);
+        Context(event_base *base, evdns_base *dnsBase, size_t maxWorker);
         ~Context();
 
     public:
@@ -22,11 +24,19 @@ namespace aio {
         void loopBreak();
 
     private:
+        size_t mMaxWorker;
         event_base *mBase;
         evdns_base *mDnsBase;
+        std::queue<std::shared_ptr<Worker>> mWorkers;
+
+        template<typename T, typename F>
+        friend std::shared_ptr<zero::async::promise::Promise<T>> toThread(
+                const std::shared_ptr<Context> &context,
+                F &&f
+        );
     };
 
-    std::shared_ptr<Context> newContext();
+    std::shared_ptr<Context> newContext(size_t maxWorker = 16);
 }
 
 #endif //AIO_CONTEXT_H

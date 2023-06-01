@@ -6,7 +6,8 @@
 #include <event2/thread.h>
 #endif
 
-aio::Context::Context(event_base *base, evdns_base *dnsBase) : mBase(base), mDnsBase(dnsBase) {
+aio::Context::Context(event_base *base, evdns_base *dnsBase, size_t maxWorker)
+        : mBase(base), mDnsBase(dnsBase), mMaxWorker(maxWorker) {
 
 }
 
@@ -35,7 +36,7 @@ void aio::Context::loopBreak() {
     event_base_loopbreak(mBase);
 }
 
-std::shared_ptr<aio::Context> aio::newContext() {
+std::shared_ptr<aio::Context> aio::newContext(size_t maxWorker) {
 #ifndef EVENT__DISABLE_THREAD_SUPPORT
 #ifdef _WIN32
     evthread_use_windows_threads();
@@ -74,5 +75,5 @@ std::shared_ptr<aio::Context> aio::newContext() {
         return nullptr;
     }
 
-    return std::make_shared<Context>(base, dnsBase);
+    return std::make_shared<Context>(base, dnsBase, maxWorker);
 }
