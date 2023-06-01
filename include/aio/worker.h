@@ -15,7 +15,13 @@ namespace aio {
         ~Worker();
 
     public:
-        void execute(std::function<void()> &&task);
+        template<typename F>
+        void execute(F &&f) {
+            std::lock_guard<std::mutex> guard(mMutex);
+
+            mTask = std::forward<F>(f);
+            mCond.notify_one();
+        }
 
     private:
         void work();

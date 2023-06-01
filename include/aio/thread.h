@@ -2,7 +2,6 @@
 #define AIO_THREAD_H
 
 #include "ev/event.h"
-#include <thread>
 
 namespace aio {
     template<typename T, typename F>

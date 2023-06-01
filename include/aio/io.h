@@ -1,9 +1,8 @@
 #ifndef AIO_IO_H
 #define AIO_IO_H
 
-#include "error.h"
-#include <vector>
-#include <zero/async/promise.h>
+#include "channel.h"
+#include <nonstd/span.hpp>
 
 namespace aio {
     template<typename T>
@@ -14,7 +13,7 @@ namespace aio {
             reader->read()->then([=](nonstd::span<const std::byte> data) {
                 buffer->insert(buffer->end(), data.begin(), data.end());
                 P_CONTINUE(loop);
-            })->fail([=](const zero::async::promise::Reason &reason) {
+            }, [=](const zero::async::promise::Reason &reason) {
                 if (reason.code != IO_EOF) {
                     P_BREAK_E(loop, reason);
                     return;
@@ -25,22 +24,42 @@ namespace aio {
         });
     }
 
-    template<typename Reader, typename Writer>
-    std::shared_ptr<zero::async::promise::Promise<void>> copy(const Reader &src, const Writer &dst) {
+    template<typename T>
+    std::shared_ptr<zero::async::promise::Promise<void>> copy(
+            const zero::ptr::RefPtr<IReceiver<T>> &src,
+            const zero::ptr::RefPtr<ISender<T>> &dst
+    ) {
         return zero::async::promise::loop<void>([=](const auto &loop) {
-            src->read()->then([=](nonstd::span<const std::byte> data) {
-                dst->write(data);
-                return dst->drain()->then([=]() {
+            src->receive()->then([=](const T &element) {
+                dst->send(element)->then([=]() {
                     P_CONTINUE(loop);
+                }, [=](const zero::async::promise::Reason &reason) {
+                    P_BREAK_E(loop, reason);
                 });
-            })->fail([=](const zero::async::promise::Reason &reason) {
+            }, [=](const zero::async::promise::Reason &reason) {
                 if (reason.code != IO_EOF) {
                     P_BREAK_E(loop, reason);
                     return;
                 }
 
-                if (dst->closed()) {
-                    P_BREAK_E(loop, { IO_ERROR, "writer is closed" });
+                P_BREAK(loop);
+            });
+        });
+    }
+
+    template<typename Reader, typename Writer>
+    std::shared_ptr<zero::async::promise::Promise<void>> copy(const Reader &src, const Writer &dst) {
+        return zero::async::promise::loop<void>([=](const auto &loop) {
+            src->read()->then([=](nonstd::span<const std::byte> data) {
+                dst->write(data);
+                dst->drain()->then([=]() {
+                    P_CONTINUE(loop);
+                }, [=](const zero::async::promise::Reason &reason) {
+                    P_BREAK_E(loop, reason);
+                });
+            }, [=](const zero::async::promise::Reason &reason) {
+                if (reason.code != IO_EOF) {
+                    P_BREAK_E(loop, reason);
                     return;
                 }
 
@@ -52,36 +71,8 @@ namespace aio {
     template<typename First, typename Second>
     std::shared_ptr<zero::async::promise::Promise<void>> tunnel(const First &first, const Second &second) {
         return zero::async::promise::race(
-                zero::async::promise::loop<void>([=](const auto &loop) {
-                    first->read()->then([=](nonstd::span<const std::byte> data) {
-                        second->write(data);
-                        return second->drain()->then([=]() {
-                            P_CONTINUE(loop);
-                        });
-                    })->fail([=](const zero::async::promise::Reason &reason) {
-                        if (reason.code != IO_EOF) {
-                            P_BREAK_E(loop, reason);
-                            return;
-                        }
-
-                        P_BREAK(loop);
-                    });
-                }),
-                zero::async::promise::loop<void>([=](const auto &loop) {
-                    second->read()->then([=](nonstd::span<const std::byte> data) {
-                        first->write(data);
-                        return first->drain()->then([=]() {
-                            P_CONTINUE(loop);
-                        });
-                    })->fail([=](const zero::async::promise::Reason &reason) {
-                        if (reason.code != IO_EOF) {
-                            P_BREAK_E(loop, reason);
-                            return;
-                        }
-
-                        P_BREAK(loop);
-                    });
-                })
+                copy(first, second),
+                copy(second, first)
         );
     }
 }

@@ -14,13 +14,6 @@ aio::Worker::~Worker() {
     mThread.join();
 }
 
-void aio::Worker::execute(std::function<void()> &&task) {
-    std::lock_guard<std::mutex> guard(mMutex);
-
-    mTask = std::move(task);
-    mCond.notify_one();
-}
-
 void aio::Worker::work() {
     while (true) {
         std::unique_lock<std::mutex> lock(mMutex);
