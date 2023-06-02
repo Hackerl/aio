@@ -54,15 +54,18 @@ namespace aio {
 
     public:
         bool sendSync(const T &element) override {
-            return sendSync(std::move(T{element}));
+            T e = element;
+            return sendSync(std::move(e));
         }
 
         nonstd::expected<void, Error> sendNoWait(const T &element) override {
-            return sendNoWait(std::move(T{element}));
+            T e = element;
+            return sendNoWait(std::move(e));
         }
 
         std::shared_ptr<zero::async::promise::Promise<void>> send(const T &element) override {
-            return send(std::move(T{element}));
+            T e = element;
+            return send(std::move(e));
         }
 
     public:
