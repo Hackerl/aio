@@ -35,7 +35,7 @@
   <p align="center">
     A promise-based asynchronous library implemented in C++17
     <br />
-    <a href="https://github.com/Hackerl/aio"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/Hackerl/aio/wiki"><strong>Explore the docs »</strong></a>
     <br />
     <br />
     <a href="https://github.com/Hackerl/aio/tree/master/sample">View Demo</a>
@@ -62,7 +62,7 @@
       <a href="#getting-started">Getting Started</a>
       <ul>
         <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
+        <li><a href="#build">Build</a></li>
       </ul>
     </li>
     <li><a href="#usage">Usage</a></li>
@@ -110,7 +110,7 @@ Create a `CMake` project and two configuration files, `vcpkg-configuration.json`
       {
         "kind": "git",
         "repository": "https://github.com/Hackerl/vcpkg-registry",
-        "baseline": "0688d7a1a7a24bb3a65c3e7805affc84c6ed2eb4",
+        "baseline": "7cc1a197fc00fbc0637e20776187b256b4d2454c",
         "packages": [
           "aio",
           "zero"
@@ -129,7 +129,7 @@ Create a `CMake` project and two configuration files, `vcpkg-configuration.json`
     "dependencies": [
       {
         "name": "aio",
-        "version>=": "1.0.3"
+        "version>=": "1.0.5"
       },
       {
         "name": "curl",
@@ -172,218 +172,218 @@ Export environment variables:
 
 * Basic
 
-```cpp
-#include <aio/http/request.h>
-#include <zero/log.h>
+  ```cpp
+  #include <aio/http/request.h>
+  #include <zero/log.h>
 
-int main() {
-    INIT_CONSOLE_LOG(zero::INFO_LEVEL);
+  int main() {
+      INIT_CONSOLE_LOG(zero::INFO_LEVEL);
 
-#ifdef _WIN32
-    WSADATA wsaData;
+  #ifdef _WIN32
+      WSADATA wsaData;
 
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        LOG_ERROR("WSAStartup failed");
-        return -1;
-    }
-#endif
+      if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+          LOG_ERROR("WSAStartup failed");
+          return -1;
+      }
+  #endif
 
-    std::shared_ptr<aio::Context> context = aio::newContext();
+      std::shared_ptr<aio::Context> context = aio::newContext();
 
-    if (!context)
-        return -1;
+      if (!context)
+          return -1;
 
-    zero::ptr::RefPtr<aio::http::Requests> requests = zero::ptr::makeRef<aio::http::Requests>(context);
+      zero::ptr::RefPtr<aio::http::Requests> requests = zero::ptr::makeRef<aio::http::Requests>(context);
 
-    requests->get("https://www.google.com")->then([=](const zero::ptr::RefPtr<aio::http::Response> &response) {
-        return response->string();
-    })->then([](const std::string &content) {
-        LOG_INFO("content: %s", content.c_str());
-    })->fail([](const zero::async::promise::Reason &reason) {
-        LOG_ERROR("%s", reason.message.c_str());
-    })->finally([=]() {
-        context->loopBreak();
-    });
+      requests->get("https://www.google.com")->then([=](const zero::ptr::RefPtr<aio::http::Response> &response) {
+          return response->string();
+      })->then([](const std::string &content) {
+          LOG_INFO("content: %s", content.c_str());
+      })->fail([](const zero::async::promise::Reason &reason) {
+          LOG_ERROR("%s", reason.message.c_str());
+      })->finally([=]() {
+          context->loopBreak();
+      });
 
-    context->dispatch();
+      context->dispatch();
 
-#ifdef _WIN32
-    WSACleanup();
-#endif
+  #ifdef _WIN32
+      WSACleanup();
+  #endif
 
-    return 0;
-}
-```
+      return 0;
+  }
+  ```
 
 * Post form
 
-```cpp
-requests->post(
-        "https://www.google.com",
-        std::map<std::string, std::string>{
-                {"name", "jack"}
-        }
-);
-```
+  ```cpp
+  requests->post(
+          "https://www.google.com",
+          std::map<std::string, std::string>{
+                  {"name", "jack"}
+          }
+  );
+  ```
 
 * Post file
 
-```cpp
-requests->post(
-        "https://www.google.com",
-        std::map<std::string, std::filesystem::path>{
-                {"file", "/tmp/test"}
-        }
-);
+  ```cpp
+  requests->post(
+          "https://www.google.com",
+          std::map<std::string, std::filesystem::path>{
+                  {"file", "/tmp/test"}
+          }
+  );
 
-requests->post(
-        "https://www.google.com",
-        std::map<std::string, std::variant<std::string, std::filesystem::path>>{
-                {"name", std::string{"jack"}},
-                {"file", std::filesystem::path{"/tmp/test"}}
-        }
-);
-```
+  requests->post(
+          "https://www.google.com",
+          std::map<std::string, std::variant<std::string, std::filesystem::path>>{
+                  {"name", std::string{"jack"}},
+                  {"file", std::filesystem::path{"/tmp/test"}}
+          }
+  );
+  ```
 
 * Post json
 
-```cpp
-requests->post(
-        "https://www.google.com",
-        nlohmann::json{
-                {"name", "jack"}
-        }
-)->then([=](const zero::ptr::RefPtr<aio::http::Response> &response) {
-    return response->json();
-})->then([](const nlohmann::json &j) {
+  ```cpp
+  requests->post(
+          "https://www.google.com",
+          nlohmann::json{
+                  {"name", "jack"}
+          }
+  )->then([=](const zero::ptr::RefPtr<aio::http::Response> &response) {
+      return response->json();
+  })->then([](const nlohmann::json &j) {
 
-});
+  });
 
-requests->post(
-        "https://www.google.com",
-        nlohmann::json{
-                {"name", "jack"}
-        }
-)->then([=](const zero::ptr::RefPtr<aio::http::Response> &response) {
-    return response->json<People>();
-})->then([](const People &people) {
+  requests->post(
+          "https://www.google.com",
+          nlohmann::json{
+                  {"name", "jack"}
+          }
+  )->then([=](const zero::ptr::RefPtr<aio::http::Response> &response) {
+      return response->json<People>();
+  })->then([](const People &people) {
 
-});
-```
+  });
+  ```
 
 * Websocket
 
-```cpp
-aio::http::ws::connect(context, url)->then([](const zero::ptr::RefPtr<aio::http::ws::WebSocket> &ws) {
-    return zero::async::promise::loop<void>([=](const auto &loop) {
-        ws->read()->then([=](const aio::http::ws::Message &message) {
-            switch (message.opcode) {
-                case aio::http::ws::TEXT:
-                    LOG_INFO("receive text message: %s", std::get<std::string>(message.data).c_str());
-                    break;
+  ```cpp
+  aio::http::ws::connect(context, url)->then([](const zero::ptr::RefPtr<aio::http::ws::WebSocket> &ws) {
+      return zero::async::promise::loop<void>([=](const auto &loop) {
+          ws->read()->then([=](const aio::http::ws::Message &message) {
+              switch (message.opcode) {
+                  case aio::http::ws::TEXT:
+                      LOG_INFO("receive text message: %s", std::get<std::string>(message.data).c_str());
+                      break;
 
-                case aio::http::ws::BINARY: {
-                    const auto &binary = std::get<std::vector<std::byte>>(message.data);
-                    LOG_INFO(
-                            "receive binary message: %s",
-                            zero::encoding::hex::encode(binary).c_str()
-                    );
-                    break;
-                }
+                  case aio::http::ws::BINARY: {
+                      const auto &binary = std::get<std::vector<std::byte>>(message.data);
+                      LOG_INFO(
+                              "receive binary message: %s",
+                              zero::encoding::hex::encode(binary).c_str()
+                      );
+                      break;
+                  }
 
-                default:
-                    break;
-            }
+                  default:
+                      break;
+              }
 
-            return ws->write(message);
-        })->then([=]() {
-            P_CONTINUE(loop);
-        }, [=](const zero::async::promise::Reason &reason) {
-            P_BREAK_E(loop, reason);
-        });
-    });
-})
-```
+              return ws->write(message);
+          })->then([=]() {
+              P_CONTINUE(loop);
+          }, [=](const zero::async::promise::Reason &reason) {
+              P_BREAK_E(loop, reason);
+          });
+      });
+  })
+  ```
 
 ### TCP/TLS
 
 * Basic
 
-```cpp
-aio::net::connect(context, "www.google.com", 80)->then([=](const zero::ptr::RefPtr<aio::ev::IBuffer> &buffer) {
-    buffer->write("hello world");
-    return buffer->drain()->then([=]() {
-        return buffer->read();
-    });
-})->then([](nonstd::span<const std::byte> data) {
+  ```cpp
+  aio::net::connect(context, "www.google.com", 80)->then([=](const zero::ptr::RefPtr<aio::ev::IBuffer> &buffer) {
+      buffer->write("hello world");
+      return buffer->drain()->then([=]() {
+          return buffer->read();
+      });
+  })->then([](nonstd::span<const std::byte> data) {
 
-});
-```
+  });
+  ```
 
 * TLS
 
-```cpp
-aio::net::ssl::connect(context, "www.google.com", 443)->then([=](const zero::ptr::RefPtr<aio::ev::IBuffer> &buffer) {
-    buffer->write("hello world");
-    return buffer->drain()->then([=]() {
-        return buffer->read();
-    });
-})->then([](nonstd::span<const std::byte> data) {
+  ```cpp
+  aio::net::ssl::connect(context, "www.google.com", 443)->then([=](const zero::ptr::RefPtr<aio::ev::IBuffer> &buffer) {
+      buffer->write("hello world");
+      return buffer->drain()->then([=]() {
+          return buffer->read();
+      });
+  })->then([](nonstd::span<const std::byte> data) {
 
-});
-```
+  });
+  ```
 
 ### Worker
 
 * Basic
 
-```cpp
-aio::toThread<int>(context, []() {
-    std::this_thread::sleep_for(100ms);
-    return 1024;
-})->then([=](int result) {
-    REQUIRE(result == 1024);
-});
-```
+  ```cpp
+  aio::toThread<int>(context, []() {
+      std::this_thread::sleep_for(100ms);
+      return 1024;
+  })->then([=](int result) {
+      REQUIRE(result == 1024);
+  });
+  ```
 
 * Throw error
 
-```cpp
-aio::toThread<int>(context, []() -> nonstd::expected<int, zero::async::promise::Reason> {
-    std::this_thread::sleep_for(100ms);
-    return nonstd::make_unexpected(zero::async::promise::Reason{-1});
-})->then([=](int) {
-    FAIL();
-}, [=](const zero::async::promise::Reason &reason) {
-    REQUIRE(reason.code == -1);
-    context->loopBreak();
-});
-```
+  ```cpp
+  aio::toThread<int>(context, []() -> nonstd::expected<int, zero::async::promise::Reason> {
+      std::this_thread::sleep_for(100ms);
+      return nonstd::make_unexpected(zero::async::promise::Reason{-1});
+  })->then([=](int) {
+      FAIL();
+  }, [=](const zero::async::promise::Reason &reason) {
+      REQUIRE(reason.code == -1);
+      context->loopBreak();
+  });
+  ```
 
 ### Channel
 
 * Basic
 
-```cpp
-zero::ptr::RefPtr<aio::IChannel<int>> channel = zero::ptr::makeRef<aio::Channel<int, 100>>(context);
+  ```cpp
+  zero::ptr::RefPtr<aio::IChannel<int>> channel = zero::ptr::makeRef<aio::Channel<int, 100>>(context);
 
-zero::async::promise::all(
-        zero::ptr::makeRef<aio::ev::Timer>(context)->setInterval(5s, [=]() {
-            channel->sendNoWait(1024);
-            return true;
-        }),
-        aio::toThread<void>(context, [=]() {
-            while (true) {
-                std::optional<int> element = channel->receiveSync();
+  zero::async::promise::all(
+          zero::ptr::makeRef<aio::ev::Timer>(context)->setInterval(5s, [=]() {
+              channel->sendNoWait(1024);
+              return true;
+          }),
+          aio::toThread<void>(context, [=]() {
+              while (true) {
+                  std::optional<int> element = channel->receiveSync();
 
-                if (!element)
-                    break;
+                  if (!element)
+                      break;
 
-                // do something that takes a long time
-            }
-        })
-);
-```
+                  // do something that takes a long time
+              }
+          })
+  );
+  ```
 
 _For more examples, please refer to the [Documentation](https://github.com/Hackerl/aio/wiki)_
 
