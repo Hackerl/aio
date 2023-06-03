@@ -103,6 +103,14 @@ Due to many dependencies, it is not recommended to install manually, you should 
 ### Prerequisites
 
 Create a `CMake` project and two configuration files, `vcpkg-configuration.json` and `vcpkg.json`.
+
+* CMakeLists.txt
+  ```cmake
+  find_package(aio CONFIG REQUIRED)
+  add_executable(demo main.cpp)
+  target_link_libraries(demo PRIVATE aio::aio)
+  ```
+
 * vcpkg-configuration.json
   ```json
   {
@@ -147,7 +155,7 @@ Export environment variables:
 
 * Linux
   ```sh
-  mkdir build && cmake -B build -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" && cmake --build build -j$(nproc)
+  mkdir -p build && cmake -B build -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" && cmake --build build -j$(nproc)
   ```
 
 * Android
