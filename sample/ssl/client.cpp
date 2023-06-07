@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
     aio::net::ssl::connect(context, host, port, ctx)->then([=](const zero::ptr::RefPtr<aio::ev::IBuffer> &buffer) {
         return zero::async::promise::all(
                 zero::async::promise::loop<void>([=](const auto &loop) {
-                    input->read()->then([=](nonstd::span<const std::byte> data) {
+                    input->read(10240)->then([=](nonstd::span<const std::byte> data) {
                         buffer->write(data);
                         return buffer->drain();
                     })->then([=]() {
@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
                     });
                 }),
                 zero::async::promise::loop<void>([=](const auto &loop) {
-                    buffer->read()->then([=](nonstd::span<const std::byte> data) {
+                    buffer->read(10240)->then([=](nonstd::span<const std::byte> data) {
                         LOG_INFO("receive: %.*s", data.size(), data.data());
                     })->then([=]() {
                         P_CONTINUE(loop);

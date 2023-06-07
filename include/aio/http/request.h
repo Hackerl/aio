@@ -20,9 +20,9 @@
 namespace aio::http {
     using namespace std::chrono_literals;
 
-    class Response : public zero::ptr::RefCounter {
+    class Response : public ev::IBufferReader {
     public:
-        Response(CURL *easy, zero::ptr::RefPtr<ev::IBuffer> buffer);
+        Response(CURL *easy, zero::ptr::RefPtr<ev::IBufferReader> buffer);
         ~Response() override;
 
     public:
@@ -33,9 +33,11 @@ namespace aio::http {
         std::map<std::string, std::string> &headers();
 
     public:
-        std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read();
-        std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read(size_t n);
-        std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(evbuffer_eol_style style);
+        std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read(size_t n) override;
+        std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> readExactly(size_t n) override;
+        std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(ev::EOL eol) override;
+
+    public:
         std::shared_ptr<zero::async::promise::Promise<std::string>> string();
         std::shared_ptr<zero::async::promise::Promise<void>> output(const std::filesystem::path &path);
         std::shared_ptr<zero::async::promise::Promise<nlohmann::json>> json();
@@ -53,7 +55,7 @@ namespace aio::http {
 
     private:
         CURL *mEasy;
-        zero::ptr::RefPtr<ev::IBuffer> mBuffer;
+        zero::ptr::RefPtr<ev::IBufferReader> mBuffer;
         std::map<std::string, std::string> mHeaders;
     };
 

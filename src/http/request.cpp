@@ -3,7 +3,8 @@
 #include <aio/ev/event.h>
 #include <fstream>
 
-aio::http::Response::Response(CURL *easy, zero::ptr::RefPtr<ev::IBuffer> buffer) : mEasy(easy), mBuffer(std::move(buffer)) {
+aio::http::Response::Response(CURL *easy, zero::ptr::RefPtr<ev::IBufferReader> buffer)
+        : mEasy(easy), mBuffer(std::move(buffer)) {
 
 }
 
@@ -55,16 +56,16 @@ std::map<std::string, std::string> &aio::http::Response::headers() {
     return mHeaders;
 }
 
-std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::http::Response::read() {
-    return mBuffer->read();
-}
-
 std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::http::Response::read(size_t n) {
     return mBuffer->read(n);
 }
 
-std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::readLine(evbuffer_eol_style style) {
-    return mBuffer->readLine(style);
+std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::http::Response::readExactly(size_t n) {
+    return mBuffer->readExactly(n);
+}
+
+std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::readLine(ev::EOL eol) {
+    return mBuffer->readLine(eol);
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>> aio::http::Response::output(const std::filesystem::path &path) {
@@ -74,7 +75,7 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::http::Response::output
         return zero::async::promise::reject<void>({-1, "create file output stream failed"});
 
     return zero::async::promise::loop<void>([=](const auto &loop) {
-        read()->then([=](nonstd::span<const std::byte> data) -> nonstd::expected<void, zero::async::promise::Reason> {
+        read(10240)->then([=](nonstd::span<const std::byte> data) -> nonstd::expected<void, zero::async::promise::Reason> {
             stream->write((const char *) data.data(), (std::streamsize) data.size());
 
             if (!stream->good())
@@ -98,7 +99,7 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response:
     std::optional<curl_off_t> length = contentLength();
 
     if (length)
-        return read(*length)->then([](nonstd::span<const std::byte> data) {
+        return readExactly(*length)->then([](nonstd::span<const std::byte> data) {
             return std::string{(const char *) data.data(), data.size()};
         });
 

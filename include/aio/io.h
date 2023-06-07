@@ -5,24 +5,20 @@
 #include <nonstd/span.hpp>
 
 namespace aio {
-    template<typename T>
-    std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> readAll(const T &reader) {
-        std::shared_ptr<std::vector<std::byte>> buffer = std::make_shared<std::vector<std::byte>>();
+    class IReader : public virtual zero::ptr::RefCounter {
+    public:
+        virtual std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read(size_t n) = 0;
+    };
 
-        return zero::async::promise::loop<std::vector<std::byte>>([=](const auto &loop) {
-            reader->read()->then([=](nonstd::span<const std::byte> data) {
-                buffer->insert(buffer->end(), data.begin(), data.end());
-                P_CONTINUE(loop);
-            }, [=](const zero::async::promise::Reason &reason) {
-                if (reason.code != IO_EOF) {
-                    P_BREAK_E(loop, reason);
-                    return;
-                }
+    class IWriter : public virtual zero::ptr::RefCounter {
+    public:
+        virtual nonstd::expected<void, int> write(std::string_view str) = 0;
+        virtual nonstd::expected<void, int> write(nonstd::span<const std::byte> buffer) = 0;
+        virtual std::shared_ptr<zero::async::promise::Promise<void>> drain() = 0;
+        virtual nonstd::expected<void, int> close() = 0;
+    };
 
-                P_BREAK_V(loop, std::move(*buffer));
-            });
-        });
-    }
+    std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> readAll(const zero::ptr::RefPtr<IReader> &reader);
 
     template<typename T>
     std::shared_ptr<zero::async::promise::Promise<void>> copy(
@@ -50,7 +46,7 @@ namespace aio {
     template<typename Reader, typename Writer>
     std::shared_ptr<zero::async::promise::Promise<void>> copy(const Reader &src, const Writer &dst) {
         return zero::async::promise::loop<void>([=](const auto &loop) {
-            src->read()->then([=](nonstd::span<const std::byte> data) {
+            src->read(10240)->then([=](nonstd::span<const std::byte> data) {
                 dst->write(data);
                 dst->drain()->then([=]() {
                     P_CONTINUE(loop);

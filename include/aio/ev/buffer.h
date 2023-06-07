@@ -1,34 +1,32 @@
 #ifndef AIO_BUFFER_H
 #define AIO_BUFFER_H
 
-#include <vector>
-#include <chrono>
-#include <event.h>
-#include <zero/interface.h>
-#include <zero/async/promise.h>
-#include <zero/ptr/ref.h>
-#include <nonstd/span.hpp>
+#include <aio/io.h>
 
 namespace aio::ev {
-    class IBuffer : public zero::ptr::RefCounter {
-    public:
-        virtual std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read() = 0;
-        virtual std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read(size_t n) = 0;
-        virtual std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(evbuffer_eol_style style) = 0;
+    enum EOL {
+        ANY = EVBUFFER_EOL_ANY,
+        CRLF = EVBUFFER_EOL_CRLF,
+        CRLF_STRICT = EVBUFFER_EOL_CRLF_STRICT,
+        LF = EVBUFFER_EOL_LF,
+        NUL = EVBUFFER_EOL_NUL
+    };
 
+    class IBufferReader : public IReader {
     public:
-        virtual bool write(std::string_view str) = 0;
-        virtual bool write(nonstd::span<const std::byte> buffer) = 0;
-        virtual std::shared_ptr<zero::async::promise::Promise<void>> drain() = 0;
+        virtual std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> readExactly(size_t n) = 0;
+        virtual std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(EOL eol) = 0;
+    };
 
+    class IBufferWriter : public IWriter {
     public:
         virtual size_t pending() = 0;
-        virtual void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) = 0;
-
-    public:
-        virtual void close() = 0;
-        virtual bool closed() = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> waitClosed() = 0;
+    };
+
+    class IBuffer : public IBufferReader, public IBufferWriter {
+    public:
+        virtual void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) = 0;
     };
 
     class Buffer : public virtual IBuffer {
@@ -37,13 +35,13 @@ namespace aio::ev {
         ~Buffer() override;
 
     public:
-        std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read() override;
         std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read(size_t n) override;
-        std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(evbuffer_eol_style style) override;
+        std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> readExactly(size_t n) override;
+        std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(EOL eol) override;
 
     public:
-        bool write(std::string_view str) override;
-        bool write(nonstd::span<const std::byte> buffer) override;
+        nonstd::expected<void, int> write(std::string_view str) override;
+        nonstd::expected<void, int> write(nonstd::span<const std::byte> buffer) override;
         std::shared_ptr<zero::async::promise::Promise<void>> drain() override;
 
     public:
@@ -51,8 +49,7 @@ namespace aio::ev {
         void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
 
     public:
-        void close() override;
-        bool closed() override;
+        nonstd::expected<void, int> close() override;
         std::shared_ptr<zero::async::promise::Promise<void>> waitClosed() override;
 
     private:

@@ -29,9 +29,9 @@ namespace aio {
     private:
         bool mExit;
         std::mutex mMutex;
-        std::thread mThread;
         std::function<void()> mTask;
         std::condition_variable mCond;
+        std::thread mThread;
     };
 }
 

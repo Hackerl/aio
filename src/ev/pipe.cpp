@@ -12,9 +12,9 @@ aio::ev::PairedBuffer::~PairedBuffer() {
     bufferevent_flush(mBev, EV_WRITE, BEV_FINISHED);
 }
 
-void aio::ev::PairedBuffer::close() {
+nonstd::expected<void, int> aio::ev::PairedBuffer::close() {
     bufferevent_flush(mBev, EV_WRITE, BEV_FINISHED);
-    Buffer::close();
+    return Buffer::close();
 }
 
 std::string aio::ev::PairedBuffer::getError() {

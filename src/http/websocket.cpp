@@ -82,7 +82,7 @@ aio::http::ws::WebSocket::WebSocket(const std::shared_ptr<aio::Context> &context
 
 std::shared_ptr<zero::async::promise::Promise<std::tuple<aio::http::ws::Header, std::vector<std::byte>>>>
 aio::http::ws::WebSocket::readFrame() {
-    return mBuffer->read(sizeof(Header))->then([=](nonstd::span<const std::byte> data) {
+    return mBuffer->readExactly(sizeof(Header))->then([=](nonstd::span<const std::byte> data) {
         auto header = *(Header *) data.data();
 
         if (header.mask())
@@ -93,7 +93,7 @@ aio::http::ws::WebSocket::readFrame() {
         if (header.length() >= TWO_BYTE_PAYLOAD_LENGTH) {
             size_t extendedBytes = header.length() == EIGHT_BYTE_PAYLOAD_LENGTH ? 8 : 2;
 
-            return mBuffer->read(extendedBytes)->then([=](nonstd::span<const std::byte> data) {
+            return mBuffer->readExactly(extendedBytes)->then([=](nonstd::span<const std::byte> data) {
                 return mBuffer->read(
 #if _WIN32
                         extendedBytes == 2 ? ntohs(*(uint16_t *) data.data()) : ntohll(*(uint64_t *) data.data())
@@ -106,7 +106,7 @@ aio::http::ws::WebSocket::readFrame() {
             });
         }
 
-        return mBuffer->read(header.length())->then([=](const std::vector<std::byte> &data) {
+        return mBuffer->readExactly(header.length())->then([=](const std::vector<std::byte> &data) {
             return std::tuple<Header, std::vector<std::byte>>{header, data};
         });
     });
@@ -472,7 +472,7 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
         buffer->write("\r\n");
 
         return buffer->drain()->then([=]() {
-            return buffer->readLine(EVBUFFER_EOL_CRLF);
+            return buffer->readLine(ev::EOL::CRLF);
         })->then([=](const std::string &line) -> nonstd::expected<void, zero::async::promise::Reason> {
             std::vector<std::string> tokens = zero::strings::split(line, " ");
 
@@ -513,7 +513,7 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
             std::shared_ptr<std::map<std::string, std::string>> headers = std::make_shared<std::map<std::string, std::string>>();
 
             return zero::async::promise::loop<zero::ptr::RefPtr<WebSocket>>([=](const auto &loop) {
-                buffer->readLine(EVBUFFER_EOL_CRLF)->then([=](const std::string &line) {
+                buffer->readLine(ev::EOL::CRLF)->then([=](const std::string &line) {
                     if (!line.empty()) {
                         std::vector<std::string> tokens = zero::strings::split(line, ":", 1);
 

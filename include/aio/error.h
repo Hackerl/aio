@@ -5,6 +5,7 @@ namespace aio {
     enum Error {
         IO_EOF = -1000,
         IO_TIMEOUT,
+        IO_CLOSED,
         IO_ERROR,
         IO_CANCEL,
         IO_AGAIN,
