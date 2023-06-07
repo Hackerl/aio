@@ -71,6 +71,12 @@ namespace aio::ev {
         zero::async::promise::Reason mReason;
         std::shared_ptr<zero::async::promise::Promise<void>> mPromise[3];
     };
+
+    zero::ptr::RefPtr<aio::ev::Buffer> newBuffer(
+            const std::shared_ptr<Context> &context,
+            evutil_socket_t fd,
+            bool own = true
+    );
 }
 
 #endif //AIO_BUFFER_H

@@ -24,9 +24,7 @@ int main(int argc, char **argv) {
     if (!context)
         return -1;
 
-    zero::ptr::RefPtr<aio::ev::Buffer> input = zero::ptr::makeRef<aio::ev::Buffer>(
-            bufferevent_socket_new(context->base(), STDIN_FILENO, 0)
-    );
+    zero::ptr::RefPtr<aio::ev::Buffer> input = aio::ev::newBuffer(context, STDIN_FILENO, false);
 
     zero::ptr::RefPtr<aio::net::Listener> listener = aio::net::listen(context, host, port);
 

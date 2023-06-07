@@ -36,9 +36,7 @@ int main(int argc, char **argv) {
     if (!context)
         return -1;
 
-    zero::ptr::RefPtr<aio::ev::Buffer> input = zero::ptr::makeRef<aio::ev::Buffer>(
-            bufferevent_socket_new(context->base(), STDIN_FILENO, 0)
-    );
+    zero::ptr::RefPtr<aio::ev::Buffer> input = aio::ev::newBuffer(context, STDIN_FILENO, false);
 
     std::shared_ptr<aio::net::ssl::Context> ctx = aio::net::ssl::newContext(
             aio::net::ssl::Config{

@@ -55,7 +55,7 @@ std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::ev::IBuffer
         mPromise = p;
         evconnlistener_enable(mListener);
     })->then([=](evutil_socket_t fd) -> zero::ptr::RefPtr<ev::IBuffer> {
-        return zero::ptr::makeRef<ev::Buffer>(bufferevent_socket_new(mContext->base(), fd, BEV_OPT_CLOSE_ON_FREE));
+        return ev::newBuffer(mContext, fd);
     })->finally([=]() {
         evconnlistener_disable(mListener);
         release();
