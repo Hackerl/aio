@@ -18,7 +18,9 @@ namespace aio {
         virtual nonstd::expected<void, int> close() = 0;
     };
 
-    std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> readAll(const zero::ptr::RefPtr<IReader> &reader);
+    class IStreamIO : public virtual IReader, public virtual IWriter {
+
+    };
 
     template<typename T>
     std::shared_ptr<zero::async::promise::Promise<void>> copy(
@@ -43,34 +45,17 @@ namespace aio {
         });
     }
 
-    template<typename Reader, typename Writer>
-    std::shared_ptr<zero::async::promise::Promise<void>> copy(const Reader &src, const Writer &dst) {
-        return zero::async::promise::loop<void>([=](const auto &loop) {
-            src->read(10240)->then([=](nonstd::span<const std::byte> data) {
-                dst->write(data);
-                dst->drain()->then([=]() {
-                    P_CONTINUE(loop);
-                }, [=](const zero::async::promise::Reason &reason) {
-                    P_BREAK_E(loop, reason);
-                });
-            }, [=](const zero::async::promise::Reason &reason) {
-                if (reason.code != IO_EOF) {
-                    P_BREAK_E(loop, reason);
-                    return;
-                }
+    std::shared_ptr<zero::async::promise::Promise<void>> copy(
+            const zero::ptr::RefPtr<IReader> &src,
+            const zero::ptr::RefPtr<IWriter> &dst
+    );
 
-                P_BREAK(loop);
-            });
-        });
-    }
+    std::shared_ptr<zero::async::promise::Promise<void>> tunnel(
+            const zero::ptr::RefPtr<IStreamIO> &first,
+            const zero::ptr::RefPtr<IStreamIO> &second
+    );
 
-    template<typename First, typename Second>
-    std::shared_ptr<zero::async::promise::Promise<void>> tunnel(const First &first, const Second &second) {
-        return zero::async::promise::race(
-                copy(first, second),
-                copy(second, first)
-        );
-    }
+    std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> readAll(const zero::ptr::RefPtr<IReader> &reader);
 }
 
 #endif //AIO_IO_H

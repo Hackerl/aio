@@ -12,19 +12,19 @@ namespace aio::ev {
         NUL = EVBUFFER_EOL_NUL
     };
 
-    class IBufferReader : public IReader {
+    class IBufferReader : public virtual IReader {
     public:
         virtual std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> readExactly(size_t n) = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(EOL eol) = 0;
     };
 
-    class IBufferWriter : public IWriter {
+    class IBufferWriter : public virtual IWriter {
     public:
         virtual size_t pending() = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> waitClosed() = 0;
     };
 
-    class IBuffer : public IBufferReader, public IBufferWriter {
+    class IBuffer : public IStreamIO, public IBufferReader, public IBufferWriter {
     public:
         virtual void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) = 0;
     };

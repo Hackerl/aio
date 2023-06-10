@@ -309,7 +309,11 @@ std::string aio::ev::Buffer::getError() {
     return evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR());
 }
 
-zero::ptr::RefPtr<aio::ev::Buffer> aio::ev::newBuffer(const std::shared_ptr<Context> &context, int fd, bool own) {
+zero::ptr::RefPtr<aio::ev::Buffer> aio::ev::newBuffer(
+        const std::shared_ptr<Context> &context,
+        evutil_socket_t fd,
+        bool own
+) {
     bufferevent *bev = bufferevent_socket_new(context->base(), fd, own ? BEV_OPT_CLOSE_ON_FREE : 0);
 
     if (!bev)

@@ -1,4 +1,40 @@
 #include <aio/io.h>
+#include <zero/strings/strings.h>
+
+std::shared_ptr<zero::async::promise::Promise<void>>
+aio::copy(const zero::ptr::RefPtr<IReader> &src, const zero::ptr::RefPtr<IWriter> &dst) {
+    return zero::async::promise::loop<void>([=](const auto &loop) {
+        src->read(10240)->then([=](nonstd::span<const std::byte> data) {
+            nonstd::expected<void, int> result = dst->write(data);
+
+            if (!result) {
+                P_BREAK_E(loop, { IO_ERROR, zero::strings::format("failed to write data: %d", result.error()) });
+                return;
+            }
+
+            dst->drain()->then([=]() {
+                P_CONTINUE(loop);
+            }, [=](const zero::async::promise::Reason &reason) {
+                P_BREAK_E(loop, reason);
+            });
+        }, [=](const zero::async::promise::Reason &reason) {
+            if (reason.code != IO_EOF) {
+                P_BREAK_E(loop, reason);
+                return;
+            }
+
+            P_BREAK(loop);
+        });
+    });
+}
+
+std::shared_ptr<zero::async::promise::Promise<void>>
+aio::tunnel(const zero::ptr::RefPtr<IStreamIO> &first, const zero::ptr::RefPtr<IStreamIO> &second) {
+    return zero::async::promise::race(
+            aio::copy(first, second),
+            aio::copy(second, first)
+    );
+}
 
 std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>>
 aio::readAll(const zero::ptr::RefPtr<IReader> &reader) {
