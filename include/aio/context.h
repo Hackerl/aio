@@ -9,7 +9,7 @@
 namespace aio {
     class Context {
     public:
-        Context(event_base *base, evdns_base *dnsBase, size_t maxWorker);
+        Context(event_base *base, evdns_base *dnsBase, size_t maxWorkers);
         ~Context();
 
     public:
@@ -24,7 +24,7 @@ namespace aio {
         void loopBreak();
 
     private:
-        size_t mMaxWorker;
+        size_t mMaxWorkers;
         event_base *mBase;
         evdns_base *mDnsBase;
         std::queue<std::shared_ptr<Worker>> mWorkers;
@@ -36,7 +36,7 @@ namespace aio {
         );
     };
 
-    std::shared_ptr<Context> newContext(size_t maxWorker = 16);
+    std::shared_ptr<Context> newContext(size_t maxWorkers = 16);
 }
 
 #endif //AIO_CONTEXT_H

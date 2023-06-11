@@ -21,7 +21,7 @@ aio::ev::Buffer::Buffer(bufferevent *bev) : mBev(bev), mClosed(false) {
             this
     );
 
-    bufferevent_enable(mBev, EV_READ | EV_WRITE);
+    bufferevent_enable(mBev, EV_WRITE);
     bufferevent_setwatermark(mBev, EV_READ | EV_WRITE, 0, 0);
 }
 
@@ -51,7 +51,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
     }
 
     if (mClosed)
-        return zero::async::promise::reject<std::vector<std::byte>>(mReason);
+        return zero::async::promise::reject<std::vector<std::byte>>({IO_CLOSED, "buffer is closed"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         addRef();
@@ -66,6 +66,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
         evbuffer_remove(input, buffer.data(), buffer.size());
         return buffer;
     })->finally([=]() {
+        bufferevent_disable(mBev, EV_READ);
         release();
     });
 }
@@ -89,7 +90,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
     }
 
     if (mClosed)
-        return zero::async::promise::reject<std::vector<std::byte>>(mReason);
+        return zero::async::promise::reject<std::vector<std::byte>>({IO_CLOSED, "buffer is closed"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         addRef();
@@ -104,6 +105,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
         evbuffer_remove(input, buffer.data(), buffer.size());
         return buffer;
     })->finally([=]() {
+        bufferevent_disable(mBev, EV_READ);
         bufferevent_setwatermark(mBev, EV_READ, 0, 0);
         release();
     });
@@ -122,7 +124,7 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
         return zero::async::promise::resolve<std::string>(std::unique_ptr<char>(ptr).get());
 
     if (mClosed)
-        return zero::async::promise::reject<std::string>(mReason);
+        return zero::async::promise::reject<std::string>({IO_CLOSED, "buffer is closed"});
 
     return zero::async::promise::loop<std::string>([=](const auto &loop) {
         zero::async::promise::chain<void>([=](const auto &p) {
@@ -132,6 +134,7 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
             bufferevent_setwatermark(mBev, EV_READ, 0, 0);
             bufferevent_enable(mBev, EV_READ);
         })->finally([=]() {
+            bufferevent_disable(mBev, EV_READ);
             release();
         })->then([=]() {
             char *ptr = evbuffer_readln(bufferevent_get_input(mBev), nullptr, (evbuffer_eol_style) eol);
@@ -168,7 +171,7 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::drain() {
         return zero::async::promise::reject<void>({IO_ERROR, "pending request not completed"});
 
     if (mClosed)
-        return zero::async::promise::reject<void>(mReason);
+        return zero::async::promise::reject<void>({IO_CLOSED, "buffer is closed"});
 
     evbuffer *output = bufferevent_get_output(mBev);
 
@@ -213,7 +216,7 @@ nonstd::expected<void, int> aio::ev::Buffer::close() {
     if (mClosed)
         return nonstd::make_unexpected(IO_CLOSED);
 
-    onClose({IO_EOF, "buffer will be closed"});
+    onClose({IO_CLOSED, "buffer will be closed"});
 
     bufferevent_free(mBev);
     mBev = nullptr;
@@ -229,7 +232,7 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::waitClosed
         return zero::async::promise::reject<void>({IO_ERROR, "pending request not completed"});
 
     if (mClosed)
-        return zero::async::promise::resolve<void>();
+        return zero::async::promise::reject<void>({IO_CLOSED, "buffer is closed"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         addRef();
@@ -238,36 +241,38 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::waitClosed
         bufferevent_enable(mBev, EV_READ);
         bufferevent_set_timeouts(mBev, nullptr, nullptr);
     })->finally([=]() {
+        bufferevent_disable(mBev, EV_READ);
         release();
     });
 }
 
 void aio::ev::Buffer::onClose(const zero::async::promise::Reason &reason) {
     mClosed = true;
-    mReason = reason;
 
     auto [read, drain, waitClosed] = std::move(mPromise);
 
     if (read)
-        read->reject(mReason);
+        read->reject(reason);
 
     if (drain)
-        drain->reject(mReason);
+        drain->reject(reason);
 
-    if (waitClosed)
-        waitClosed->resolve();
+    if (!waitClosed)
+        return;
+
+    if (reason.code != IO_EOF) {
+        waitClosed->reject(reason);
+        return;
+    }
+
+    waitClosed->resolve();
 }
 
 void aio::ev::Buffer::onBufferRead() {
-    if (mPromise[WAIT_CLOSED_INDEX])
-        return;
-
     auto p = std::move(mPromise[READ_INDEX]);
 
-    if (!p) {
-        bufferevent_disable(mBev, EV_READ);
+    if (!p)
         return;
-    }
 
     p->resolve();
 }

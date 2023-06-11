@@ -68,7 +68,6 @@ namespace aio::ev {
         bufferevent *mBev;
 
     private:
-        zero::async::promise::Reason mReason;
         std::shared_ptr<zero::async::promise::Promise<void>> mPromise[3];
     };
 

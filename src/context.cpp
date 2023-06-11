@@ -1,13 +1,10 @@
 #include <aio/context.h>
 #include <zero/log.h>
 #include <event2/dns.h>
-
-#ifndef EVENT__DISABLE_THREAD_SUPPORT
 #include <event2/thread.h>
-#endif
 
-aio::Context::Context(event_base *base, evdns_base *dnsBase, size_t maxWorker)
-        : mBase(base), mDnsBase(dnsBase), mMaxWorker(maxWorker) {
+aio::Context::Context(event_base *base, evdns_base *dnsBase, size_t maxWorkers)
+        : mBase(base), mDnsBase(dnsBase), mMaxWorkers(maxWorkers) {
 
 }
 
@@ -36,13 +33,11 @@ void aio::Context::loopBreak() {
     event_base_loopbreak(mBase);
 }
 
-std::shared_ptr<aio::Context> aio::newContext(size_t maxWorker) {
-#ifndef EVENT__DISABLE_THREAD_SUPPORT
+std::shared_ptr<aio::Context> aio::newContext(size_t maxWorkers) {
 #ifdef _WIN32
     evthread_use_windows_threads();
 #else
     evthread_use_pthreads();
-#endif
 #endif
 
     event_base *base = event_base_new();
@@ -75,5 +70,5 @@ std::shared_ptr<aio::Context> aio::newContext(size_t maxWorker) {
         return nullptr;
     }
 
-    return std::make_shared<Context>(base, dnsBase, maxWorker);
+    return std::make_shared<Context>(base, dnsBase, maxWorkers);
 }

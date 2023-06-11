@@ -27,7 +27,7 @@ namespace aio {
                     });
 
                     event->on(ev::READ)->then([=, worker = std::move(worker)](short) mutable {
-                        if (context->mWorkers.size() < context->mMaxWorker)
+                        if (context->mWorkers.size() < context->mMaxWorkers)
                             context->mWorkers.push(std::move(worker));
 
                         if (*result)
@@ -42,7 +42,7 @@ namespace aio {
                     });
 
                     event->on(ev::READ)->then([=, worker = std::move(worker)](short) mutable {
-                        if (context->mWorkers.size() < context->mMaxWorker)
+                        if (context->mWorkers.size() < context->mMaxWorkers)
                             context->mWorkers.push(std::move(worker));
 
                         p->resolve();
@@ -58,7 +58,7 @@ namespace aio {
                     });
 
                     event->on(ev::READ)->then([=, worker = std::move(worker)](short) mutable {
-                        if (context->mWorkers.size() < context->mMaxWorker)
+                        if (context->mWorkers.size() < context->mMaxWorkers)
                             context->mWorkers.push(std::move(worker));
 
                         if (*result)
@@ -75,7 +75,7 @@ namespace aio {
                     });
 
                     event->on(ev::READ)->then([=, worker = std::move(worker)](short) mutable {
-                        if (context->mWorkers.size() < context->mMaxWorker)
+                        if (context->mWorkers.size() < context->mMaxWorkers)
                             context->mWorkers.push(std::move(worker));
 
                         p->resolve(std::move(*result));
