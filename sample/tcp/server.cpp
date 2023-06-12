@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
     if (!listener)
         return -1;
 
-    listener->accept()->then([=](const zero::ptr::RefPtr<aio::ev::IBuffer> &buffer) {
+    listener->accept()->then([=](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
         return zero::async::promise::all(
                 zero::async::promise::loop<void>([=](const auto &loop) {
                     input->read(10240)->then([=](nonstd::span<const std::byte> data) {

@@ -1,6 +1,7 @@
 #ifndef AIO_SSL_H
 #define AIO_SSL_H
 
+#include "stream.h"
 #include <optional>
 #include <filesystem>
 #include <aio/context.h>
@@ -38,7 +39,7 @@ namespace aio::net::ssl {
 
     std::shared_ptr<Context> newContext(const Config &config);
 
-    class Buffer : public ev::Buffer {
+    class Buffer : public net::Buffer {
     private:
         explicit Buffer(bufferevent *bev);
 
@@ -52,6 +53,8 @@ namespace aio::net::ssl {
     class Listener : public zero::ptr::RefCounter {
     private:
         explicit Listener(std::shared_ptr<aio::Context> context, std::shared_ptr<Context> ctx, evconnlistener *listener);
+
+    public:
         Listener(const Listener &) = delete;
         ~Listener() override;
 
@@ -59,7 +62,7 @@ namespace aio::net::ssl {
         Listener &operator=(const Listener &) = delete;
 
     public:
-        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<ev::IBuffer>>> accept();
+        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IBuffer>>> accept();
         void close();
 
     private:
@@ -75,10 +78,10 @@ namespace aio::net::ssl {
     zero::ptr::RefPtr<Listener>
     listen(const std::shared_ptr<aio::Context> &context, const std::string &host, short port, const std::shared_ptr<Context> &ctx);
 
-    std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<ev::IBuffer>>>
+    std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IBuffer>>>
     connect(const std::shared_ptr<aio::Context> &context, const std::string &host, short port);
 
-    std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<ev::IBuffer>>>
+    std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IBuffer>>>
     connect(const std::shared_ptr<aio::Context> &context, const std::string &host, short port, const std::shared_ptr<Context> &ctx);
 }
 

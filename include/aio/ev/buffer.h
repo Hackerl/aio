@@ -26,6 +26,7 @@ namespace aio::ev {
 
     class IBuffer : public IStreamIO, public IBufferReader, public IBufferWriter {
     public:
+        virtual evutil_socket_t fd() = 0;
         virtual void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) = 0;
     };
 
@@ -52,6 +53,9 @@ namespace aio::ev {
 
     public:
         size_t pending() override;
+
+    public:
+        evutil_socket_t fd() override;
         void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
 
     public:

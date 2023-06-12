@@ -187,10 +187,23 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::drain() {
 }
 
 size_t aio::ev::Buffer::pending() {
+    if (!mBev)
+        return -1;
+
     return evbuffer_get_length(bufferevent_get_output(mBev));
 }
 
+evutil_socket_t aio::ev::Buffer::fd() {
+    if (!mBev)
+        return -1;
+
+    return bufferevent_getfd(mBev);
+}
+
 void aio::ev::Buffer::setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) {
+    if (!mBev)
+        return;
+
     std::optional<timeval> rtv, wtv;
 
     if (readTimeout != std::chrono::milliseconds::zero())

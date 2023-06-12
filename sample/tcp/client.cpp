@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
 
     zero::ptr::RefPtr<aio::ev::Buffer> input = aio::ev::newBuffer(context, STDIN_FILENO, false);
 
-    aio::net::connect(context, host, port)->then([=](const zero::ptr::RefPtr<aio::ev::IBuffer> &buffer) {
+    aio::net::connect(context, host, port)->then([=](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
         return zero::async::promise::all(
                 zero::async::promise::loop<void>([=](const auto &loop) {
                     input->read(10240)->then([=](nonstd::span<const std::byte> data) {

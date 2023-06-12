@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
     if (!ctx)
         return -1;
 
-    aio::net::ssl::connect(context, host, port, ctx)->then([=](const zero::ptr::RefPtr<aio::ev::IBuffer> &buffer) {
+    aio::net::ssl::connect(context, host, port, ctx)->then([=](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
         return zero::async::promise::all(
                 zero::async::promise::loop<void>([=](const auto &loop) {
                     input->read(10240)->then([=](nonstd::span<const std::byte> data) {
