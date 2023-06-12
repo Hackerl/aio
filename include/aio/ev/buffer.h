@@ -30,9 +30,15 @@ namespace aio::ev {
     };
 
     class Buffer : public virtual IBuffer {
-    public:
+    protected:
         explicit Buffer(bufferevent *bev);
+
+    public:
+        Buffer(const Buffer &) = delete;
         ~Buffer() override;
+
+    public:
+        Buffer &operator=(const Buffer &) = delete;
 
     public:
         std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read(size_t n) override;
@@ -69,6 +75,9 @@ namespace aio::ev {
 
     private:
         std::shared_ptr<zero::async::promise::Promise<void>> mPromise[3];
+
+        template<typename T, typename ...Args>
+        friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
     };
 
     zero::ptr::RefPtr<aio::ev::Buffer> newBuffer(

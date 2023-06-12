@@ -12,8 +12,10 @@ namespace aio::ev {
     };
 
     class PairedBuffer : public Buffer, public IPairedBuffer {
-    public:
+    private:
         PairedBuffer(bufferevent *bev, std::shared_ptr<std::string> error);
+
+    public:
         ~PairedBuffer() override;
 
     public:
@@ -25,6 +27,9 @@ namespace aio::ev {
 
     private:
         std::shared_ptr<std::string> mError;
+
+        template<typename T, typename ...Args>
+        friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
     };
 
     std::array<zero::ptr::RefPtr<aio::ev::IPairedBuffer>, 2> pipe(const std::shared_ptr<Context> &context);

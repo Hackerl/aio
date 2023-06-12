@@ -68,8 +68,12 @@ namespace aio::http::ws {
     };
 
     class WebSocket : public zero::ptr::RefCounter {
-    public:
+    private:
         WebSocket(const std::shared_ptr<aio::Context> &context, zero::ptr::RefPtr<ev::IBuffer> buffer);
+
+    public:
+        WebSocket(const WebSocket &) = delete;
+        WebSocket &operator=(const WebSocket &) = delete;
 
     private:
         std::shared_ptr<zero::async::promise::Promise<std::tuple<Header, std::vector<std::byte>>>> readFrame();
@@ -95,6 +99,9 @@ namespace aio::http::ws {
         zero::ptr::RefPtr<ev::Event> mEvent;
         zero::ptr::RefPtr<ev::IBuffer> mBuffer;
         std::optional<unsigned int> mHeartbeat;
+
+        template<typename T, typename ...Args>
+        friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
     };
 
     std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<WebSocket>>>

@@ -39,17 +39,24 @@ namespace aio::net::ssl {
     std::shared_ptr<Context> newContext(const Config &config);
 
     class Buffer : public ev::Buffer {
-    public:
+    private:
         explicit Buffer(bufferevent *bev);
 
     private:
         std::string getError() override;
+
+        template<typename T, typename ...Args>
+        friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
     };
 
     class Listener : public zero::ptr::RefCounter {
-    public:
+    private:
         explicit Listener(std::shared_ptr<aio::Context> context, std::shared_ptr<Context> ctx, evconnlistener *listener);
+        Listener(const Listener &) = delete;
         ~Listener() override;
+
+    public:
+        Listener &operator=(const Listener &) = delete;
 
     public:
         std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<ev::IBuffer>>> accept();
@@ -60,6 +67,9 @@ namespace aio::net::ssl {
         std::shared_ptr<Context> mCTX;
         std::shared_ptr<aio::Context> mContext;
         std::shared_ptr<zero::async::promise::Promise<evutil_socket_t>> mPromise;
+
+        template<typename T, typename ...Args>
+        friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
     };
 
     zero::ptr::RefPtr<Listener>

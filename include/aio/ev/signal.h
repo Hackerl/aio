@@ -7,9 +7,15 @@
 
 namespace aio::ev {
     class Signal : public zero::ptr::RefCounter {
-    public:
+    private:
         Signal(const std::shared_ptr<Context> &context, int sig);
+
+    public:
+        Signal(const Signal &) = delete;
         ~Signal() override;
+
+    public:
+        Signal &operator=(const Signal &) = delete;
 
     public:
         bool cancel();
@@ -22,6 +28,9 @@ namespace aio::ev {
     private:
         event *mEvent;
         std::shared_ptr<zero::async::promise::Promise<void>> mPromise;
+
+        template<typename T, typename ...Args>
+        friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
     };
 }
 

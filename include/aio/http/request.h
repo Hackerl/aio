@@ -21,9 +21,15 @@ namespace aio::http {
     using namespace std::chrono_literals;
 
     class Response : public ev::IBufferReader {
-    public:
+    private:
         Response(CURL *easy, zero::ptr::RefPtr<ev::IBufferReader> buffer);
+
+    public:
+        Response(const Response &) = delete;
         ~Response() override;
+
+    public:
+        Response &operator=(const Response &) = delete;
 
     public:
         long statusCode();
@@ -57,6 +63,9 @@ namespace aio::http {
         CURL *mEasy;
         zero::ptr::RefPtr<ev::IBufferReader> mBuffer;
         std::map<std::string, std::string> mHeaders;
+
+        template<typename T, typename ...Args>
+        friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
     };
 
     struct Connection {
@@ -83,10 +92,16 @@ namespace aio::http {
     };
 
     class Requests : public zero::ptr::RefCounter {
-    public:
+    private:
         explicit Requests(const std::shared_ptr<Context> &context);
         Requests(const std::shared_ptr<Context> &context, Options options);
+
+    public:
+        Requests(const Requests &) = delete;
         ~Requests() override;
+
+    public:
+        Requests &operator=(const Requests &) = delete;
 
     private:
         void onCURLTimer(long timeout);
@@ -397,6 +412,9 @@ namespace aio::http {
         Options mOptions;
         zero::ptr::RefPtr<ev::Timer> mTimer;
         std::shared_ptr<Context> mContext;
+
+        template<typename T, typename ...Args>
+        friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
     };
 }
 

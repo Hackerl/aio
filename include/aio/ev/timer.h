@@ -8,9 +8,15 @@
 
 namespace aio::ev {
     class Timer : public zero::ptr::RefCounter {
-    public:
+    private:
         explicit Timer(const std::shared_ptr<Context> &context);
+
+    public:
+        Timer(const Timer &) = delete;
         ~Timer() override;
+
+    public:
+        Timer &operator=(const Timer &) = delete;
 
     public:
         bool cancel();
@@ -25,6 +31,9 @@ namespace aio::ev {
     private:
         event *mEvent;
         std::shared_ptr<zero::async::promise::Promise<void>> mPromise;
+
+        template<typename T, typename ...Args>
+        friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
     };
 }
 

@@ -47,10 +47,14 @@ namespace aio {
         static constexpr auto SENDER = 0;
         static constexpr auto RECEIVER = 1;
 
-    public:
+    private:
         explicit Channel(std::shared_ptr<Context> context) : mClosed(false), mContext(std::move(context)) {
 
         }
+
+    public:
+        Channel(const Channel &) = delete;
+        Channel &operator=(const Channel &) = delete;
 
     public:
         bool sendSync(const T &element) override {
@@ -345,6 +349,9 @@ namespace aio {
         zero::atomic::CircularBuffer<T, N> mBuffer;
         std::list<zero::ptr::RefPtr<ev::Event>> mEvents;
         std::list<zero::ptr::RefPtr<ev::Event>> mPending[2];
+
+        template<typename Channel, typename ...Args>
+        friend zero::ptr::RefPtr<Channel> zero::ptr::makeRef(Args &&... args);
     };
 }
 
