@@ -46,8 +46,8 @@ namespace aio::ev {
         std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(EOL eol) override;
 
     public:
-        nonstd::expected<void, int> write(std::string_view str) override;
-        nonstd::expected<void, int> write(nonstd::span<const std::byte> buffer) override;
+        nonstd::expected<void, Error> write(std::string_view str) override;
+        nonstd::expected<void, Error> write(nonstd::span<const std::byte> buffer) override;
         std::shared_ptr<zero::async::promise::Promise<void>> drain() override;
 
     public:
@@ -55,7 +55,7 @@ namespace aio::ev {
         void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
 
     public:
-        nonstd::expected<void, int> close() override;
+        nonstd::expected<void, Error> close() override;
         std::shared_ptr<zero::async::promise::Promise<void>> waitClosed() override;
 
     private:

@@ -151,11 +151,11 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
     });
 }
 
-nonstd::expected<void, int> aio::ev::Buffer::write(std::string_view str) {
+nonstd::expected<void, aio::Error> aio::ev::Buffer::write(std::string_view str) {
     return write({(const std::byte *) str.data(), str.length()});
 }
 
-nonstd::expected<void, int> aio::ev::Buffer::write(nonstd::span<const std::byte> buffer) {
+nonstd::expected<void, aio::Error> aio::ev::Buffer::write(nonstd::span<const std::byte> buffer) {
     if (mClosed)
         return nonstd::make_unexpected(IO_CLOSED);
 
@@ -212,7 +212,7 @@ void aio::ev::Buffer::setTimeout(std::chrono::milliseconds readTimeout, std::chr
     );
 }
 
-nonstd::expected<void, int> aio::ev::Buffer::close() {
+nonstd::expected<void, aio::Error> aio::ev::Buffer::close() {
     if (mClosed)
         return nonstd::make_unexpected(IO_CLOSED);
 

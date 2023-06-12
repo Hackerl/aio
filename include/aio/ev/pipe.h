@@ -19,7 +19,7 @@ namespace aio::ev {
         ~PairedBuffer() override;
 
     public:
-        nonstd::expected<void, int> close() override;
+        nonstd::expected<void, Error> close() override;
         std::string getError() override;
 
     public:

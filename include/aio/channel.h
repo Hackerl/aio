@@ -124,7 +124,7 @@ namespace aio {
 
         nonstd::expected<void, Error> sendNoWait(T &&element) override {
             if (mClosed)
-                return nonstd::make_unexpected(IO_EOF);
+                return nonstd::make_unexpected(IO_CLOSED);
 
             std::optional<size_t> index = mBuffer.reserve();
 
@@ -145,7 +145,7 @@ namespace aio {
 
         std::shared_ptr<zero::async::promise::Promise<void>> send(T &&element) override {
             if (mClosed)
-                return zero::async::promise::reject<void>({IO_ERROR, "channel closed"});
+                return zero::async::promise::reject<void>({IO_CLOSED, "channel closed"});
 
             this->addRef();
 
@@ -157,7 +157,7 @@ namespace aio {
                             std::lock_guard<std::mutex> guard(mMutex);
 
                             if (mClosed) {
-                                P_BREAK_E(loop, { IO_EOF, "channel closed" });
+                                P_BREAK_E(loop, { IO_CLOSED, "channel closed" });
                                 return;
                             }
 
@@ -250,7 +250,7 @@ namespace aio {
             std::optional<size_t> index = mBuffer.acquire();
 
             if (!index)
-                return nonstd::make_unexpected(mClosed ? IO_EOF : IO_AGAIN);
+                return nonstd::make_unexpected(mClosed ? IO_CLOSED : IO_AGAIN);
 
             T element = std::move(mBuffer[*index]);
             mBuffer.release(*index);
@@ -274,7 +274,7 @@ namespace aio {
                     std::lock_guard<std::mutex> guard(mMutex);
 
                     if (mClosed) {
-                        P_BREAK_E(loop, { IO_EOF, "channel closed" });
+                        P_BREAK_E(loop, { IO_CLOSED, "channel closed" });
                         return;
                     }
 
@@ -285,7 +285,12 @@ namespace aio {
 
                     zero::ptr::RefPtr<ev::Event> event = getEvent();
 
-                    event->on(ev::READ)->finally([=]() {
+                    event->on(ev::READ)->then([=](short what) {
+                        if (what & ev::CLOSED) {
+                            P_BREAK_E(loop, { IO_EOF, "channel is closed" });
+                            return;
+                        }
+
                         P_CONTINUE(loop);
                     });
 

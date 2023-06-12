@@ -12,10 +12,10 @@ namespace aio {
 
     class IWriter : public virtual zero::ptr::RefCounter {
     public:
-        virtual nonstd::expected<void, int> write(std::string_view str) = 0;
-        virtual nonstd::expected<void, int> write(nonstd::span<const std::byte> buffer) = 0;
+        virtual nonstd::expected<void, Error> write(std::string_view str) = 0;
+        virtual nonstd::expected<void, Error> write(nonstd::span<const std::byte> buffer) = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> drain() = 0;
-        virtual nonstd::expected<void, int> close() = 0;
+        virtual nonstd::expected<void, Error> close() = 0;
     };
 
     class IStreamIO : public virtual IReader, public virtual IWriter {
