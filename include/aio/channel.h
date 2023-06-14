@@ -15,14 +15,24 @@ namespace aio {
     template<typename T>
     class ISender : public virtual zero::ptr::RefCounter {
     public:
-        virtual bool sendSync(const T &element) = 0;
-        virtual nonstd::expected<void, Error> sendNoWait(const T &element) = 0;
+        virtual nonstd::expected<void, Error> trySend(const T &element) = 0;
+        virtual nonstd::expected<void, Error> sendSync(const T &element) = 0;
+        virtual nonstd::expected<void, Error> sendSync(const T &element, std::chrono::milliseconds timeout) = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> send(const T &element) = 0;
+        virtual std::shared_ptr<zero::async::promise::Promise<void>> send(
+                const T &element,
+                std::chrono::milliseconds timeout
+        ) = 0;
 
     public:
-        virtual bool sendSync(T &&element) = 0;
-        virtual nonstd::expected<void, Error> sendNoWait(T &&element) = 0;
+        virtual nonstd::expected<void, Error> trySend(T &&element) = 0;
+        virtual nonstd::expected<void, Error> sendSync(T &&element) = 0;
+        virtual nonstd::expected<void, Error> sendSync(T &&element, std::chrono::milliseconds timeout) = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> send(T &&element) = 0;
+        virtual std::shared_ptr<zero::async::promise::Promise<void>> send(
+                T &&element,
+                std::chrono::milliseconds timeout
+        ) = 0;
 
     public:
         virtual void close() = 0;
@@ -31,9 +41,11 @@ namespace aio {
     template<typename T>
     class IReceiver : public virtual zero::ptr::RefCounter {
     public:
-        virtual std::optional<T> receiveSync() = 0;
-        virtual nonstd::expected<T, Error> receiveNoWait() = 0;
+        virtual nonstd::expected<T, Error> receiveSync() = 0;
+        virtual nonstd::expected<T, Error> receiveSync(std::chrono::milliseconds timeout) = 0;
+        virtual nonstd::expected<T, Error> tryReceive() = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<T>> receive() = 0;
+        virtual std::shared_ptr<zero::async::promise::Promise<T>> receive(std::chrono::milliseconds timeout) = 0;
     };
 
     template<typename T>
@@ -57,14 +69,14 @@ namespace aio {
         Channel &operator=(const Channel &) = delete;
 
     public:
-        bool sendSync(const T &element) override {
+        nonstd::expected<void, Error> sendSync(const T &element) override {
             T e = element;
-            return sendSync(std::move(e));
+            return sendSync(std::move(e), std::nullopt);
         }
 
-        nonstd::expected<void, Error> sendNoWait(const T &element) override {
+        nonstd::expected<void, Error> sendSync(const T &element, std::chrono::milliseconds timeout) override {
             T e = element;
-            return sendNoWait(std::move(e));
+            return sendSync(std::move(e), std::make_optional<std::chrono::milliseconds>(timeout));
         }
 
         std::shared_ptr<zero::async::promise::Promise<void>> send(const T &element) override {
@@ -72,57 +84,54 @@ namespace aio {
             return send(std::move(e));
         }
 
-    public:
-        bool sendSync(T &&element) override {
-            if (mClosed)
-                return false;
-
-            while (true) {
-                std::optional<size_t> index = mBuffer.reserve();
-
-                if (!index) {
-                    mMutex.lock();
-
-                    if (mClosed) {
-                        mMutex.unlock();
-                        return false;
-                    }
-
-                    if (!mBuffer.full()) {
-                        mMutex.unlock();
-                        continue;
-                    }
-
-                    zero::atomic::Event evt;
-                    zero::ptr::RefPtr<ev::Event> event = getEvent();
-
-                    event->on(ev::WRITE)->finally([&]() {
-                        evt.notify();
-                    });
-
-                    mPending[SENDER].push_back(std::move(event));
-                    mMutex.unlock();
-
-                    evt.wait();
-                    continue;
-                }
-
-                mBuffer[*index] = std::move(element);
-                mBuffer.commit(*index);
-
-                std::lock_guard<std::mutex> guard(mMutex);
-
-                for (const auto &event: mPending[RECEIVER])
-                    event->trigger(ev::READ);
-
-                mPending[RECEIVER].clear();
-                break;
-            }
-
-            return true;
+        std::shared_ptr<zero::async::promise::Promise<void>>
+        send(const T &element, std::chrono::milliseconds timeout) override {
+            T e = element;
+            return send(std::move(e), std::make_optional<std::chrono::milliseconds>(timeout));
         }
 
-        nonstd::expected<void, Error> sendNoWait(T &&element) override {
+    public:
+        nonstd::expected<void, Error> sendSync(T &&element) override {
+            return sendSync(std::move(element), std::nullopt);
+        }
+
+        nonstd::expected<void, Error> sendSync(T &&element, std::chrono::milliseconds timeout) override {
+            return sendSync(std::move(element), std::make_optional<std::chrono::milliseconds>(timeout));
+        }
+
+        std::shared_ptr<zero::async::promise::Promise<void>> send(T &&element) override {
+            return send(std::move(element), std::nullopt);
+        }
+
+        std::shared_ptr<zero::async::promise::Promise<void>>
+        send(T &&element, std::chrono::milliseconds timeout) override {
+            return send(std::move(element), std::make_optional<std::chrono::milliseconds>(timeout));
+        }
+
+        nonstd::expected<void, Error> trySend(const T &element) override {
+            T e = element;
+            return trySend(std::move(e));
+        }
+
+    public:
+        nonstd::expected<T, Error> receiveSync() override {
+            return receiveSync(std::nullopt);
+        }
+
+        nonstd::expected<T, Error> receiveSync(std::chrono::milliseconds timeout) override {
+            return receiveSync(std::make_optional<std::chrono::milliseconds>(timeout));
+        }
+
+        std::shared_ptr<zero::async::promise::Promise<T>> receive() override {
+            return receive(std::nullopt);
+        }
+
+        std::shared_ptr<zero::async::promise::Promise<T>> receive(std::chrono::milliseconds timeout) override {
+            return receive(std::make_optional<std::chrono::milliseconds>(timeout));
+        }
+
+    public:
+        nonstd::expected<void, Error> trySend(T &&element) override {
             if (mClosed)
                 return nonstd::make_unexpected(IO_CLOSED);
 
@@ -143,7 +152,86 @@ namespace aio {
             return {};
         }
 
-        std::shared_ptr<zero::async::promise::Promise<void>> send(T &&element) override {
+        nonstd::expected<T, Error> tryReceive() override {
+            std::optional<size_t> index = mBuffer.acquire();
+
+            if (!index)
+                return nonstd::make_unexpected(mClosed ? IO_CLOSED : IO_AGAIN);
+
+            T element = std::move(mBuffer[*index]);
+            mBuffer.release(*index);
+
+            std::lock_guard<std::mutex> guard(mMutex);
+
+            for (const auto &event: mPending[SENDER])
+                event->trigger(ev::WRITE);
+
+            mPending[SENDER].clear();
+            return element;
+        }
+
+    private:
+        nonstd::expected<void, Error> sendSync(T &&element, std::optional<std::chrono::milliseconds> timeout) {
+            if (mClosed)
+                return nonstd::make_unexpected(IO_CLOSED);
+
+            while (true) {
+                std::optional<size_t> index = mBuffer.reserve();
+
+                if (!index) {
+                    mMutex.lock();
+
+                    if (mClosed) {
+                        mMutex.unlock();
+                        return nonstd::make_unexpected(IO_CLOSED);
+                    }
+
+                    if (!mBuffer.full()) {
+                        mMutex.unlock();
+                        continue;
+                    }
+
+                    zero::atomic::Event evt;
+                    std::optional<aio::Error> error;
+                    zero::ptr::RefPtr<ev::Event> event = getEvent();
+
+                    event->on(ev::WRITE, timeout)->then([&](short what) {
+                        if (what & ev::CLOSED)
+                            error = IO_EOF;
+                        else if (what & ev::TIMEOUT)
+                            error = IO_TIMEOUT;
+
+                        evt.notify();
+                    });
+
+                    mPending[SENDER].push_back(std::move(event));
+                    mMutex.unlock();
+
+                    evt.wait();
+
+                    if (error)
+                        return nonstd::make_unexpected(*error);
+
+                    continue;
+                }
+
+                mBuffer[*index] = std::move(element);
+                mBuffer.commit(*index);
+
+                std::lock_guard<std::mutex> guard(mMutex);
+
+                for (const auto &event: mPending[RECEIVER])
+                    event->trigger(ev::READ);
+
+                mPending[RECEIVER].clear();
+                break;
+            }
+
+            return {};
+        }
+
+        std::shared_ptr<zero::async::promise::Promise<void>>
+        send(T &&element, std::optional<std::chrono::milliseconds> timeout) {
             if (mClosed)
                 return zero::async::promise::reject<void>({IO_CLOSED, "channel closed"});
 
@@ -168,9 +256,12 @@ namespace aio {
 
                             zero::ptr::RefPtr<ev::Event> event = getEvent();
 
-                            event->on(ev::WRITE)->then([=](short what) {
+                            event->on(ev::WRITE, timeout)->then([=](short what) {
                                 if (what & ev::CLOSED) {
                                     P_BREAK_E(loop, { IO_EOF, "channel is closed" });
+                                    return;
+                                } else if (what & ev::TIMEOUT) {
+                                    P_BREAK_E(loop, { IO_TIMEOUT, "channel send timed out" });
                                     return;
                                 }
 
@@ -197,9 +288,9 @@ namespace aio {
             });
         }
 
-    public:
-        std::optional<T> receiveSync() override {
-            std::optional<T> element;
+    private:
+        nonstd::expected<T, Error> receiveSync(std::optional<std::chrono::milliseconds> timeout) {
+            T element;
 
             while (true) {
                 std::optional<size_t> index = mBuffer.acquire();
@@ -209,7 +300,7 @@ namespace aio {
 
                     if (mClosed) {
                         mMutex.unlock();
-                        break;
+                        return nonstd::make_unexpected(IO_CLOSED);
                     }
 
                     if (!mBuffer.empty()) {
@@ -218,15 +309,25 @@ namespace aio {
                     }
 
                     zero::atomic::Event evt;
+                    std::optional<aio::Error> error;
                     zero::ptr::RefPtr<ev::Event> event = getEvent();
 
-                    event->on(ev::READ)->finally([&]() {
+                    event->on(ev::READ, timeout)->then([&](short what) {
+                        if (what & ev::CLOSED)
+                            error = IO_EOF;
+                        else if (what & ev::TIMEOUT)
+                            error = IO_TIMEOUT;
+
                         evt.notify();
                     });
 
                     mPending[RECEIVER].push_back(std::move(event));
                     mMutex.unlock();
+
                     evt.wait();
+
+                    if (error)
+                        return nonstd::make_unexpected(*error);
 
                     continue;
                 }
@@ -246,25 +347,7 @@ namespace aio {
             return element;
         }
 
-        nonstd::expected<T, Error> receiveNoWait() override {
-            std::optional<size_t> index = mBuffer.acquire();
-
-            if (!index)
-                return nonstd::make_unexpected(mClosed ? IO_CLOSED : IO_AGAIN);
-
-            T element = std::move(mBuffer[*index]);
-            mBuffer.release(*index);
-
-            std::lock_guard<std::mutex> guard(mMutex);
-
-            for (const auto &event: mPending[SENDER])
-                event->trigger(ev::WRITE);
-
-            mPending[SENDER].clear();
-            return element;
-        }
-
-        std::shared_ptr<zero::async::promise::Promise<T>> receive() override {
+        std::shared_ptr<zero::async::promise::Promise<T>> receive(std::optional<std::chrono::milliseconds> timeout) {
             this->addRef();
 
             return zero::async::promise::loop<T>([=](const auto &loop) {
@@ -285,9 +368,12 @@ namespace aio {
 
                     zero::ptr::RefPtr<ev::Event> event = getEvent();
 
-                    event->on(ev::READ)->then([=](short what) {
+                    event->on(ev::READ, timeout)->then([=](short what) {
                         if (what & ev::CLOSED) {
                             P_BREAK_E(loop, { IO_EOF, "channel is closed" });
+                            return;
+                        } else if (what & ev::TIMEOUT) {
+                            P_BREAK_E(loop, { IO_TIMEOUT, "channel receive timed out" });
                             return;
                         }
 

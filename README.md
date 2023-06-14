@@ -377,7 +377,7 @@ Export environment variables:
 
   zero::async::promise::all(
           zero::ptr::makeRef<aio::ev::Timer>(context)->setInterval(5s, [=]() {
-              channel->sendNoWait(1024);
+              channel->trySend(1024);
               return true;
           }),
           aio::toThread<void>(context, [=]() {

@@ -21,12 +21,7 @@ namespace aio {
                 if constexpr (std::is_same_v<nonstd::expected<void, zero::async::promise::Reason>, std::invoke_result_t<F>>) {
                     std::shared_ptr<nonstd::expected<void, zero::async::promise::Reason>> result = std::make_shared<nonstd::expected<void, zero::async::promise::Reason>>();
 
-                    worker->execute([=, f = std::move(f)]() {
-                        *result = f();
-                        event->trigger(ev::READ);
-                    });
-
-                    event->on(ev::READ)->then([=, worker = std::move(worker)](short) mutable {
+                    event->on(ev::READ)->then([=](short) mutable {
                         if (context->mWorkers.size() < context->mMaxWorkers)
                             context->mWorkers.push(std::move(worker));
 
@@ -35,29 +30,29 @@ namespace aio {
                         else
                             p->reject(std::move(result->error()));
                     });
-                } else {
+
                     worker->execute([=, f = std::move(f)]() {
-                        f();
+                        *result = f();
                         event->trigger(ev::READ);
                     });
-
-                    event->on(ev::READ)->then([=, worker = std::move(worker)](short) mutable {
+                } else {
+                    event->on(ev::READ)->then([=](short) mutable {
                         if (context->mWorkers.size() < context->mMaxWorkers)
                             context->mWorkers.push(std::move(worker));
 
                         p->resolve();
+                    });
+
+                    worker->execute([=, f = std::move(f)]() {
+                        f();
+                        event->trigger(ev::READ);
                     });
                 }
             } else {
                 if constexpr (std::is_same_v<nonstd::expected<T, zero::async::promise::Reason>, std::invoke_result_t<F>>) {
                     std::shared_ptr<nonstd::expected<T, zero::async::promise::Reason>> result = std::make_shared<nonstd::expected<T, zero::async::promise::Reason>>();
 
-                    worker->execute([=, f = std::move(f)]() {
-                        *result = f();
-                        event->trigger(ev::READ);
-                    });
-
-                    event->on(ev::READ)->then([=, worker = std::move(worker)](short) mutable {
+                    event->on(ev::READ)->then([=](short) mutable {
                         if (context->mWorkers.size() < context->mMaxWorkers)
                             context->mWorkers.push(std::move(worker));
 
@@ -66,19 +61,24 @@ namespace aio {
                         else
                             p->reject(std::move(result->error()));
                     });
-                } else {
-                    std::shared_ptr<T> result = std::make_shared<T>();
 
                     worker->execute([=, f = std::move(f)]() {
                         *result = f();
                         event->trigger(ev::READ);
                     });
+                } else {
+                    std::shared_ptr<T> result = std::make_shared<T>();
 
-                    event->on(ev::READ)->then([=, worker = std::move(worker)](short) mutable {
+                    event->on(ev::READ)->then([=](short) mutable {
                         if (context->mWorkers.size() < context->mMaxWorkers)
                             context->mWorkers.push(std::move(worker));
 
                         p->resolve(std::move(*result));
+                    });
+
+                    worker->execute([=, f = std::move(f)]() {
+                        *result = f();
+                        event->trigger(ev::READ);
                     });
                 }
             }

@@ -23,6 +23,26 @@ namespace aio {
         void dispatch();
         void loopBreak();
 
+    public:
+        template<typename F>
+        void post(F &&f) {
+            auto ctx = new std::decay_t<F>(std::forward<F>(f));
+
+            event_base_once(
+                    mBase,
+                    -1,
+                    EV_TIMEOUT,
+                    [](evutil_socket_t, short, void *arg) {
+                        auto ctx = (std::decay_t<F> *) arg;
+
+                        ctx->operator()();
+                        delete ctx;
+                    },
+                    ctx,
+                    nullptr
+            );
+        }
+
     private:
         size_t mMaxWorkers;
         event_base *mBase;

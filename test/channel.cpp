@@ -1,6 +1,8 @@
 #include <aio/channel.h>
+#include <aio/thread.h>
 #include <catch2/catch_test_macros.hpp>
-#include <thread>
+
+using namespace std::chrono_literals;
 
 TEST_CASE("async channel buffer", "[channel]") {
     std::shared_ptr<aio::Context> context = aio::newContext();
@@ -10,151 +12,283 @@ TEST_CASE("async channel buffer", "[channel]") {
     zero::ptr::RefPtr<aio::IChannel<int>> channel = zero::ptr::makeRef<aio::Channel<int, 100>>(context);
 
     SECTION("async sender/async receiver") {
-        zero::async::promise::all(
-                zero::async::promise::loop<void>([=](const auto &loop) {
-                    if (*counters[0] >= 100000) {
-                        P_BREAK(loop);
-                        return;
-                    }
+        SECTION("normal") {
+            zero::async::promise::all(
+                    zero::async::promise::loop<void>([=](const auto &loop) {
+                        if (*counters[0] >= 100000) {
+                            P_BREAK(loop);
+                            return;
+                        }
 
-                    channel->send((*counters[0])++)->then([=]() {
-                        P_CONTINUE(loop);
-                    }, [=](const zero::async::promise::Reason &reason) {
-                        P_BREAK_E(loop, reason);
-                    });
-                }),
-                zero::async::promise::loop<void>([=](const auto &loop) {
-                    if (*counters[0] >= 100000) {
-                        P_BREAK(loop);
-                        return;
-                    }
+                        channel->send((*counters[0])++)->then([=]() {
+                            P_CONTINUE(loop);
+                        }, [=](const zero::async::promise::Reason &reason) {
+                            P_BREAK_E(loop, reason);
+                        });
+                    }),
+                    zero::async::promise::loop<void>([=](const auto &loop) {
+                        if (*counters[0] >= 100000) {
+                            P_BREAK(loop);
+                            return;
+                        }
 
-                    channel->send((*counters[0])++)->then([=]() {
-                        P_CONTINUE(loop);
-                    }, [=](const zero::async::promise::Reason &reason) {
-                        P_BREAK_E(loop, reason);
-                    });
-                })
-        )->then([=]() {
-            channel->close();
-        }, [](const zero::async::promise::Reason &reason) {
-            FAIL();
-        });
+                        channel->send((*counters[0])++)->then([=]() {
+                            P_CONTINUE(loop);
+                        }, [=](const zero::async::promise::Reason &reason) {
+                            P_BREAK_E(loop, reason);
+                        });
+                    })
+            )->then([=]() {
+                channel->close();
+            }, [](const zero::async::promise::Reason &reason) {
+                FAIL();
+            });
 
-        zero::async::promise::any(
-                zero::async::promise::loop<void>([=](const auto &loop) {
-                    channel->receive()->then([=](int element) {
-                        (*counters[1])++;
-                        P_CONTINUE(loop);
-                    }, [=](const zero::async::promise::Reason &reason) {
-                        P_BREAK_E(loop, reason);
-                    });
-                }),
-                zero::async::promise::loop<void>([=](const auto &loop) {
-                    channel->receive()->then([=](int element) {
-                        (*counters[1])++;
-                        P_CONTINUE(loop);
-                    }, [=](const zero::async::promise::Reason &reason) {
-                        P_BREAK_E(loop, reason);
-                    });
-                })
-        )->fail([=](const zero::async::promise::Reason &reason) {
-            REQUIRE(reason.message == "channel closed");
-            REQUIRE(*counters[0] == *counters[1]);
-        })->finally([=]() {
-            context->loopBreak();
-        });
+            zero::async::promise::any(
+                    zero::async::promise::loop<void>([=](const auto &loop) {
+                        channel->receive()->then([=](int element) {
+                            (*counters[1])++;
+                            P_CONTINUE(loop);
+                        }, [=](const zero::async::promise::Reason &reason) {
+                            P_BREAK_E(loop, reason);
+                        });
+                    }),
+                    zero::async::promise::loop<void>([=](const auto &loop) {
+                        channel->receive()->then([=](int element) {
+                            (*counters[1])++;
+                            P_CONTINUE(loop);
+                        }, [=](const zero::async::promise::Reason &reason) {
+                            P_BREAK_E(loop, reason);
+                        });
+                    })
+            )->fail([=](const zero::async::promise::Reason &reason) {
+                REQUIRE((reason.code == aio::IO_EOF || reason.code == aio::IO_CLOSED));
+                REQUIRE(reason.message == "channel closed");
+                REQUIRE(*counters[0] == *counters[1]);
+            })->finally([=]() {
+                context->loopBreak();
+            });
 
-        context->dispatch();
+            context->dispatch();
+        }
+
+        SECTION("send timeout") {
+            zero::async::promise::loop<void>([=](const auto &loop) {
+                if (*counters[0] >= 100000) {
+                    P_BREAK(loop);
+                    return;
+                }
+
+                channel->send((*counters[0])++, 50ms)->then([=]() {
+                    P_CONTINUE(loop);
+                }, [=](const zero::async::promise::Reason &reason) {
+                    P_BREAK_E(loop, reason);
+                });
+            })->fail([=](const zero::async::promise::Reason &reason) {
+                REQUIRE(reason.code == aio::IO_TIMEOUT);
+                REQUIRE(reason.message == "channel send timed out");
+            })->finally([=]() {
+                context->loopBreak();
+            });
+
+            context->dispatch();
+        }
+
+        SECTION("receive timeout") {
+            channel->receive(50ms)->then([=](int element) {
+                FAIL();
+            }, [=](const zero::async::promise::Reason &reason) {
+                REQUIRE(reason.code == aio::IO_TIMEOUT);
+                REQUIRE(reason.message == "channel receive timed out");
+            })->finally([=]() {
+                context->loopBreak();
+            });
+
+            context->dispatch();
+        }
     }
 
     SECTION("sync sender/async receiver") {
-        std::thread thread([=]() {
-            while (true) {
-                if (*counters[0] >= 100000)
-                    break;
+        SECTION("normal") {
+            aio::toThread<void>(context, [=]() {
+                while (true) {
+                    if (*counters[0] >= 100000)
+                        break;
 
-                channel->sendSync((*counters[0])++);
-            }
+                    if (!channel->sendSync((*counters[0])++))
+                        FAIL();
+                }
 
-            channel->close();
-        });
+                channel->close();
+            });
 
-        zero::async::promise::any(
-                zero::async::promise::loop<void>([=](const auto &loop) {
-                    channel->receive()->then([=](int element) {
-                        (*counters[1])++;
-                        P_CONTINUE(loop);
-                    }, [=](const zero::async::promise::Reason &reason) {
-                        P_BREAK_E(loop, reason);
-                    });
-                }),
-                zero::async::promise::loop<void>([=](const auto &loop) {
-                    channel->receive()->then([=](int element) {
-                        (*counters[1])++;
-                        P_CONTINUE(loop);
-                    }, [=](const zero::async::promise::Reason &reason) {
-                        P_BREAK_E(loop, reason);
-                    });
-                })
-        )->fail([=](const zero::async::promise::Reason &reason) {
-            REQUIRE(reason.message == "channel closed");
-            REQUIRE(*counters[0] == *counters[1]);
-        })->finally([=]() {
-            context->loopBreak();
-        });
+            zero::async::promise::any(
+                    zero::async::promise::loop<void>([=](const auto &loop) {
+                        channel->receive()->then([=](int element) {
+                            (*counters[1])++;
+                            P_CONTINUE(loop);
+                        }, [=](const zero::async::promise::Reason &reason) {
+                            P_BREAK_E(loop, reason);
+                        });
+                    }),
+                    zero::async::promise::loop<void>([=](const auto &loop) {
+                        channel->receive()->then([=](int element) {
+                            (*counters[1])++;
+                            P_CONTINUE(loop);
+                        }, [=](const zero::async::promise::Reason &reason) {
+                            P_BREAK_E(loop, reason);
+                        });
+                    })
+            )->fail([=](const zero::async::promise::Reason &reason) {
+                REQUIRE(reason.message == "channel closed");
+                REQUIRE(*counters[0] == *counters[1]);
+            })->finally([=]() {
+                context->loopBreak();
+            });
 
-        context->dispatch();
-        thread.join();
+            context->dispatch();
+        }
+
+        SECTION("send timeout") {
+            aio::toThread<void>(context, [=]() -> nonstd::expected<void, zero::async::promise::Reason> {
+                while (true) {
+                    if (*counters[0] >= 100000)
+                        break;
+
+                    nonstd::expected<void, aio::Error> result = channel->sendSync((*counters[0])++, 50ms);
+
+                    if (!result) {
+                        channel->close();
+                        return nonstd::make_unexpected(
+                                zero::async::promise::Reason{
+                                        result.error(),
+                                        "channel send timed out"
+                                }
+                        );
+                    }
+                }
+
+                channel->close();
+                return {};
+            })->fail([=](const zero::async::promise::Reason &reason) {
+                REQUIRE(reason.code == aio::IO_TIMEOUT);
+                REQUIRE(reason.message == "channel send timed out");
+            })->finally([=]() {
+                context->loopBreak();
+            });
+
+            context->dispatch();
+        }
+
+        SECTION("receive timeout") {
+            channel->receive(50ms)->then([=](int element) {
+                FAIL();
+            }, [=](const zero::async::promise::Reason &reason) {
+                REQUIRE(reason.code == aio::IO_TIMEOUT);
+                REQUIRE(reason.message == "channel receive timed out");
+            })->finally([=]() {
+                context->loopBreak();
+            });
+
+            context->dispatch();
+        }
     }
 
     SECTION("async sender/sync receiver") {
-        zero::async::promise::all(
-                zero::async::promise::loop<void>([=](const auto &loop) {
-                    if (*counters[0] >= 100000) {
-                        P_BREAK(loop);
-                        return;
+        SECTION("normal") {
+            zero::async::promise::all(
+                    zero::async::promise::loop<void>([=](const auto &loop) {
+                        if (*counters[0] >= 100000) {
+                            P_BREAK(loop);
+                            return;
+                        }
+
+                        channel->send((*counters[0])++)->then([=]() {
+                            P_CONTINUE(loop);
+                        }, [=](const zero::async::promise::Reason &reason) {
+                            P_BREAK_E(loop, reason);
+                        });
+                    }),
+                    zero::async::promise::loop<void>([=](const auto &loop) {
+                        if (*counters[0] >= 100000) {
+                            P_BREAK(loop);
+                            return;
+                        }
+
+                        channel->send((*counters[0])++)->then([=]() {
+                            P_CONTINUE(loop);
+                        }, [=](const zero::async::promise::Reason &reason) {
+                            P_BREAK_E(loop, reason);
+                        });
+                    })
+            )->then([=]() {
+                channel->close();
+            }, [](const zero::async::promise::Reason &reason) {
+                FAIL();
+            });
+
+            aio::toThread<void>(context, [=]() {
+                while (true) {
+                    nonstd::expected<int, aio::Error> result = channel->receiveSync();
+
+                    if (!result) {
+                        REQUIRE((result.error() == aio::IO_EOF || result.error() == aio::IO_CLOSED));
+                        REQUIRE(*counters[0] == *counters[1]);
+                        break;
                     }
 
-                    channel->send((*counters[0])++)->then([=]() {
-                        P_CONTINUE(loop);
-                    }, [=](const zero::async::promise::Reason &reason) {
-                        P_BREAK_E(loop, reason);
-                    });
-                }),
-                zero::async::promise::loop<void>([=](const auto &loop) {
-                    if (*counters[0] >= 100000) {
-                        P_BREAK(loop);
-                        return;
-                    }
+                    (*counters[1])++;
+                }
+            })->finally([=]() {
+                context->loopBreak();
+            });
 
-                    channel->send((*counters[0])++)->then([=]() {
-                        P_CONTINUE(loop);
-                    }, [=](const zero::async::promise::Reason &reason) {
-                        P_BREAK_E(loop, reason);
-                    });
-                })
-        )->then([=]() {
-            channel->close();
-        }, [](const zero::async::promise::Reason &reason) {
-            FAIL();
-        });
+            context->dispatch();
+        }
 
-        std::thread thread([=]() {
-            while (true) {
-                std::optional<int> element = channel->receiveSync();
-
-                if (!element) {
-                    REQUIRE(*counters[0] == *counters[1]);
-                    context->loopBreak();
-                    break;
+        SECTION("send timeout") {
+            zero::async::promise::loop<void>([=](const auto &loop) {
+                if (*counters[0] >= 100000) {
+                    P_BREAK(loop);
+                    return;
                 }
 
-                (*counters[1])++;
-            }
-        });
+                channel->send((*counters[0])++, 50ms)->then([=]() {
+                    P_CONTINUE(loop);
+                }, [=](const zero::async::promise::Reason &reason) {
+                    P_BREAK_E(loop, reason);
+                });
+            })->fail([=](const zero::async::promise::Reason &reason) {
+                REQUIRE(reason.code == aio::IO_TIMEOUT);
+                REQUIRE(reason.message == "channel send timed out");
+            })->finally([=]() {
+                context->loopBreak();
+            });
 
-        context->dispatch();
-        thread.join();
+            context->dispatch();
+        }
+
+        SECTION("receive timeout") {
+            aio::toThread<void>(context, [=]() -> nonstd::expected<void, zero::async::promise::Reason> {
+                nonstd::expected<int, aio::Error> result = channel->receiveSync(50ms);
+
+                if (!result)
+                    return nonstd::make_unexpected(
+                            zero::async::promise::Reason{
+                                    result.error(),
+                                    "channel receive timed out"
+                            }
+                    );
+
+                return {};
+            })->fail([=](const zero::async::promise::Reason &reason) {
+                REQUIRE(reason.code == aio::IO_TIMEOUT);
+                REQUIRE(reason.message == "channel receive timed out");
+            })->finally([=]() {
+                context->loopBreak();
+            });
+
+            context->dispatch();
+        }
     }
 }

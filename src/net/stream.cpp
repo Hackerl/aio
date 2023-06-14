@@ -1,5 +1,4 @@
 #include <aio/net/stream.h>
-#include <aio/error.h>
 #include <zero/strings/strings.h>
 #include <cstring>
 
@@ -22,7 +21,7 @@ std::optional<aio::net::Address> parseAddress(const sockaddr_storage &storage) {
             std::array<std::byte, 4> ip = {};
             memcpy(ip.data(), &addr->sin_addr, sizeof(in_addr));
 
-            address = std::make_optional<aio::net::Address>(aio::net::TCPAddress{ntohs(addr->sin_port), ip});
+            address = aio::net::TCPAddress{ntohs(addr->sin_port), ip};
             break;
         }
 
@@ -32,18 +31,13 @@ std::optional<aio::net::Address> parseAddress(const sockaddr_storage &storage) {
             std::array<std::byte, 16> ip = {};
             memcpy(ip.data(), &addr->sin6_addr, sizeof(in6_addr));
 
-            address = std::make_optional<aio::net::Address>(aio::net::TCPAddress{ntohs(addr->sin6_port), ip});
+            address = aio::net::TCPAddress{ntohs(addr->sin6_port), ip};
             break;
         }
 
 #ifdef __unix__
         case AF_UNIX: {
-            address = std::make_optional<aio::net::Address>(
-                    aio::net::UnixAddress{
-                            ((const sockaddr_un *) &storage)->sun_path
-                    }
-            );
-
+            address = aio::net::UnixAddress{((const sockaddr_un *) &storage)->sun_path};
             break;
         }
 #endif
