@@ -50,26 +50,15 @@ namespace aio::net::ssl {
         friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
     };
 
-    class Listener : public zero::ptr::RefCounter {
+    class Listener : public ListenerBase {
     private:
-        explicit Listener(std::shared_ptr<aio::Context> context, std::shared_ptr<Context> ctx, evconnlistener *listener);
-
-    public:
-        Listener(const Listener &) = delete;
-        ~Listener() override;
-
-    public:
-        Listener &operator=(const Listener &) = delete;
+        Listener(std::shared_ptr<aio::Context> context, std::shared_ptr<Context> ctx, evconnlistener *listener);
 
     public:
         std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IBuffer>>> accept();
-        void close();
 
     private:
-        evconnlistener *mListener;
         std::shared_ptr<Context> mCTX;
-        std::shared_ptr<aio::Context> mContext;
-        std::shared_ptr<zero::async::promise::Promise<evutil_socket_t>> mPromise;
 
         template<typename T, typename ...Args>
         friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);

@@ -149,48 +149,12 @@ std::string aio::net::ssl::Buffer::getError() {
 }
 
 aio::net::ssl::Listener::Listener(std::shared_ptr<aio::Context> context, std::shared_ptr<Context> ctx, evconnlistener *listener)
-        : mContext(std::move(context)), mCTX(std::move(ctx)), mListener(listener) {
-    evconnlistener_set_cb(
-            mListener,
-            [](evconnlistener *listener, evutil_socket_t fd, sockaddr *addr, int socklen, void *arg) {
-                zero::ptr::RefPtr<Listener> ptr((Listener *) arg);
+        : mCTX(std::move(ctx)), ListenerBase(std::move(context), listener) {
 
-                auto p = std::move(ptr->mPromise);
-                p->resolve(fd);
-            },
-            this
-    );
-
-    evconnlistener_set_error_cb(
-            mListener,
-            [](evconnlistener *listener, void *arg) {
-                zero::ptr::RefPtr<Listener> ptr((Listener *) arg);
-
-                auto p = std::move(ptr->mPromise);
-                p->reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
-            }
-    );
-}
-
-aio::net::ssl::Listener::~Listener() {
-    if (mListener) {
-        evconnlistener_free(mListener);
-        mListener = nullptr;
-    }
 }
 
 std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::IBuffer>>> aio::net::ssl::Listener::accept() {
-    if (!mListener)
-        return zero::async::promise::reject<zero::ptr::RefPtr<IBuffer>>({IO_ERROR, "listener destroyed"});
-
-    if (mPromise)
-        return zero::async::promise::reject<zero::ptr::RefPtr<IBuffer>>({IO_ERROR, "pending request not completed"});
-
-    return zero::async::promise::chain<evutil_socket_t>([=](const auto &p) {
-        addRef();
-        mPromise = p;
-        evconnlistener_enable(mListener);
-    })->then([=](evutil_socket_t fd) -> zero::ptr::RefPtr<IBuffer> {
+    return fd()->then([=](evutil_socket_t fd) -> zero::ptr::RefPtr<IBuffer> {
         return zero::ptr::makeRef<Buffer>(
                 bufferevent_openssl_socket_new(
                         mContext->base(),
@@ -200,23 +164,7 @@ std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::IBuffe
                         BEV_OPT_CLOSE_ON_FREE
                 )
         );
-    })->finally([=]() {
-        evconnlistener_disable(mListener);
-        release();
     });
-}
-
-void aio::net::ssl::Listener::close() {
-    if (!mListener)
-        return;
-
-    auto p = std::move(mPromise);
-
-    if (p)
-        p->reject({IO_EOF, "listener will be closed"});
-
-    evconnlistener_free(mListener);
-    mListener = nullptr;
 }
 
 zero::ptr::RefPtr<aio::net::ssl::Listener>

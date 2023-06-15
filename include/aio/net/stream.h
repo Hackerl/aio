@@ -7,16 +7,10 @@
 #include <variant>
 
 namespace aio::net {
-    struct TCPAddress {
+    struct Address {
         unsigned short port;
         std::variant<std::array<std::byte, 4>, std::array<std::byte, 16>> ip;
     };
-
-    struct UnixAddress {
-        std::string path;
-    };
-
-    using Address = std::variant<TCPAddress, UnixAddress>;
 
     class IBuffer : public virtual ev::IBuffer {
     public:
@@ -36,25 +30,38 @@ namespace aio::net {
         friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
     };
 
-    class Listener : public zero::ptr::RefCounter {
-    private:
-        explicit Listener(std::shared_ptr<Context> context, evconnlistener *listener);
+    class ListenerBase : public zero::ptr::RefCounter {
+    protected:
+        ListenerBase(std::shared_ptr<Context> context, evconnlistener *listener);
 
     public:
-        Listener(const Listener &) = delete;
-        ~Listener() override;
+        ListenerBase(const ListenerBase &) = delete;
+        ~ListenerBase() override;
 
     public:
-        Listener &operator=(const Listener &) = delete;
+        ListenerBase &operator=(const ListenerBase &) = delete;
+
+    protected:
+        std::shared_ptr<zero::async::promise::Promise<evutil_socket_t>> fd();
 
     public:
-        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IBuffer>>> accept();
         void close();
 
-    private:
+    protected:
         evconnlistener *mListener;
         std::shared_ptr<Context> mContext;
         std::shared_ptr<zero::async::promise::Promise<evutil_socket_t>> mPromise;
+
+        template<typename T, typename ...Args>
+        friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
+    };
+
+    class Listener : public ListenerBase {
+    private:
+        Listener(std::shared_ptr<Context> context, evconnlistener *listener);
+
+    public:
+        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IBuffer>>> accept();
 
         template<typename T, typename ...Args>
         friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
@@ -66,9 +73,35 @@ namespace aio::net {
     connect(const std::shared_ptr<Context> &context, const std::string &host, short port);
 
 #ifdef __unix__
-    zero::ptr::RefPtr<Listener> listen(const std::shared_ptr<Context> &context, const std::string &path);
+    class IUnixBuffer : public virtual ev::IBuffer {
+    public:
+        virtual std::optional<std::string> localAddress() = 0;
+        virtual std::optional<std::string> remoteAddress() = 0;
+    };
 
-    std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IBuffer>>>
+    class UnixBuffer : public ev::Buffer, public IUnixBuffer {
+    protected:
+        explicit UnixBuffer(bufferevent *bev);
+
+    public:
+        std::optional<std::string> localAddress() override;
+        std::optional<std::string> remoteAddress() override;
+
+        template<typename T, typename ...Args>
+        friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
+    };
+
+    class UnixListener : public ListenerBase {
+    public:
+        UnixListener(std::shared_ptr<Context> context, evconnlistener *listener);
+
+    public:
+        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IUnixBuffer>>> accept();
+    };
+
+    zero::ptr::RefPtr<UnixListener> listen(const std::shared_ptr<Context> &context, const std::string &path);
+
+    std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IUnixBuffer>>>
     connect(const std::shared_ptr<Context> &context, const std::string &path);
 #endif
 }

@@ -21,7 +21,7 @@ std::optional<aio::net::Address> parseAddress(const sockaddr_storage &storage) {
             std::array<std::byte, 4> ip = {};
             memcpy(ip.data(), &addr->sin_addr, sizeof(in_addr));
 
-            address = aio::net::TCPAddress{ntohs(addr->sin_port), ip};
+            address = aio::net::Address{ntohs(addr->sin_port), ip};
             break;
         }
 
@@ -31,16 +31,9 @@ std::optional<aio::net::Address> parseAddress(const sockaddr_storage &storage) {
             std::array<std::byte, 16> ip = {};
             memcpy(ip.data(), &addr->sin6_addr, sizeof(in6_addr));
 
-            address = aio::net::TCPAddress{ntohs(addr->sin6_port), ip};
+            address = aio::net::Address{ntohs(addr->sin6_port), ip};
             break;
         }
-
-#ifdef __unix__
-        case AF_UNIX: {
-            address = aio::net::UnixAddress{((const sockaddr_un *) &storage)->sun_path};
-            break;
-        }
-#endif
 
         default:
             break;
@@ -83,12 +76,12 @@ std::optional<aio::net::Address> aio::net::Buffer::remoteAddress() {
     return parseAddress(storage);
 }
 
-aio::net::Listener::Listener(std::shared_ptr<Context> context, evconnlistener *listener)
+aio::net::ListenerBase::ListenerBase(std::shared_ptr<Context> context, evconnlistener *listener)
         : mContext(std::move(context)), mListener(listener) {
     evconnlistener_set_cb(
             mListener,
             [](evconnlistener *listener, evutil_socket_t fd, sockaddr *addr, int socklen, void *arg) {
-                zero::ptr::RefPtr<Listener> ptr((Listener *) arg);
+                zero::ptr::RefPtr<ListenerBase> ptr((ListenerBase *) arg);
 
                 auto p = std::move(ptr->mPromise);
                 p->resolve(fd);
@@ -99,7 +92,7 @@ aio::net::Listener::Listener(std::shared_ptr<Context> context, evconnlistener *l
     evconnlistener_set_error_cb(
             mListener,
             [](evconnlistener *listener, void *arg) {
-                zero::ptr::RefPtr<Listener> ptr((Listener *) arg);
+                zero::ptr::RefPtr<ListenerBase> ptr((ListenerBase *) arg);
 
                 auto p = std::move(ptr->mPromise);
                 p->reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
@@ -107,33 +100,31 @@ aio::net::Listener::Listener(std::shared_ptr<Context> context, evconnlistener *l
     );
 }
 
-aio::net::Listener::~Listener() {
+aio::net::ListenerBase::~ListenerBase() {
     if (mListener) {
         evconnlistener_free(mListener);
         mListener = nullptr;
     }
 }
 
-std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::IBuffer>>> aio::net::Listener::accept() {
+std::shared_ptr<zero::async::promise::Promise<evutil_socket_t>> aio::net::ListenerBase::fd() {
     if (!mListener)
-        return zero::async::promise::reject<zero::ptr::RefPtr<IBuffer>>({IO_ERROR, "listener destroyed"});
+        return zero::async::promise::reject<evutil_socket_t>({IO_ERROR, "listener destroyed"});
 
     if (mPromise)
-        return zero::async::promise::reject<zero::ptr::RefPtr<IBuffer>>({IO_ERROR, "pending request not completed"});
+        return zero::async::promise::reject<evutil_socket_t>({IO_ERROR, "pending request not completed"});
 
     return zero::async::promise::chain<evutil_socket_t>([=](const auto &p) {
         addRef();
         mPromise = p;
         evconnlistener_enable(mListener);
-    })->then([=](evutil_socket_t fd) -> zero::ptr::RefPtr<IBuffer> {
-        return zero::ptr::makeRef<Buffer>(bufferevent_socket_new(mContext->base(), fd, BEV_OPT_CLOSE_ON_FREE));
     })->finally([=]() {
         evconnlistener_disable(mListener);
         release();
     });
 }
 
-void aio::net::Listener::close() {
+void aio::net::ListenerBase::close() {
     if (!mListener)
         return;
 
@@ -144,6 +135,17 @@ void aio::net::Listener::close() {
 
     evconnlistener_free(mListener);
     mListener = nullptr;
+}
+
+aio::net::Listener::Listener(std::shared_ptr<Context> context, evconnlistener *listener)
+        : ListenerBase(std::move(context), listener) {
+
+}
+
+std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::IBuffer>>> aio::net::Listener::accept() {
+    return fd()->then([=](evutil_socket_t fd) -> zero::ptr::RefPtr<IBuffer> {
+        return zero::ptr::makeRef<Buffer>(bufferevent_socket_new(mContext->base(), fd, BEV_OPT_CLOSE_ON_FREE));
+    });
 }
 
 zero::ptr::RefPtr<aio::net::Listener>
@@ -214,7 +216,73 @@ aio::net::connect(const std::shared_ptr<Context> &context, const std::string &ho
 }
 
 #ifdef __unix__
-zero::ptr::RefPtr<aio::net::Listener> aio::net::listen(const std::shared_ptr<Context> &context, const std::string &path) {
+aio::net::UnixBuffer::UnixBuffer(bufferevent *bev) : Buffer(bev) {
+
+}
+
+std::optional<std::string> aio::net::UnixBuffer::localAddress() {
+    evutil_socket_t fd = this->fd();
+
+    if (fd == -1)
+        return std::nullopt;
+
+    sockaddr_storage storage = {};
+    socklen_t length = sizeof(sockaddr_storage);
+
+    if (getsockname(fd, (sockaddr *) &storage, &length) < 0)
+        return std::nullopt;
+
+    if (storage.ss_family != AF_UNIX)
+        return std::nullopt;
+
+    return ((sockaddr_un *) &storage)->sun_path;
+}
+
+std::optional<std::string> aio::net::UnixBuffer::remoteAddress() {
+    evutil_socket_t fd = this->fd();
+
+    if (fd == -1)
+        return std::nullopt;
+
+    sockaddr_storage storage = {};
+    socklen_t length = sizeof(sockaddr_storage);
+
+    if (getpeername(fd, (sockaddr *) &storage, &length) < 0)
+        return std::nullopt;
+
+    if (storage.ss_family != AF_UNIX)
+        return std::nullopt;
+
+    return ((sockaddr_un *) &storage)->sun_path;
+}
+
+aio::net::UnixListener::UnixListener(std::shared_ptr<Context> context, evconnlistener *listener)
+        : ListenerBase(std::move(context), listener) {
+
+}
+
+std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::IUnixBuffer>>>
+aio::net::UnixListener::accept() {
+    if (!mListener)
+        return zero::async::promise::reject<zero::ptr::RefPtr<IUnixBuffer>>({IO_ERROR, "listener destroyed"});
+
+    if (mPromise)
+        return zero::async::promise::reject<zero::ptr::RefPtr<IUnixBuffer>>(
+                {IO_ERROR, "pending request not completed"});
+
+    return zero::async::promise::chain<evutil_socket_t>([=](const auto &p) {
+        addRef();
+        mPromise = p;
+        evconnlistener_enable(mListener);
+    })->then([=](evutil_socket_t fd) -> zero::ptr::RefPtr<IUnixBuffer> {
+        return zero::ptr::makeRef<UnixBuffer>(bufferevent_socket_new(mContext->base(), fd, BEV_OPT_CLOSE_ON_FREE));
+    })->finally([=]() {
+        evconnlistener_disable(mListener);
+        release();
+    });
+}
+
+zero::ptr::RefPtr<aio::net::UnixListener> aio::net::listen(const std::shared_ptr<Context> &context, const std::string &path) {
     sockaddr_un sa = {};
 
     sa.sun_family = AF_UNIX;
@@ -233,10 +301,10 @@ zero::ptr::RefPtr<aio::net::Listener> aio::net::listen(const std::shared_ptr<Con
     if (!listener)
         return nullptr;
 
-    return zero::ptr::makeRef<Listener>(context, listener);
+    return zero::ptr::makeRef<UnixListener>(context, listener);
 }
 
-std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::IBuffer>>>
+std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::IUnixBuffer>>>
 aio::net::connect(const std::shared_ptr<Context> &context, const std::string &path) {
     sockaddr_un sa = {};
 
@@ -246,7 +314,7 @@ aio::net::connect(const std::shared_ptr<Context> &context, const std::string &pa
     bufferevent *bev = bufferevent_socket_new(context->base(), -1, BEV_OPT_CLOSE_ON_FREE);
 
     if (!bev)
-        return zero::async::promise::reject<zero::ptr::RefPtr<IBuffer>>({IO_ERROR, "new buffer failed"});
+        return zero::async::promise::reject<zero::ptr::RefPtr<IUnixBuffer>>({IO_ERROR, "new buffer failed"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         auto ctx = new std::shared_ptr(p);
@@ -274,11 +342,11 @@ aio::net::connect(const std::shared_ptr<Context> &context, const std::string &pa
             delete ctx;
             p->reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
         }
-    })->then([=]() -> zero::ptr::RefPtr<IBuffer> {
-        return zero::ptr::makeRef<Buffer>(bev);
+    })->then([=]() -> zero::ptr::RefPtr<IUnixBuffer> {
+        return zero::ptr::makeRef<UnixBuffer>(bev);
     })->fail([=](const zero::async::promise::Reason &reason) {
         bufferevent_free(bev);
-        return zero::async::promise::reject<zero::ptr::RefPtr<IBuffer>>(reason);
+        return zero::async::promise::reject<zero::ptr::RefPtr<IUnixBuffer>>(reason);
     });
 }
 #endif
