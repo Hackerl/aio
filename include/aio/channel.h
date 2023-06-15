@@ -145,10 +145,7 @@ namespace aio {
 
             std::lock_guard<std::mutex> guard(mMutex);
 
-            for (const auto &event: mPending[RECEIVER])
-                event->trigger(ev::READ);
-
-            mPending[RECEIVER].clear();
+            trigger<RECEIVER>(ev::READ);
             return {};
         }
 
@@ -163,10 +160,7 @@ namespace aio {
 
             std::lock_guard<std::mutex> guard(mMutex);
 
-            for (const auto &event: mPending[SENDER])
-                event->trigger(ev::WRITE);
-
-            mPending[SENDER].clear();
+            trigger<SENDER>(ev::WRITE);
             return element;
         }
 
@@ -220,10 +214,7 @@ namespace aio {
 
                 std::lock_guard<std::mutex> guard(mMutex);
 
-                for (const auto &event: mPending[RECEIVER])
-                    event->trigger(ev::READ);
-
-                mPending[RECEIVER].clear();
+                trigger<RECEIVER>(ev::READ);
                 break;
             }
 
@@ -277,10 +268,7 @@ namespace aio {
 
                         std::lock_guard<std::mutex> guard(mMutex);
 
-                        for (const auto &event: mPending[RECEIVER])
-                            event->trigger(ev::READ);
-
-                        mPending[RECEIVER].clear();
+                        trigger<RECEIVER>(ev::READ);
                         P_BREAK(loop);
                     }
             )->finally([=]() {
@@ -337,10 +325,7 @@ namespace aio {
 
                 std::lock_guard<std::mutex> guard(mMutex);
 
-                for (const auto &event: mPending[SENDER])
-                    event->trigger(ev::WRITE);
-
-                mPending[SENDER].clear();
+                trigger<SENDER>(ev::WRITE);
                 break;
             }
 
@@ -389,10 +374,7 @@ namespace aio {
 
                 std::lock_guard<std::mutex> guard(mMutex);
 
-                for (const auto &event: mPending[SENDER])
-                    event->trigger(ev::WRITE);
-
-                mPending[SENDER].clear();
+                trigger<SENDER>(ev::WRITE);
                 P_BREAK_V(loop, std::move(element));
             })->finally([=]() {
                 this->release();
@@ -408,18 +390,28 @@ namespace aio {
 
             mClosed = true;
 
-            for (const auto &event: mPending[SENDER])
-                event->trigger(ev::CLOSED);
-
-            mPending[SENDER].clear();
-
-            for (const auto &event: mPending[RECEIVER])
-                event->trigger(ev::CLOSED);
-
-            mPending[RECEIVER].clear();
+            trigger<SENDER>(ev::CLOSED);
+            trigger<RECEIVER>(ev::CLOSED);
         }
 
     private:
+        template<int Index>
+        void trigger(short what) {
+            if (mPending[Index].empty())
+                return;
+
+            mContext->post([=, pending = mPending[Index]]() {
+                for (const auto &event: pending) {
+                    if (!event->pending())
+                        continue;
+
+                    event->trigger(what);
+                }
+            });
+
+            mPending[Index].clear();
+        }
+
         zero::ptr::RefPtr<ev::Event> getEvent() {
             auto it = std::find_if(mEvents.begin(), mEvents.end(), [](const auto &event) {
                 return event.useCount() == 1;

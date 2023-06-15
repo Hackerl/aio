@@ -17,7 +17,7 @@ namespace aio::ev {
 
     class Event : public zero::ptr::RefCounter {
     private:
-        Event(std::shared_ptr<Context> context, evutil_socket_t fd);
+        Event(const std::shared_ptr<Context> &context, evutil_socket_t fd);
 
     public:
         Event(const Event &) = delete;
@@ -46,7 +46,6 @@ namespace aio::ev {
 
     private:
         event *mEvent;
-        std::shared_ptr<Context> mContext;
         std::shared_ptr<zero::async::promise::Promise<short>> mPromise;
 
         template<typename T, typename ...Args>

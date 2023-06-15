@@ -1,9 +1,9 @@
 #include <aio/ev/event.h>
 #include <aio/error.h>
 
-aio::ev::Event::Event(std::shared_ptr<Context> context, evutil_socket_t fd) : mContext(std::move(context)) {
+aio::ev::Event::Event(const std::shared_ptr<Context> &context, evutil_socket_t fd) {
     mEvent = event_new(
-            mContext->base(),
+            context->base(),
             fd,
             0,
             [](evutil_socket_t fd, short what, void *arg) {
@@ -37,15 +37,7 @@ bool aio::ev::Event::pending() {
 }
 
 void aio::ev::Event::trigger(short events) {
-    addRef();
-
-    mContext->post([=]() {
-        if (!pending())
-            return;
-
-        event_active(mEvent, events, 0);
-        release();
-    });
+    event_active(mEvent, events, 0);
 }
 
 std::shared_ptr<zero::async::promise::Promise<short>>
