@@ -324,7 +324,7 @@ void aio::ev::Buffer::onBufferEvent(short what) {
 }
 
 std::string aio::ev::Buffer::getError() {
-    return evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR());
+    return lastError();
 }
 
 zero::ptr::RefPtr<aio::ev::Buffer> aio::ev::newBuffer(

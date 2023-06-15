@@ -143,7 +143,7 @@ std::string aio::net::ssl::Buffer::getError() {
 
     return zero::strings::format(
             "socket[%s] ssl[%s]",
-            evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()),
+            lastError().c_str(),
             zero::strings::join(errors, "; ").c_str()
     );
 }
@@ -266,7 +266,7 @@ aio::net::ssl::connect(
                                         SSL_ERROR,
                                         zero::strings::format(
                                                 "socket[%s] ssl[%s]",
-                                                evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()),
+                                                lastError().c_str(),
                                                 zero::strings::join(errors, "; ").c_str()
                                         )
                                 }
@@ -284,7 +284,7 @@ aio::net::ssl::connect(
 
         if (bufferevent_socket_connect_hostname(bev, context->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
             delete ctx;
-            p->reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+            p->reject({IO_ERROR, lastError()});
         }
     })->then([=]() -> zero::ptr::RefPtr<IBuffer> {
         return zero::ptr::makeRef<Buffer>(bev);

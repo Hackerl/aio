@@ -1,6 +1,8 @@
 #ifndef AIO_ERROR_H
 #define AIO_ERROR_H
 
+#include <string>
+
 namespace aio {
     enum Error {
         IO_EOF = -1000,
@@ -14,6 +16,8 @@ namespace aio {
         HTTP_ERROR,
         WS_ERROR
     };
+
+    std::string lastError();
 }
 
 #endif //AIO_ERROR_H

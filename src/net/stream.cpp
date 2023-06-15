@@ -95,7 +95,7 @@ aio::net::ListenerBase::ListenerBase(std::shared_ptr<Context> context, evconnlis
                 zero::ptr::RefPtr<ListenerBase> ptr((ListenerBase *) arg);
 
                 auto p = std::move(ptr->mPromise);
-                p->reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+                p->reject({IO_ERROR, lastError()});
             }
     );
 }
@@ -192,7 +192,7 @@ aio::net::connect(const std::shared_ptr<Context> &context, const std::string &ho
                     auto p = static_cast<std::shared_ptr<zero::async::promise::Promise<void>> *>(arg);
 
                     if ((what & BEV_EVENT_CONNECTED) == 0) {
-                        p->operator*().reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+                        p->operator*().reject({IO_ERROR, lastError()});
                         delete p;
                         return;
                     }
@@ -205,7 +205,7 @@ aio::net::connect(const std::shared_ptr<Context> &context, const std::string &ho
 
         if (bufferevent_socket_connect_hostname(bev, context->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
             delete ctx;
-            p->reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+            p->reject({IO_ERROR, lastError()});
         }
     })->then([=]() -> zero::ptr::RefPtr<IBuffer> {
         return zero::ptr::makeRef<Buffer>(bev);
@@ -327,7 +327,7 @@ aio::net::connect(const std::shared_ptr<Context> &context, const std::string &pa
                     auto p = static_cast<std::shared_ptr<zero::async::promise::Promise<void>> *>(arg);
 
                     if ((what & BEV_EVENT_CONNECTED) == 0) {
-                        p->operator*().reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+                        p->operator*().reject({IO_ERROR, lastError()});
                         delete p;
                         return;
                     }
@@ -340,7 +340,7 @@ aio::net::connect(const std::shared_ptr<Context> &context, const std::string &pa
 
         if (bufferevent_socket_connect(bev, (sockaddr *) &sa, sizeof(sa)) < 0) {
             delete ctx;
-            p->reject({IO_ERROR, evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())});
+            p->reject({IO_ERROR, lastError()});
         }
     })->then([=]() -> zero::ptr::RefPtr<IUnixBuffer> {
         return zero::ptr::makeRef<UnixBuffer>(bev);

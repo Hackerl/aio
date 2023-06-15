@@ -1,4 +1,5 @@
 #include <aio/context.h>
+#include <aio/error.h>
 #include <zero/log.h>
 #include <event2/dns.h>
 #include <event2/thread.h>
@@ -43,7 +44,7 @@ std::shared_ptr<aio::Context> aio::newContext(size_t maxWorkers) {
     event_base *base = event_base_new();
 
     if (!base) {
-        LOG_ERROR("create event base failed: %s", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+        LOG_ERROR("create event base failed: %s", lastError().c_str());
         return nullptr;
     }
 
@@ -65,7 +66,7 @@ std::shared_ptr<aio::Context> aio::newContext(size_t maxWorkers) {
 #endif
 
     if (!dnsBase) {
-        LOG_ERROR("create dns base failed: %s", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
+        LOG_ERROR("create dns base failed: %s", lastError().c_str());
         event_base_free(base);
         return nullptr;
     }
