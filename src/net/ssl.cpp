@@ -1,6 +1,5 @@
 #include <aio/net/ssl.h>
 #include <aio/error.h>
-#include <zero/log.h>
 #include <zero/strings/strings.h>
 #include <cstring>
 #include <openssl/err.h>
@@ -53,6 +52,40 @@ bool aio::net::ssl::loadEmbeddedCA(Context *ctx) {
 }
 #endif
 
+EVP_PKEY *readPrivateKey(std::string_view content) {
+    BIO *bio = BIO_new_mem_buf(content.data(), (int) content.length());
+
+    if (!bio)
+        return nullptr;
+
+    EVP_PKEY *key = PEM_read_bio_PrivateKey(bio, nullptr, nullptr, nullptr);
+
+    if (!key) {
+        BIO_free(bio);
+        return nullptr;
+    }
+
+    BIO_free(bio);
+    return key;
+}
+
+X509 *readCertificate(std::string_view content) {
+    BIO *bio = BIO_new_mem_buf(content.data(), (int) content.length());
+
+    if (!bio)
+        return nullptr;
+
+    X509 *cert = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
+
+    if (!cert) {
+        BIO_free(bio);
+        return nullptr;
+    }
+
+    BIO_free(bio);
+    return cert;
+}
+
 std::string aio::net::ssl::getError() {
     return getError(ERR_get_error());
 }
@@ -72,48 +105,113 @@ std::shared_ptr<aio::net::ssl::Context> aio::net::ssl::newContext(const Config &
             }
     );
 
-    if (!ctx) {
-        LOG_ERROR("new SSL context failed: %s", getError().c_str());
+    if (!ctx)
         return nullptr;
+
+    if (!SSL_CTX_set_min_proto_version(ctx.get(), config.minVersion.value_or(TLS_VERSION_1_2)))
+        return nullptr;
+
+    if (!SSL_CTX_set_max_proto_version(ctx.get(), config.minVersion.value_or(TLS_VERSION_1_3)))
+        return nullptr;
+
+    switch (config.ca.index()) {
+        case 1: {
+            X509 *cert = readCertificate(std::get<1>(config.ca));
+
+            if (!cert)
+                return nullptr;
+
+            X509_STORE *store = SSL_CTX_get_cert_store(ctx.get());
+
+            if (!store) {
+                X509_free(cert);
+                return nullptr;
+            }
+
+            if (!X509_STORE_add_cert(store, cert)) {
+                X509_free(cert);
+                return nullptr;
+            }
+
+            break;
+        }
+
+        case 2:
+            if (!SSL_CTX_load_verify_locations(ctx.get(), std::get<2>(config.ca).string().c_str(), nullptr))
+                return nullptr;
+
+            break;
+
+        default:
+            break;
     }
 
-    if (!SSL_CTX_set_min_proto_version(ctx.get(), config.minVersion.value_or(TLS_VERSION_1_2))) {
-        LOG_ERROR("set SSL min version failed: %s", getError().c_str());
-        return nullptr;
+    switch (config.cert.index()) {
+        case 1: {
+            X509 *cert = readCertificate(std::get<1>(config.cert));
+
+            if (!cert)
+                return nullptr;
+
+            if (!SSL_CTX_use_certificate(ctx.get(), cert)) {
+                X509_free(cert);
+                return nullptr;
+            }
+
+            break;
+        }
+
+        case 2:
+            if (!SSL_CTX_use_certificate_file(ctx.get(), std::get<2>(config.cert).string().c_str(), SSL_FILETYPE_PEM))
+                return nullptr;
+
+            break;
+
+        default:
+            break;
     }
 
-    if (!SSL_CTX_set_max_proto_version(ctx.get(), config.minVersion.value_or(TLS_VERSION_1_3))) {
-        LOG_ERROR("set SSL max version failed: %s", getError().c_str());
-        return nullptr;
-    }
+    switch (config.privateKey.index()) {
+        case 1: {
+            EVP_PKEY *key = readPrivateKey(std::get<1>(config.privateKey));
 
-    if (config.ca && !SSL_CTX_load_verify_locations(ctx.get(), config.ca->string().c_str(), nullptr)) {
-        LOG_ERROR("load CA certificate failed: %s", getError().c_str());
-        return nullptr;
-    }
+            if (!key)
+                return nullptr;
 
-    if (config.cert && !SSL_CTX_use_certificate_file(ctx.get(), config.cert->string().c_str(), SSL_FILETYPE_PEM)) {
-        LOG_ERROR("load certificate failed: %s", getError().c_str());
-        return nullptr;
-    }
+            if (!SSL_CTX_use_PrivateKey(ctx.get(), key)) {
+                EVP_PKEY_free(key);
+                return nullptr;
+            }
 
-    if (config.privateKey &&
-        (!SSL_CTX_use_PrivateKey_file(ctx.get(), config.privateKey->string().c_str(), SSL_FILETYPE_PEM) ||
-         !SSL_CTX_check_private_key(ctx.get()))) {
-        LOG_ERROR("load private key failed: %s", getError().c_str());
-        return nullptr;
+            if (!SSL_CTX_check_private_key(ctx.get()))
+                return nullptr;
+
+            break;
+        }
+
+        case 2:
+            if (!SSL_CTX_use_PrivateKey_file(
+                    ctx.get(),
+                    std::get<2>(config.privateKey).string().c_str(),
+                    SSL_FILETYPE_PEM
+            ))
+                return nullptr;
+
+            if (!SSL_CTX_check_private_key(ctx.get()))
+                return nullptr;
+
+            break;
+
+        default:
+            break;
     }
 
 #ifdef AIO_EMBED_CA_CERT
-    if (!config.insecure && !config.ca && !config.server && !loadEmbeddedCA(ctx.get())) {
-        LOG_ERROR("load embed CA certificates failed: %s", getError().c_str());
+    if (!config.insecure && config.ca.index() == 0 && !config.server && !loadEmbeddedCA(ctx.get()))
         return nullptr;
-    }
 #else
-    if (!config.insecure && !config.ca && !config.server && !SSL_CTX_set_default_verify_paths(ctx.get())) {
-        LOG_ERROR("load system CA certificates failed: %s", getError().c_str());
+    if (!config.insecure && config.ca.index() == 0 && !config.server && !SSL_CTX_set_default_verify_paths(ctx.get()))
         return nullptr;
-    }
 #endif
 
     SSL_CTX_set_verify(
@@ -127,6 +225,21 @@ std::shared_ptr<aio::net::ssl::Context> aio::net::ssl::newContext(const Config &
 
 aio::net::ssl::Buffer::Buffer(bufferevent *bev) : net::Buffer(bev) {
 
+}
+
+nonstd::expected<void, aio::Error> aio::net::ssl::Buffer::close() {
+    if (mClosed)
+        return nonstd::make_unexpected(IO_CLOSED);
+
+    SSL *ctx = bufferevent_openssl_get_ssl(mBev);
+
+    if (!ctx)
+        return nonstd::make_unexpected(SSL_ERROR);
+
+    SSL_set_shutdown(ctx, SSL_RECEIVED_SHUTDOWN);
+    SSL_shutdown(ctx);
+
+    return net::Buffer::close();
 }
 
 std::string aio::net::ssl::Buffer::getError() {

@@ -1,6 +1,4 @@
 #include <aio/context.h>
-#include <aio/error.h>
-#include <zero/log.h>
 #include <event2/dns.h>
 #include <event2/thread.h>
 
@@ -43,10 +41,8 @@ std::shared_ptr<aio::Context> aio::newContext(size_t maxWorkers) {
 
     event_base *base = event_base_new();
 
-    if (!base) {
-        LOG_ERROR("create event base failed: %s", lastError().c_str());
+    if (!base)
         return nullptr;
-    }
 
 #if _WIN32 || __linux__ && !__ANDROID__
     evdns_base *dnsBase = evdns_base_new(base, EVDNS_BASE_INITIALIZE_NAMESERVERS);
@@ -58,7 +54,6 @@ std::shared_ptr<aio::Context> aio::newContext(size_t maxWorkers) {
 #define DEFAULT_NAMESERVER "8.8.8.8"
 #endif
     if (evdns_base_nameserver_ip_add(dnsBase, DEFAULT_NAMESERVER) != 0) {
-        LOG_ERROR("add nameserver failed");
         event_base_free(base);
         return nullptr;
     }
@@ -66,7 +61,6 @@ std::shared_ptr<aio::Context> aio::newContext(size_t maxWorkers) {
 #endif
 
     if (!dnsBase) {
-        LOG_ERROR("create dns base failed: %s", lastError().c_str());
         event_base_free(base);
         return nullptr;
     }

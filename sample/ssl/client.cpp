@@ -38,15 +38,21 @@ int main(int argc, char **argv) {
 
     zero::ptr::RefPtr<aio::ev::Buffer> input = aio::ev::newBuffer(context, STDIN_FILENO, false);
 
-    std::shared_ptr<aio::net::ssl::Context> ctx = aio::net::ssl::newContext(
-            aio::net::ssl::Config{
-                    .ca = ca,
-                    .cert = cert,
-                    .privateKey = privateKey,
-                    .insecure = insecure,
-                    .server = false
-            }
-    );
+    aio::net::ssl::Config config = {};
+
+    if (ca)
+        config.ca = *ca;
+
+    if (cert)
+        config.cert = *cert;
+
+    if (privateKey)
+        config.privateKey = *privateKey;
+
+    config.insecure = insecure;
+    config.server = false;
+
+    std::shared_ptr<aio::net::ssl::Context> ctx = aio::net::ssl::newContext(config);
 
     if (!ctx)
         return -1;

@@ -27,9 +27,9 @@ namespace aio::net::ssl {
     struct Config {
         std::optional<Version> minVersion;
         std::optional<Version> maxVersion;
-        std::optional<std::filesystem::path> ca;
-        std::optional<std::filesystem::path> cert;
-        std::optional<std::filesystem::path> privateKey;
+        std::variant<std::monostate, std::string, std::filesystem::path> ca;
+        std::variant<std::monostate, std::string, std::filesystem::path> cert;
+        std::variant<std::monostate, std::string, std::filesystem::path> privateKey;
         bool insecure;
         bool server;
     };
@@ -42,6 +42,9 @@ namespace aio::net::ssl {
     class Buffer : public net::Buffer {
     private:
         explicit Buffer(bufferevent *bev);
+
+    public:
+        nonstd::expected<void, Error> close() override;
 
     private:
         std::string getError() override;

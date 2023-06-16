@@ -11,6 +11,7 @@ add_executable(
         ev/buffer.cpp
         http/url.cpp
         net/stream.cpp
+        $<$<NOT:$<BOOL:${AIO_DISABLE_SSL}>>:net/ssl.cpp>
         $<$<PLATFORM_ID:Windows>:main.cpp>
 )
 
