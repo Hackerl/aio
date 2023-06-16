@@ -78,7 +78,7 @@ namespace aio::ev {
         bufferevent *mBev;
 
     private:
-        std::shared_ptr<zero::async::promise::Promise<void>> mPromise[3];
+        std::shared_ptr<zero::async::promise::Promise<void>> mPromises[3];
 
         template<typename T, typename ...Args>
         friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
