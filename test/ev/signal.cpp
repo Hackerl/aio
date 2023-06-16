@@ -9,12 +9,13 @@ TEST_CASE("signal handler", "[signal]") {
     std::shared_ptr<aio::Context> context = aio::newContext();
     REQUIRE(context);
 
-    zero::ptr::makeRef<aio::ev::Signal>(context, SIGUSR1)->on()->then([=]() {
+    zero::ptr::makeRef<aio::ev::Signal>(context, SIGINT)->on()->then([=]() {
+        SUCCEED();
         context->loopBreak();
     });
 
     zero::ptr::makeRef<aio::ev::Timer>(context)->setTimeout(500ms)->then([]() {
-        raise(SIGUSR1);
+        raise(SIGINT);
     });
 
     context->dispatch();

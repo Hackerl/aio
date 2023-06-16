@@ -6,10 +6,11 @@ add_executable(
         channel.cpp
         ev/pipe.cpp
         ev/event.cpp
+        ev/timer.cpp
+        ev/signal.cpp
         ev/buffer.cpp
         http/url.cpp
         net/stream.cpp
-        $<$<PLATFORM_ID:Linux>:ev/signal.cpp>
         $<$<PLATFORM_ID:Windows>:main.cpp>
 )
 
