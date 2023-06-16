@@ -10,7 +10,7 @@ TEST_CASE("buffer pipe", "[pipe]") {
     REQUIRE(buffers[0]);
     REQUIRE(buffers[1]);
 
-    SECTION("transfer data") {
+    SECTION("normal") {
         buffers[0]->write("hello world");
 
         zero::async::promise::all(

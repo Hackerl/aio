@@ -5,6 +5,7 @@ add_executable(
         thread.cpp
         channel.cpp
         ev/pipe.cpp
+        ev/event.cpp
         ev/buffer.cpp
         http/url.cpp
         net/stream.cpp
