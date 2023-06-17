@@ -16,11 +16,11 @@ TEST_CASE("buffer pipe", "[pipe]") {
         zero::async::promise::all(
                 buffers[0]->drain()->then([=]() {
                     return buffers[0]->readLine();
-                })->then([](std::string_view data) {
-                    REQUIRE(data == "world hello");
+                })->then([](std::string_view line) {
+                    REQUIRE(line == "world hello");
                 }),
-                buffers[1]->readLine()->then([=](std::string data) {
-                    REQUIRE(data == "hello world");
+                buffers[1]->readLine()->then([=](std::string line) {
+                    REQUIRE(line == "hello world");
                     buffers[1]->writeLine("world hello");
                     return buffers[1]->drain();
                 })
@@ -35,13 +35,13 @@ TEST_CASE("buffer pipe", "[pipe]") {
         buffers[0]->writeLine("hello world");
         buffers[0]->drain()->then([=]() {
             return buffers[0]->readLine();
-        })->then([=](std::string_view data) {
-            REQUIRE(data == "world hello");
+        })->then([=](std::string_view line) {
+            REQUIRE(line == "world hello");
             buffers[0]->close();
         });
 
-        buffers[1]->readLine()->then([=](std::string_view data) {
-            REQUIRE(data == "hello world");
+        buffers[1]->readLine()->then([=](std::string_view line) {
+            REQUIRE(line == "hello world");
             buffers[1]->writeLine("world hello");
             return buffers[1]->drain();
         })->then([=]() {
@@ -62,13 +62,13 @@ TEST_CASE("buffer pipe", "[pipe]") {
         buffers[0]->writeLine("hello world");
         buffers[0]->drain()->then([=]() {
             return buffers[0]->readLine();
-        })->then([=](std::string_view data) {
-            REQUIRE(data == "world hello");
+        })->then([=](std::string_view line) {
+            REQUIRE(line == "world hello");
             buffers[0]->throws("error occurred");
         });
 
-        buffers[1]->readLine()->then([=](std::string_view data) {
-            REQUIRE(data == "hello world");
+        buffers[1]->readLine()->then([=](std::string_view line) {
+            REQUIRE(line == "hello world");
             buffers[1]->writeLine("world hello");
             return buffers[1]->drain();
         })->then([=]() {

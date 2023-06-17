@@ -27,8 +27,8 @@ TEST_CASE("stream network connection", "[stream]") {
                     buffer->writeLine("hello world");
                     return buffer->drain()->then([=]() {
                         return buffer->readLine();
-                    })->then([](std::string_view data) {
-                        REQUIRE(data == "world hello");
+                    })->then([](std::string_view line) {
+                        REQUIRE(line == "world hello");
                     })->then([=]() {
                         buffer->close();
                     });
@@ -51,8 +51,8 @@ TEST_CASE("stream network connection", "[stream]") {
                                     std::byte{127}, std::byte{0}, std::byte{0}, std::byte{1}
                             });
 
-                            return buffer->readLine()->then([](std::string_view data) {
-                                REQUIRE(data == "hello world");
+                            return buffer->readLine()->then([](std::string_view line) {
+                                REQUIRE(line == "hello world");
                             })->then([=]() {
                                 buffer->writeLine("world hello");
                                 return buffer->drain();
@@ -88,8 +88,8 @@ TEST_CASE("stream network connection", "[stream]") {
                     buffer->writeLine("hello world");
                     return buffer->drain()->then([=]() {
                         return buffer->readLine();
-                    })->then([](std::string_view data) {
-                        REQUIRE(data == "world hello");
+                    })->then([](std::string_view line) {
+                        REQUIRE(line == "world hello");
                     })->then([=]() {
                         buffer->close();
                     });
@@ -107,8 +107,8 @@ TEST_CASE("stream network connection", "[stream]") {
                             REQUIRE(remoteAddress);
                             REQUIRE(*remoteAddress == "/tmp/aio-test.sock");
 
-                            return buffer->readLine()->then([](std::string_view data) {
-                                REQUIRE(data == "hello world");
+                            return buffer->readLine()->then([](std::string_view line) {
+                                REQUIRE(line == "hello world");
                             })->then([=]() {
                                 buffer->writeLine("world hello");
                                 return buffer->drain();

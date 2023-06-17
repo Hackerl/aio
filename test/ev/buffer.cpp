@@ -34,8 +34,8 @@ TEST_CASE("async stream buffer", "[buffer]") {
                 })->then([=]() {
                     buffers[0]->close();
                 }),
-                buffers[1]->readLine()->then([](std::string_view data) {
-                    REQUIRE(data == "hello world");
+                buffers[1]->readLine()->then([](std::string_view line) {
+                    REQUIRE(line == "hello world");
                 })->then([=]() {
                     buffers[1]->writeLine("world hello");
                     return buffers[1]->drain();

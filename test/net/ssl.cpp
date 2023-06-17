@@ -155,8 +155,8 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                     buffer->writeLine("hello world");
                     return buffer->drain()->then([=]() {
                         return buffer->readLine();
-                    })->then([](std::string_view data) {
-                        REQUIRE(data == "world hello");
+                    })->then([](std::string_view line) {
+                        REQUIRE(line == "world hello");
                     })->then([=]() {
                         buffer->close();
                     });
@@ -165,8 +165,8 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                 }),
                 aio::net::ssl::connect(context, "localhost", 30001, cCTX)->then(
                         [](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
-                            return buffer->readLine()->then([](std::string_view data) {
-                                REQUIRE(data == "hello world");
+                            return buffer->readLine()->then([](std::string_view line) {
+                                REQUIRE(line == "hello world");
                             })->then([=]() {
                                 buffer->writeLine("world hello");
                                 return buffer->drain();
@@ -210,8 +210,8 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                     buffer->writeLine("hello world");
                     return buffer->drain()->then([=]() {
                         return buffer->readLine();
-                    })->then([](std::string_view data) {
-                        REQUIRE(data == "world hello");
+                    })->then([](std::string_view line) {
+                        REQUIRE(line == "world hello");
                     })->then([=]() {
                         buffer->close();
                     });
@@ -220,8 +220,8 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                 }),
                 aio::net::ssl::connect(context, "localhost", 30001, cCTX)->then(
                         [](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
-                            return buffer->readLine()->then([](std::string_view data) {
-                                REQUIRE(data == "hello world");
+                            return buffer->readLine()->then([](std::string_view line) {
+                                REQUIRE(line == "hello world");
                             })->then([=]() {
                                 buffer->writeLine("world hello");
                                 return buffer->drain();
