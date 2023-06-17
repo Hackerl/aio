@@ -40,8 +40,11 @@ namespace aio::http {
 
     public:
         std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read(size_t n) override;
-        std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> readExactly(size_t n) override;
+
+    public:
+        std::shared_ptr<zero::async::promise::Promise<std::string>> readLine() override;
         std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(ev::EOL eol) override;
+        std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> readExactly(size_t n) override;
 
     public:
         std::shared_ptr<zero::async::promise::Promise<std::string>> string();
@@ -197,7 +200,7 @@ namespace aio::http {
                                     return CURL_WRITEFUNC_PAUSE;
                                 }
 
-                                if (!connection->buffer->write({buffer, size * n}))
+                                if (!connection->buffer->submit({(const std::byte *) buffer, size * n}))
                                     return CURL_WRITEFUNC_ERROR;
 
                                 return size * n;

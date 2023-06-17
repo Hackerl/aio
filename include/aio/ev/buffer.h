@@ -14,11 +14,18 @@ namespace aio::ev {
 
     class IBufferReader : public virtual IReader {
     public:
-        virtual std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> readExactly(size_t n) = 0;
+        virtual std::shared_ptr<zero::async::promise::Promise<std::string>> readLine() = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(EOL eol) = 0;
+        virtual std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> readExactly(size_t n) = 0;
     };
 
     class IBufferWriter : public virtual IWriter {
+    public:
+        virtual nonstd::expected<void, Error> writeLine(std::string_view line) = 0;
+        virtual nonstd::expected<void, Error> writeLine(std::string_view line, EOL eol) = 0;
+        virtual nonstd::expected<void, Error> submit(nonstd::span<const std::byte> buffer) = 0;
+        virtual std::shared_ptr<zero::async::promise::Promise<void>> drain() = 0;
+
     public:
         virtual size_t pending() = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> waitClosed() = 0;
@@ -43,24 +50,29 @@ namespace aio::ev {
 
     public:
         std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read(size_t n) override;
-        std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> readExactly(size_t n) override;
-        std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(EOL eol) override;
 
     public:
-        nonstd::expected<void, Error> write(std::string_view str) override;
-        nonstd::expected<void, Error> write(nonstd::span<const std::byte> buffer) override;
+        std::shared_ptr<zero::async::promise::Promise<std::string>> readLine() override;
+        std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(EOL eol) override;
+        std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> readExactly(size_t n) override;
+
+    public:
+        nonstd::expected<void, Error> writeLine(std::string_view line) override;
+        nonstd::expected<void, Error> writeLine(std::string_view line, EOL eol) override;
+        nonstd::expected<void, Error> submit(nonstd::span<const std::byte> buffer) override;
         std::shared_ptr<zero::async::promise::Promise<void>> drain() override;
 
     public:
         size_t pending() override;
+        std::shared_ptr<zero::async::promise::Promise<void>> waitClosed() override;
+
+    public:
+        std::shared_ptr<zero::async::promise::Promise<void>> write(nonstd::span<const std::byte> buffer) override;
+        nonstd::expected<void, Error> close() override;
 
     public:
         evutil_socket_t fd() override;
         void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
-
-    public:
-        nonstd::expected<void, Error> close() override;
-        std::shared_ptr<zero::async::promise::Promise<void>> waitClosed() override;
 
     private:
         void onClose(const zero::async::promise::Reason& reason);

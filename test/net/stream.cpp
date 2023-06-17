@@ -24,11 +24,11 @@ TEST_CASE("stream network connection", "[stream]") {
                             std::byte{127}, std::byte{0}, std::byte{0}, std::byte{1}
                     });
 
-                    buffer->write("hello world");
+                    buffer->writeLine("hello world");
                     return buffer->drain()->then([=]() {
-                        return buffer->readExactly(11);
-                    })->then([](nonstd::span<std::byte> data) {
-                        REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "world hello");
+                        return buffer->readLine();
+                    })->then([](std::string_view data) {
+                        REQUIRE(data == "world hello");
                     })->then([=]() {
                         buffer->close();
                     });
@@ -51,10 +51,10 @@ TEST_CASE("stream network connection", "[stream]") {
                                     std::byte{127}, std::byte{0}, std::byte{0}, std::byte{1}
                             });
 
-                            return buffer->readExactly(11)->then([](nonstd::span<std::byte> data) {
-                                REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "hello world");
+                            return buffer->readLine()->then([](std::string_view data) {
+                                REQUIRE(data == "hello world");
                             })->then([=]() {
-                                buffer->write("world hello");
+                                buffer->writeLine("world hello");
                                 return buffer->drain();
                             })->then([=]() {
                                 return buffer->waitClosed();
@@ -85,11 +85,11 @@ TEST_CASE("stream network connection", "[stream]") {
                     REQUIRE(remoteAddress);
                     REQUIRE(remoteAddress->empty());
 
-                    buffer->write("hello world");
+                    buffer->writeLine("hello world");
                     return buffer->drain()->then([=]() {
-                        return buffer->readExactly(11);
-                    })->then([](nonstd::span<std::byte> data) {
-                        REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "world hello");
+                        return buffer->readLine();
+                    })->then([](std::string_view data) {
+                        REQUIRE(data == "world hello");
                     })->then([=]() {
                         buffer->close();
                     });
@@ -107,10 +107,10 @@ TEST_CASE("stream network connection", "[stream]") {
                             REQUIRE(remoteAddress);
                             REQUIRE(*remoteAddress == "/tmp/aio-test.sock");
 
-                            return buffer->readExactly(11)->then([](nonstd::span<std::byte> data) {
-                                REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "hello world");
+                            return buffer->readLine()->then([](std::string_view data) {
+                                REQUIRE(data == "hello world");
                             })->then([=]() {
-                                buffer->write("world hello");
+                                buffer->writeLine("world hello");
                                 return buffer->drain();
                             })->then([=]() {
                                 return buffer->waitClosed();

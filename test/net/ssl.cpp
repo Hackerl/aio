@@ -152,11 +152,11 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
 
         zero::async::promise::all(
                 listener->accept()->then([](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
-                    buffer->write("hello world");
+                    buffer->writeLine("hello world");
                     return buffer->drain()->then([=]() {
-                        return buffer->readExactly(11);
-                    })->then([](nonstd::span<std::byte> data) {
-                        REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "world hello");
+                        return buffer->readLine();
+                    })->then([](std::string_view data) {
+                        REQUIRE(data == "world hello");
                     })->then([=]() {
                         buffer->close();
                     });
@@ -165,10 +165,10 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                 }),
                 aio::net::ssl::connect(context, "localhost", 30001, cCTX)->then(
                         [](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
-                            return buffer->readExactly(11)->then([](nonstd::span<std::byte> data) {
-                                REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "hello world");
+                            return buffer->readLine()->then([](std::string_view data) {
+                                REQUIRE(data == "hello world");
                             })->then([=]() {
-                                buffer->write("world hello");
+                                buffer->writeLine("world hello");
                                 return buffer->drain();
                             })->then([=]() {
                                 return buffer->waitClosed();
@@ -207,11 +207,11 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
 
         zero::async::promise::all(
                 listener->accept()->then([](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
-                    buffer->write("hello world");
+                    buffer->writeLine("hello world");
                     return buffer->drain()->then([=]() {
-                        return buffer->readExactly(11);
-                    })->then([](nonstd::span<std::byte> data) {
-                        REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "world hello");
+                        return buffer->readLine();
+                    })->then([](std::string_view data) {
+                        REQUIRE(data == "world hello");
                     })->then([=]() {
                         buffer->close();
                     });
@@ -220,10 +220,10 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                 }),
                 aio::net::ssl::connect(context, "localhost", 30001, cCTX)->then(
                         [](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
-                            return buffer->readExactly(11)->then([](nonstd::span<std::byte> data) {
-                                REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "hello world");
+                            return buffer->readLine()->then([](std::string_view data) {
+                                REQUIRE(data == "hello world");
                             })->then([=]() {
-                                buffer->write("world hello");
+                                buffer->writeLine("world hello");
                                 return buffer->drain();
                             })->then([=]() {
                                 return buffer->waitClosed();

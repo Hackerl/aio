@@ -11,17 +11,17 @@ TEST_CASE("buffer pipe", "[pipe]") {
     REQUIRE(buffers[1]);
 
     SECTION("normal") {
-        buffers[0]->write("hello world");
+        buffers[0]->writeLine("hello world");
 
         zero::async::promise::all(
                 buffers[0]->drain()->then([=]() {
-                    return buffers[0]->readExactly(11);
-                })->then([](nonstd::span<const std::byte> data) {
-                    REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "world hello");
+                    return buffers[0]->readLine();
+                })->then([](std::string_view data) {
+                    REQUIRE(data == "world hello");
                 }),
-                buffers[1]->readExactly(11)->then([=](nonstd::span<const std::byte> data) {
-                    REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "hello world");
-                    buffers[1]->write("world hello");
+                buffers[1]->readLine()->then([=](std::string data) {
+                    REQUIRE(data == "hello world");
+                    buffers[1]->writeLine("world hello");
                     return buffers[1]->drain();
                 })
         )->finally([=]() {
@@ -32,17 +32,17 @@ TEST_CASE("buffer pipe", "[pipe]") {
     }
 
     SECTION("close pipe") {
-        buffers[0]->write("hello world");
+        buffers[0]->writeLine("hello world");
         buffers[0]->drain()->then([=]() {
-            return buffers[0]->readExactly(11);
-        })->then([=](nonstd::span<const std::byte> data) {
-            REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "world hello");
+            return buffers[0]->readLine();
+        })->then([=](std::string_view data) {
+            REQUIRE(data == "world hello");
             buffers[0]->close();
         });
 
-        buffers[1]->readExactly(11)->then([=](nonstd::span<const std::byte> data) {
-            REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "hello world");
-            buffers[1]->write("world hello");
+        buffers[1]->readLine()->then([=](std::string_view data) {
+            REQUIRE(data == "hello world");
+            buffers[1]->writeLine("world hello");
             return buffers[1]->drain();
         })->then([=]() {
             return buffers[1]->read(10240);
@@ -59,17 +59,17 @@ TEST_CASE("buffer pipe", "[pipe]") {
     }
 
     SECTION("throws error") {
-        buffers[0]->write("hello world");
+        buffers[0]->writeLine("hello world");
         buffers[0]->drain()->then([=]() {
-            return buffers[0]->readExactly(11);
-        })->then([=](nonstd::span<const std::byte> data) {
-            REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "world hello");
+            return buffers[0]->readLine();
+        })->then([=](std::string_view data) {
+            REQUIRE(data == "world hello");
             buffers[0]->throws("error occurred");
         });
 
-        buffers[1]->readExactly(11)->then([=](nonstd::span<const std::byte> data) {
-            REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "hello world");
-            buffers[1]->write("world hello");
+        buffers[1]->readLine()->then([=](std::string_view data) {
+            REQUIRE(data == "hello world");
+            buffers[1]->writeLine("world hello");
             return buffers[1]->drain();
         })->then([=]() {
             return buffers[1]->read(10240);

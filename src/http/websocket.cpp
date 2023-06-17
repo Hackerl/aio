@@ -174,10 +174,10 @@ aio::http::ws::WebSocket::writeMessage(const InternalMessage &message) {
         header.length(length);
     }
 
-    mBuffer->write({(const std::byte *) &header, sizeof(Header)});
+    mBuffer->submit({(const std::byte *) &header, sizeof(Header)});
 
     if (extendedBytes)
-        mBuffer->write({extended.get(), extendedBytes});
+        mBuffer->submit({extended.get(), extendedBytes});
 
     std::random_device rd;
     std::byte maskingKey[MASKING_KEY_LENGTH] = {};
@@ -186,7 +186,7 @@ aio::http::ws::WebSocket::writeMessage(const InternalMessage &message) {
         b = std::byte(rd() & 0xff);
     }
 
-    mBuffer->write(maskingKey);
+    mBuffer->submit(maskingKey);
 
     std::unique_ptr<std::byte[]> buffer = std::make_unique<std::byte[]>(length);
 
@@ -194,7 +194,7 @@ aio::http::ws::WebSocket::writeMessage(const InternalMessage &message) {
         buffer[i] = message.data[i] ^ maskingKey[i % 4];
     }
 
-    mBuffer->write({buffer.get(), length});
+    mBuffer->submit({buffer.get(), length});
 
     return mBuffer->drain();
 }
@@ -446,33 +446,17 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
         std::string path = url.path().value_or("/");
         std::optional<std::string> query = url.query();
 
-        buffer->write(
-                zero::strings::format(
-                        "GET %s HTTP/1.1\r\n",
-                        (!query ? path : (path + "?" + *query)).c_str()
-                )
-        );
-
-        buffer->write(zero::strings::format("Host: %s:%hd\r\n", host->c_str(), *port));
-        buffer->write("Upgrade: websocket\r\n");
-        buffer->write("Connection: upgrade\r\n");
-        buffer->write(zero::strings::format(
-                "Sec-WebSocket-Key: %s\r\n",
-                key.c_str()
-        ));
-
-        buffer->write("Sec-WebSocket-Version: 13\r\n");
-        buffer->write(zero::strings::format(
-                "Origin: %s://%s:%hd\r\n",
-                scheme->c_str(),
-                host->c_str(),
-                *port
-        ));
-
-        buffer->write("\r\n");
+        buffer->writeLine(zero::strings::format("GET %s HTTP/1.1", (!query ? path : (path + "?" + *query)).c_str()));
+        buffer->writeLine(zero::strings::format("Host: %s:%hd", host->c_str(), *port));
+        buffer->writeLine("Upgrade: websocket");
+        buffer->writeLine("Connection: upgrade");
+        buffer->writeLine(zero::strings::format("Sec-WebSocket-Key: %s",key.c_str()));
+        buffer->writeLine("Sec-WebSocket-Version: 13");
+        buffer->writeLine(zero::strings::format("Origin: %s://%s:%hd",scheme->c_str(),host->c_str(),*port));
+        buffer->writeLine("");
 
         return buffer->drain()->then([=]() {
-            return buffer->readLine(ev::EOL::CRLF);
+            return buffer->readLine();
         })->then([=](const std::string &line) -> nonstd::expected<void, zero::async::promise::Reason> {
             std::vector<std::string> tokens = zero::strings::split(line, " ");
 
@@ -513,7 +497,7 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
             std::shared_ptr<std::map<std::string, std::string>> headers = std::make_shared<std::map<std::string, std::string>>();
 
             return zero::async::promise::loop<zero::ptr::RefPtr<WebSocket>>([=](const auto &loop) {
-                buffer->readLine(ev::EOL::CRLF)->then([=](const std::string &line) {
+                buffer->readLine()->then([=](const std::string &line) {
                     if (!line.empty()) {
                         std::vector<std::string> tokens = zero::strings::split(line, ":", 1);
 

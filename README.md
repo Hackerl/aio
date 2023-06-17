@@ -319,7 +319,7 @@ Export environment variables:
 
   ```cpp
   aio::net::connect(context, "www.google.com", 80)->then([=](const zero::ptr::RefPtr<aio::ev::IBuffer> &buffer) {
-      buffer->write("hello world");
+      buffer->writeLine("hello world");
       return buffer->drain()->then([=]() {
           return buffer->read();
       });
@@ -332,7 +332,7 @@ Export environment variables:
 
   ```cpp
   aio::net::ssl::connect(context, "www.google.com", 443)->then([=](const zero::ptr::RefPtr<aio::ev::IBuffer> &buffer) {
-      buffer->write("hello world");
+      buffer->writeLine("hello world");
       return buffer->drain()->then([=]() {
           return buffer->read();
       });

@@ -5,14 +5,7 @@ std::shared_ptr<zero::async::promise::Promise<void>>
 aio::copy(const zero::ptr::RefPtr<IReader> &src, const zero::ptr::RefPtr<IWriter> &dst) {
     return zero::async::promise::loop<void>([=](const auto &loop) {
         src->read(10240)->then([=](nonstd::span<const std::byte> data) {
-            nonstd::expected<void, Error> result = dst->write(data);
-
-            if (!result) {
-                P_BREAK_E(loop, { IO_ERROR, zero::strings::format("failed to write data: %d", result.error()) });
-                return;
-            }
-
-            dst->drain()->then([=]() {
+            dst->write(data)->then([=]() {
                 P_CONTINUE(loop);
             }, [=](const zero::async::promise::Reason &reason) {
                 P_BREAK_E(loop, reason);

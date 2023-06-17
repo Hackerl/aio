@@ -61,8 +61,7 @@ int main(int argc, char **argv) {
         return zero::async::promise::all(
                 zero::async::promise::loop<void>([=](const auto &loop) {
                     input->read(10240)->then([=](nonstd::span<const std::byte> data) {
-                        buffer->write(data);
-                        return buffer->drain();
+                        return buffer->write(data);
                     })->then([=]() {
                         P_CONTINUE(loop);
                     }, [=](const zero::async::promise::Reason &reason) {

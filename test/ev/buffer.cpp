@@ -19,20 +19,20 @@ TEST_CASE("async stream buffer", "[buffer]") {
     REQUIRE((buffers[0]->fd() > 0 && buffers[1]->fd() > 0));
 
     SECTION("normal") {
-        buffers[0]->write("hello world");
+        buffers[0]->writeLine("hello world");
 
         zero::async::promise::all(
                 buffers[0]->drain()->then([=]() {
-                    return buffers[0]->readLine(aio::ev::EOL::LF);
+                    return buffers[0]->readLine();
                 })->then([](std::string_view line) {
                     REQUIRE(line == "world hello");
                 })->then([=]() {
                     buffers[0]->close();
                 }),
-                buffers[1]->readExactly(11)->then([](nonstd::span<std::byte> data) {
-                    REQUIRE(std::string_view{(const char *) data.data(), data.size()} == "hello world");
+                buffers[1]->readLine()->then([](std::string_view data) {
+                    REQUIRE(data == "hello world");
                 })->then([=]() {
-                    buffers[1]->write("world hello\n");
+                    buffers[1]->writeLine("world hello");
                     return buffers[1]->drain();
                 })->then([=]() {
                     return buffers[1]->waitClosed();
@@ -64,7 +64,7 @@ TEST_CASE("async stream buffer", "[buffer]") {
         std::unique_ptr<std::byte[]> data = std::make_unique<std::byte[]>(1024 * 1024);
 
         buffers[0]->setTimeout(0ms, 500ms);
-        buffers[0]->write({data.get(), 1024 * 1024});
+        buffers[0]->submit({data.get(), 1024 * 1024});
         REQUIRE(buffers[0]->pending() == 1024 * 1024);
 
         buffers[0]->drain()->then([]() {
