@@ -8,7 +8,12 @@ TEST_CASE("async stream buffer", "[buffer]") {
     REQUIRE(context);
 
     evutil_socket_t fds[2];
+
+#ifdef _WIN32
     REQUIRE(evutil_socketpair(AF_INET, SOCK_STREAM, 0, fds) == 0);
+#else
+    REQUIRE(evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0);
+#endif
 
     zero::ptr::RefPtr<aio::ev::Buffer> buffers[2] = {
             aio::ev::newBuffer(context, fds[0]),

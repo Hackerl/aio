@@ -8,7 +8,12 @@ TEST_CASE("async event notification", "[event]") {
     REQUIRE(context);
 
     evutil_socket_t fds[2];
+
+#ifdef _WIN32
     REQUIRE(evutil_socketpair(AF_INET, SOCK_STREAM, 0, fds) == 0);
+#else
+    REQUIRE(evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0);
+#endif
 
     zero::ptr::RefPtr<aio::ev::Event> events[2] = {
             zero::ptr::makeRef<aio::ev::Event>(context, fds[0]),
