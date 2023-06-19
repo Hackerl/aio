@@ -39,42 +39,55 @@ namespace aio::net::ssl {
 
     std::shared_ptr<Context> newContext(const Config &config);
 
-    class Buffer : public net::Buffer {
-    private:
-        explicit Buffer(bufferevent *bev);
+    namespace stream {
+        class Buffer : public net::stream::Buffer {
+        private:
+            explicit Buffer(bufferevent *bev);
 
-    public:
-        nonstd::expected<void, Error> close() override;
+        public:
+            nonstd::expected<void, Error> close() override;
 
-    private:
-        std::string getError() override;
+        private:
+            std::string getError() override;
 
-        template<typename T, typename ...Args>
-        friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
-    };
+            template<typename T, typename ...Args>
+            friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
+        };
 
-    class Listener : public ListenerBase {
-    private:
-        Listener(std::shared_ptr<aio::Context> context, std::shared_ptr<Context> ctx, evconnlistener *listener);
+        class Listener : public net::stream::ListenerBase {
+        private:
+            Listener(std::shared_ptr<aio::Context> context, std::shared_ptr<Context> ctx, evconnlistener *listener);
 
-    public:
-        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IBuffer>>> accept();
+        public:
+            std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<net::stream::IBuffer>>> accept();
 
-    private:
-        std::shared_ptr<Context> mCTX;
+        private:
+            std::shared_ptr<Context> mCTX;
 
-        template<typename T, typename ...Args>
-        friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
-    };
+            template<typename T, typename ...Args>
+            friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
+        };
 
-    zero::ptr::RefPtr<Listener>
-    listen(const std::shared_ptr<aio::Context> &context, const std::string &host, short port, const std::shared_ptr<Context> &ctx);
+        zero::ptr::RefPtr<Listener> listen(
+                const std::shared_ptr<aio::Context> &context,
+                const std::string &ip,
+                short port,
+                const std::shared_ptr<Context> &ctx
+        );
 
-    std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IBuffer>>>
-    connect(const std::shared_ptr<aio::Context> &context, const std::string &host, short port);
+        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<net::stream::IBuffer>>> connect(
+                const std::shared_ptr<aio::Context> &context,
+                const std::string &host,
+                short port
+        );
 
-    std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IBuffer>>>
-    connect(const std::shared_ptr<aio::Context> &context, const std::string &host, short port, const std::shared_ptr<Context> &ctx);
+        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<net::stream::IBuffer>>> connect(
+                const std::shared_ptr<aio::Context> &context,
+                const std::string &host,
+                short port,
+                const std::shared_ptr<Context> &ctx
+        );
+    }
 }
 
 #endif //AIO_SSL_H

@@ -6,23 +6,25 @@ TEST_CASE("stream network connection", "[stream]") {
     REQUIRE(context);
 
     SECTION("TCP") {
-        zero::ptr::RefPtr<aio::net::Listener> listener = aio::net::listen(context, "127.0.0.1", 30000);
+        zero::ptr::RefPtr<aio::net::stream::Listener> listener = aio::net::stream::listen(context, "127.0.0.1", 30000);
         REQUIRE(listener);
 
         zero::async::promise::all(
-                listener->accept()->then([](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
+                listener->accept()->then([](const zero::ptr::RefPtr<aio::net::stream::IBuffer> &buffer) {
                     std::optional<aio::net::Address> localAddress = buffer->localAddress();
                     REQUIRE(localAddress);
-                    REQUIRE(localAddress->port == 30000);
-                    REQUIRE(std::get<std::array<std::byte, 4>>(localAddress->ip) == std::array<std::byte, 4>{
-                            std::byte{127}, std::byte{0}, std::byte{0}, std::byte{1}
-                    });
+                    REQUIRE(localAddress->index() == 0);
+
+                    aio::net::IPv4Address address = std::get<aio::net::IPv4Address>(*localAddress);
+                    REQUIRE(address.port == 30000);
+                    REQUIRE(memcmp(address.ip, "\x7f\x00\x00\x01", 4) == 0);
 
                     std::optional<aio::net::Address> remoteAddress = buffer->remoteAddress();
                     REQUIRE(remoteAddress);
-                    REQUIRE(std::get<std::array<std::byte, 4>>(remoteAddress->ip) == std::array<std::byte, 4>{
-                            std::byte{127}, std::byte{0}, std::byte{0}, std::byte{1}
-                    });
+                    REQUIRE(remoteAddress->index() == 0);
+
+                    address = std::get<aio::net::IPv4Address>(*remoteAddress);
+                    REQUIRE(memcmp(address.ip, "\x7f\x00\x00\x01", 4) == 0);
 
                     buffer->writeLine("hello world");
                     return buffer->drain()->then([=]() {
@@ -35,21 +37,24 @@ TEST_CASE("stream network connection", "[stream]") {
                 })->finally([=]() {
                     listener->close();
                 }),
-                aio::net::connect(context, "127.0.0.1", 30000)->then(
-                        [](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
+                aio::net::stream::connect(context, "127.0.0.1", 30000)->then(
+                        [](const zero::ptr::RefPtr<aio::net::stream::IBuffer> &buffer) {
                             std::optional<aio::net::Address> localAddress = buffer->localAddress();
                             REQUIRE(localAddress);
-                            REQUIRE(std::get<std::array<std::byte, 4>>(localAddress->ip) == std::array<std::byte, 4>{
-                                    std::byte{127}, std::byte{0}, std::byte{0}, std::byte{1}
-                            });
+                            REQUIRE(localAddress->index() == 0);
+
+                            aio::net::IPv4Address address = std::get<aio::net::IPv4Address>(*localAddress);
+                            REQUIRE(memcmp(address.ip, "\x7f\x00\x00\x01", 4) == 0);
 
                             std::optional<aio::net::Address> remoteAddress = buffer->remoteAddress();
 
                             REQUIRE(remoteAddress);
-                            REQUIRE(remoteAddress->port == 30000);
-                            REQUIRE(std::get<std::array<std::byte, 4>>(remoteAddress->ip) == std::array<std::byte, 4>{
-                                    std::byte{127}, std::byte{0}, std::byte{0}, std::byte{1}
-                            });
+                            REQUIRE(remoteAddress->index() == 0);
+
+                            address = std::get<aio::net::IPv4Address>(*remoteAddress);
+
+                            REQUIRE(address.port == 30000);
+                            REQUIRE(memcmp(address.ip, "\x7f\x00\x00\x01", 4) == 0);
 
                             return buffer->readLine()->then([](std::string_view line) {
                                 REQUIRE(line == "hello world");
@@ -72,18 +77,24 @@ TEST_CASE("stream network connection", "[stream]") {
 
 #ifdef __unix__
     SECTION("UNIX domain") {
-        zero::ptr::RefPtr<aio::net::UnixListener> listener = aio::net::listen(context, "/tmp/aio-test.sock");
+        zero::ptr::RefPtr<aio::net::stream::Listener> listener = aio::net::stream::listen(context, "/tmp/aio-test.sock");
         REQUIRE(listener);
 
         zero::async::promise::all(
-                listener->accept()->then([](const zero::ptr::RefPtr<aio::net::IUnixBuffer> &buffer) {
-                    std::optional<std::string> localAddress = buffer->localAddress();
+                listener->accept()->then([](const zero::ptr::RefPtr<aio::net::stream::IBuffer> &buffer) {
+                    std::optional<aio::net::Address> localAddress = buffer->localAddress();
                     REQUIRE(localAddress);
-                    REQUIRE(*localAddress == "/tmp/aio-test.sock");
+                    REQUIRE(localAddress->index() == 2);
 
-                    std::optional<std::string> remoteAddress = buffer->remoteAddress();
+                    aio::net::UnixAddress address = std::get<aio::net::UnixAddress>(*localAddress);
+                    REQUIRE(address.path == "/tmp/aio-test.sock");
+
+                    std::optional<aio::net::Address> remoteAddress = buffer->remoteAddress();
                     REQUIRE(remoteAddress);
-                    REQUIRE(remoteAddress->empty());
+                    REQUIRE(localAddress->index() == 2);
+
+                    address = std::get<aio::net::UnixAddress>(*remoteAddress);
+                    REQUIRE(address.path.empty());
 
                     buffer->writeLine("hello world");
                     return buffer->drain()->then([=]() {
@@ -97,15 +108,21 @@ TEST_CASE("stream network connection", "[stream]") {
                     listener->close();
                     remove("/tmp/aio-test.sock");
                 }),
-                aio::net::connect(context, "/tmp/aio-test.sock")->then(
-                        [](const zero::ptr::RefPtr<aio::net::IUnixBuffer> &buffer) {
-                            std::optional<std::string> localAddress = buffer->localAddress();
+                aio::net::stream::connect(context, "/tmp/aio-test.sock")->then(
+                        [](const zero::ptr::RefPtr<aio::net::stream::IBuffer> &buffer) {
+                            std::optional<aio::net::Address> localAddress = buffer->localAddress();
                             REQUIRE(localAddress);
-                            REQUIRE(localAddress->empty());
+                            REQUIRE(localAddress->index() == 2);
 
-                            std::optional<std::string> remoteAddress = buffer->remoteAddress();
+                            aio::net::UnixAddress address = std::get<aio::net::UnixAddress>(*localAddress);
+                            REQUIRE(address.path.empty());
+
+                            std::optional<aio::net::Address> remoteAddress = buffer->remoteAddress();
                             REQUIRE(remoteAddress);
-                            REQUIRE(*remoteAddress == "/tmp/aio-test.sock");
+                            REQUIRE(localAddress->index() == 2);
+
+                            address = std::get<aio::net::UnixAddress>(*remoteAddress);
+                            REQUIRE(address.path == "/tmp/aio-test.sock");
 
                             return buffer->readLine()->then([](std::string_view line) {
                                 REQUIRE(line == "hello world");

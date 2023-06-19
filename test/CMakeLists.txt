@@ -12,6 +12,7 @@ add_executable(
         http/url.cpp
         http/request.cpp
         net/stream.cpp
+        net/dgram.cpp
         $<$<NOT:$<BOOL:${AIO_DISABLE_SSL}>>:net/ssl.cpp>
         $<$<PLATFORM_ID:Windows>:main.cpp>
 )

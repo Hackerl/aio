@@ -35,7 +35,9 @@ add_library(
         src/ev/event.cpp
         src/ev/timer.cpp
         src/ev/signal.cpp
+        src/net/net.cpp
         src/net/stream.cpp
+        src/net/dgram.cpp
         src/http/url.cpp
         src/http/request.cpp
         $<$<NOT:$<BOOL:${AIO_DISABLE_SSL}>>:src/net/ssl.cpp>

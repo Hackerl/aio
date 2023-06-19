@@ -1,21 +1,14 @@
 #ifndef AIO_STREAM_H
 #define AIO_STREAM_H
 
+#include "net.h"
 #include <aio/context.h>
 #include <aio/ev/buffer.h>
 #include <event2/listener.h>
-#include <variant>
 
-namespace aio::net {
-    struct Address {
-        unsigned short port;
-        std::variant<std::array<std::byte, 4>, std::array<std::byte, 16>> ip;
-    };
+namespace aio::net::stream {
+    class IBuffer : public virtual IEndpoint, public virtual ev::IBuffer {
 
-    class IBuffer : public virtual ev::IBuffer {
-    public:
-        virtual std::optional<Address> localAddress() = 0;
-        virtual std::optional<Address> remoteAddress() = 0;
     };
 
     class Buffer : public ev::Buffer, public IBuffer {
@@ -67,41 +60,15 @@ namespace aio::net {
         friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
     };
 
-    zero::ptr::RefPtr<Listener> listen(const std::shared_ptr<Context> &context, const std::string &host, short port);
+    zero::ptr::RefPtr<Listener> listen(const std::shared_ptr<Context> &context, const std::string &ip, short port);
 
     std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IBuffer>>>
     connect(const std::shared_ptr<Context> &context, const std::string &host, short port);
 
 #ifdef __unix__
-    class IUnixBuffer : public virtual ev::IBuffer {
-    public:
-        virtual std::optional<std::string> localAddress() = 0;
-        virtual std::optional<std::string> remoteAddress() = 0;
-    };
+    zero::ptr::RefPtr<Listener> listen(const std::shared_ptr<Context> &context, const std::string &path);
 
-    class UnixBuffer : public ev::Buffer, public IUnixBuffer {
-    protected:
-        explicit UnixBuffer(bufferevent *bev);
-
-    public:
-        std::optional<std::string> localAddress() override;
-        std::optional<std::string> remoteAddress() override;
-
-        template<typename T, typename ...Args>
-        friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
-    };
-
-    class UnixListener : public ListenerBase {
-    public:
-        UnixListener(std::shared_ptr<Context> context, evconnlistener *listener);
-
-    public:
-        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IUnixBuffer>>> accept();
-    };
-
-    zero::ptr::RefPtr<UnixListener> listen(const std::shared_ptr<Context> &context, const std::string &path);
-
-    std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IUnixBuffer>>>
+    std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IBuffer>>>
     connect(const std::shared_ptr<Context> &context, const std::string &path);
 #endif
 }

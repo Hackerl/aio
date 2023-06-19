@@ -31,7 +31,7 @@ namespace aio::ev {
         virtual std::shared_ptr<zero::async::promise::Promise<void>> waitClosed() = 0;
     };
 
-    class IBuffer : public IStreamIO, public IBufferReader, public IBufferWriter {
+    class IBuffer : public virtual IStreamIO, public IBufferReader, public IBufferWriter {
     public:
         virtual evutil_socket_t fd() = 0;
         virtual void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) = 0;

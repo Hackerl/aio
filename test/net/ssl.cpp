@@ -147,11 +147,17 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
         std::shared_ptr<aio::net::ssl::Context> cCTX = aio::net::ssl::newContext(clientConfig);
         REQUIRE(cCTX);
 
-        zero::ptr::RefPtr<aio::net::ssl::Listener> listener = aio::net::ssl::listen(context, "localhost", 30001, sCTX);
+        zero::ptr::RefPtr<aio::net::ssl::stream::Listener> listener = aio::net::ssl::stream::listen(
+                context,
+                "127.0.0.1",
+                30001,
+                sCTX
+        );
+
         REQUIRE(listener);
 
         zero::async::promise::all(
-                listener->accept()->then([](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
+                listener->accept()->then([](const zero::ptr::RefPtr<aio::net::stream::IBuffer> &buffer) {
                     buffer->writeLine("hello world");
                     return buffer->drain()->then([=]() {
                         return buffer->readLine();
@@ -163,8 +169,8 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                 })->finally([=]() {
                     listener->close();
                 }),
-                aio::net::ssl::connect(context, "localhost", 30001, cCTX)->then(
-                        [](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
+                aio::net::ssl::stream::connect(context, "localhost", 30001, cCTX)->then(
+                        [](const zero::ptr::RefPtr<aio::net::stream::IBuffer> &buffer) {
                             return buffer->readLine()->then([](std::string_view line) {
                                 REQUIRE(line == "hello world");
                             })->then([=]() {
@@ -202,11 +208,16 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
         std::shared_ptr<aio::net::ssl::Context> cCTX = aio::net::ssl::newContext(clientConfig);
         REQUIRE(cCTX);
 
-        zero::ptr::RefPtr<aio::net::ssl::Listener> listener = aio::net::ssl::listen(context, "localhost", 30001, sCTX);
+        zero::ptr::RefPtr<aio::net::ssl::stream::Listener> listener = aio::net::ssl::stream::listen(
+                context,
+                "127.0.0.1",
+                30001,
+                sCTX
+        );
         REQUIRE(listener);
 
         zero::async::promise::all(
-                listener->accept()->then([](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
+                listener->accept()->then([](const zero::ptr::RefPtr<aio::net::stream::IBuffer> &buffer) {
                     buffer->writeLine("hello world");
                     return buffer->drain()->then([=]() {
                         return buffer->readLine();
@@ -218,8 +229,8 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                 })->finally([=]() {
                     listener->close();
                 }),
-                aio::net::ssl::connect(context, "localhost", 30001, cCTX)->then(
-                        [](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
+                aio::net::ssl::stream::connect(context, "localhost", 30001, cCTX)->then(
+                        [](const zero::ptr::RefPtr<aio::net::stream::IBuffer> &buffer) {
                             return buffer->readLine()->then([](std::string_view line) {
                                 REQUIRE(line == "hello world");
                             })->then([=]() {

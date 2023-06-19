@@ -9,14 +9,14 @@ TEST_CASE("http requests", "[request]") {
     zero::ptr::RefPtr<aio::http::Requests> requests = zero::ptr::makeRef<aio::http::Requests>(context);
     REQUIRE(requests);
 
-    zero::ptr::RefPtr<aio::net::Listener> listener = aio::net::listen(context, "localhost", 30002);
+    zero::ptr::RefPtr<aio::net::stream::Listener> listener = aio::net::stream::listen(context, "127.0.0.1", 30002);
     REQUIRE(listener);
 
     aio::http::URL url = "http://localhost:30002";
 
     SECTION("GET") {
         zero::async::promise::all(
-                listener->accept()->then([](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
+                listener->accept()->then([](const zero::ptr::RefPtr<aio::net::stream::IBuffer> &buffer) {
                     return buffer->readLine()->then([=](std::string_view line) {
                         REQUIRE(line == "GET /object?id=0 HTTP/1.1");
 
@@ -63,7 +63,7 @@ TEST_CASE("http requests", "[request]") {
 
     SECTION("POST") {
         zero::async::promise::all(
-                listener->accept()->then([](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
+                listener->accept()->then([](const zero::ptr::RefPtr<aio::net::stream::IBuffer> &buffer) {
                     return buffer->readLine()->then([=](std::string_view line) {
                         REQUIRE(line == "POST /object?id=0 HTTP/1.1");
 

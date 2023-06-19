@@ -57,12 +57,17 @@ int main(int argc, char **argv) {
     if (!ctx)
         return -1;
 
-    zero::ptr::RefPtr<aio::net::ssl::Listener> listener = aio::net::ssl::listen(context, host, port, ctx);
+    zero::ptr::RefPtr<aio::net::ssl::stream::Listener> listener = aio::net::ssl::stream::listen(
+            context,
+            host,
+            port,
+            ctx
+    );
 
     if (!listener)
         return -1;
 
-    listener->accept()->then([=](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
+    listener->accept()->then([=](const zero::ptr::RefPtr<aio::net::stream::IBuffer> &buffer) {
         return zero::async::promise::all(
                 zero::async::promise::loop<void>([=](const auto &loop) {
                     input->read(10240)->then([=](nonstd::span<const std::byte> data) {

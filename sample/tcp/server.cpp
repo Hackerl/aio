@@ -26,12 +26,12 @@ int main(int argc, char **argv) {
 
     zero::ptr::RefPtr<aio::ev::Buffer> input = aio::ev::newBuffer(context, STDIN_FILENO, false);
 
-    zero::ptr::RefPtr<aio::net::Listener> listener = aio::net::listen(context, host, port);
+    zero::ptr::RefPtr<aio::net::stream::Listener> listener = aio::net::stream::listen(context, host, port);
 
     if (!listener)
         return -1;
 
-    listener->accept()->then([=](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
+    listener->accept()->then([=](const zero::ptr::RefPtr<aio::net::stream::IBuffer> &buffer) {
         return zero::async::promise::all(
                 zero::async::promise::loop<void>([=](const auto &loop) {
                     input->read(10240)->then([=](nonstd::span<const std::byte> data) {

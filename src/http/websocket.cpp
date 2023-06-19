@@ -423,17 +423,17 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
     if (!scheme || !host || !port)
         return zero::async::promise::reject<zero::ptr::RefPtr<WebSocket>>({WS_ERROR, "invalid url"});
 
-    std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<net::IBuffer>>> promise;
+    std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<net::stream::IBuffer>>> promise;
 
     if (*scheme == WS_SCHEME) {
-        promise = net::connect(context, *host, *port);
+        promise = net::stream::connect(context, *host, *port);
     } else if (scheme == WS_SECURE_SCHEME) {
-        promise = net::ssl::connect(context, *host, *port);
+        promise = net::ssl::stream::connect(context, *host, *port);
     } else {
         return zero::async::promise::reject<zero::ptr::RefPtr<WebSocket>>({WS_ERROR, "unsupported scheme"});
     }
 
-    return promise->then([=](const zero::ptr::RefPtr<net::IBuffer> &buffer) {
+    return promise->then([=](const zero::ptr::RefPtr<net::stream::IBuffer> &buffer) {
         std::random_device rd;
         std::byte secret[16] = {};
 

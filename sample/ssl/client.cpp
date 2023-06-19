@@ -57,31 +57,33 @@ int main(int argc, char **argv) {
     if (!ctx)
         return -1;
 
-    aio::net::ssl::connect(context, host, port, ctx)->then([=](const zero::ptr::RefPtr<aio::net::IBuffer> &buffer) {
-        return zero::async::promise::all(
-                zero::async::promise::loop<void>([=](const auto &loop) {
-                    input->read(10240)->then([=](nonstd::span<const std::byte> data) {
-                        return buffer->write(data);
-                    })->then([=]() {
-                        P_CONTINUE(loop);
-                    }, [=](const zero::async::promise::Reason &reason) {
-                        P_BREAK_E(loop, reason);
-                    });
-                }),
-                zero::async::promise::loop<void>([=](const auto &loop) {
-                    buffer->read(10240)->then([=](nonstd::span<const std::byte> data) {
-                        LOG_INFO("receive: %.*s", data.size(), data.data());
-                    })->then([=]() {
-                        P_CONTINUE(loop);
-                    }, [=](const zero::async::promise::Reason &reason) {
-                        P_BREAK_E(loop, reason);
-                    });
-                })
-        )->finally([=]() {
-            input->close();
-            buffer->close();
-        });
-    })->fail([](const zero::async::promise::Reason &reason) {
+    aio::net::ssl::stream::connect(context, host, port, ctx)->then(
+            [=](const zero::ptr::RefPtr<aio::net::stream::IBuffer> &buffer) {
+                return zero::async::promise::all(
+                        zero::async::promise::loop<void>([=](const auto &loop) {
+                            input->read(10240)->then([=](nonstd::span<const std::byte> data) {
+                                return buffer->write(data);
+                            })->then([=]() {
+                                P_CONTINUE(loop);
+                            }, [=](const zero::async::promise::Reason &reason) {
+                                P_BREAK_E(loop, reason);
+                            });
+                        }),
+                        zero::async::promise::loop<void>([=](const auto &loop) {
+                            buffer->read(10240)->then([=](nonstd::span<const std::byte> data) {
+                                LOG_INFO("receive: %.*s", data.size(), data.data());
+                            })->then([=]() {
+                                P_CONTINUE(loop);
+                            }, [=](const zero::async::promise::Reason &reason) {
+                                P_BREAK_E(loop, reason);
+                            });
+                        })
+                )->finally([=]() {
+                    input->close();
+                    buffer->close();
+                });
+            }
+    )->fail([](const zero::async::promise::Reason &reason) {
         LOG_ERROR("%s", reason.message.c_str());
     })->finally([=]() {
         context->loopBreak();
