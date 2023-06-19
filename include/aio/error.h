@@ -11,6 +11,7 @@ namespace aio {
         IO_ERROR,
         IO_CANCEL,
         IO_AGAIN,
+        DNS_ERROR,
         SSL_ERROR,
         JSON_ERROR,
         HTTP_ERROR,

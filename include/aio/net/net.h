@@ -30,16 +30,22 @@ namespace aio::net {
 
     class ISocket : public virtual IStreamIO, public virtual IEndpoint {
     public:
-        virtual bool bind(const std::string &ip, unsigned short port) = 0;
-        virtual std::shared_ptr<zero::async::promise::Promise<void>> connect(
-                const std::string &host,
-                unsigned short port
-        ) = 0;
+        virtual bool bind(const Address &address) = 0;
+        virtual std::shared_ptr<zero::async::promise::Promise<void>> connect(const Address &address) = 0;
     };
 
     std::optional<Address> getSocketAddress(evutil_socket_t fd, bool peer);
-    std::optional<Address> addressFromStorage(const sockaddr_storage *storage);
-    sockaddr_storage addressToStorage(const Address &address);
+
+    std::optional<Address> addressFrom(const sockaddr *storage);
+    std::optional<Address> IPv4AddressFrom(const std::string &ip, unsigned short port);
+
+    std::optional<Address> IPv6AddressFrom(
+            const std::string &ip,
+            unsigned short port,
+            const std::optional<std::string> &zone = std::nullopt
+    );
+
+    std::optional<std::vector<std::byte>> socketAddressFrom(const Address &address);
 }
 
 #endif //AIO_NET_H

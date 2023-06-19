@@ -26,10 +26,9 @@ namespace aio::net::dgram {
         std::optional<Address> localAddress() override;
         std::optional<Address> remoteAddress() override;
 
-        bool bind(const std::string &ip, unsigned short port) override;
-
-        std::shared_ptr<zero::async::promise::Promise<void>>
-        connect(const std::string &host, unsigned short port) override;
+    public:
+        bool bind(const Address &address) override;
+        std::shared_ptr<zero::async::promise::Promise<void>> connect(const Address &address) override;
 
     public:
         std::shared_ptr<zero::async::promise::Promise<std::pair<std::vector<std::byte>, Address>>> readFrom(size_t n);

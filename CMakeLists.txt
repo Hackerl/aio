@@ -35,6 +35,7 @@ add_library(
         src/ev/event.cpp
         src/ev/timer.cpp
         src/ev/signal.cpp
+        src/net/dns.cpp
         src/net/net.cpp
         src/net/stream.cpp
         src/net/dgram.cpp

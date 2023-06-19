@@ -1,4 +1,10 @@
 #include <aio/net/dgram.h>
+#include <aio/net/dns.h>
+#include <cstring>
+
+#ifdef __linux__
+#include <netinet/in.h>
+#endif
 
 constexpr auto READ_INDEX = 0;
 constexpr auto WRITE_INDEX = 1;
@@ -46,7 +52,7 @@ aio::net::dgram::Socket::readFrom(size_t n) {
         ssize_t num = recvfrom(mFD, buffer.get(), n, 0, (sockaddr *) &storage, &length);
 
         if (num == -1 && errno != EWOULDBLOCK) {
-            P_BREAK_E(loop, { IO_ERROR, "failed to receive data" });
+            P_BREAK_E(loop, { IO_ERROR, lastError() });
             return;
         }
 #endif
@@ -57,7 +63,7 @@ aio::net::dgram::Socket::readFrom(size_t n) {
         }
 
         if (num > 0) {
-            std::optional<aio::net::Address> address = addressFromStorage(&storage);
+            std::optional<aio::net::Address> address = addressFrom((const sockaddr *) &storage);
 
             if (!address) {
                 P_BREAK_E(loop, { IO_ERROR, "failed to parse socket address" });
@@ -82,10 +88,15 @@ std::shared_ptr<zero::async::promise::Promise<void>>
 aio::net::dgram::Socket::writeTo(nonstd::span<const std::byte> buffer, const aio::net::Address &address) {
     addRef();
 
+    std::optional<std::vector<std::byte>> socketAddress = socketAddressFrom(address);
+
+    if (!socketAddress)
+        return zero::async::promise::reject<void>({IO_ERROR, "invalid socket address"});
+
     return zero::async::promise::loop<void>(
             [
                     =,
-                    storage = addressToStorage(address),
+                    socketAddress = std::move(*socketAddress),
                     data = std::vector<std::byte>{buffer.begin(), buffer.end()}
             ](const auto &loop) {
                 if (mClosed) {
@@ -104,12 +115,12 @@ aio::net::dgram::Socket::writeTo(nonstd::span<const std::byte> buffer, const aio
                         (const char *) data.data(),
                         (int) data.size(),
                         0,
-                        (const sockaddr *) &storage,
+                        (const sockaddr *) socketAddress.data(),
                         sizeof(sockaddr_storage)
                 );
 
                 if (num == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
-                    P_BREAK_E(loop, { IO_ERROR, "failed to send data" });
+                    P_BREAK_E(loop, { IO_ERROR, lastError() });
                     return;
                 }
 #else
@@ -118,12 +129,12 @@ aio::net::dgram::Socket::writeTo(nonstd::span<const std::byte> buffer, const aio
                         data.data(),
                         data.size(),
                         0,
-                        (const sockaddr *) &storage,
+                        (const sockaddr *) socketAddress.data(),
                         sizeof(sockaddr_storage)
                 );
 
                 if (num == -1 && errno != EWOULDBLOCK) {
-                    P_BREAK_E(loop, { IO_ERROR, "failed to send data" });
+                    P_BREAK_E(loop, { IO_ERROR, lastError() });
                     return;
                 }
 #endif
@@ -169,14 +180,14 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::net:
         int num = recv(mFD, (char *) buffer.get(), (int) n, 0);
 
         if (num == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
-            P_BREAK_E(loop, { IO_ERROR, "failed to receive data" });
+            P_BREAK_E(loop, { IO_ERROR, lastError() });
             return;
         }
 #else
         ssize_t num = recv(mFD, buffer.get(), n, 0);
 
         if (num == -1 && errno != EWOULDBLOCK) {
-            P_BREAK_E(loop, { IO_ERROR, "failed to receive data" });
+            P_BREAK_E(loop, { IO_ERROR, lastError() });
             return;
         }
 #endif
@@ -221,14 +232,14 @@ aio::net::dgram::Socket::write(nonstd::span<const std::byte> buffer) {
                 int num = send(mFD, (const char *) data.data(), (int) data.size(), 0);
 
                 if (num == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
-                    P_BREAK_E(loop, { IO_ERROR, "failed to send data" });
+                    P_BREAK_E(loop, { IO_ERROR, lastError() });
                     return;
                 }
 #else
                 ssize_t num = send(mFD, data.data(), data.size(), 0);
 
                 if (num == -1 && errno != EWOULDBLOCK) {
-                    P_BREAK_E(loop, { IO_ERROR, "failed to send data" });
+                    P_BREAK_E(loop, { IO_ERROR, lastError() });
                     return;
                 }
 #endif
@@ -259,6 +270,14 @@ nonstd::expected<void, aio::Error> aio::net::dgram::Socket::close() {
         return nonstd::make_unexpected(IO_CLOSED);
 
     mClosed = true;
+
+    for (const auto &event: mEvents) {
+        if (!event->pending())
+            continue;
+
+        event->cancel();
+    }
+
     evutil_closesocket(mFD);
 
     return {};
@@ -278,21 +297,26 @@ std::optional<aio::net::Address> aio::net::dgram::Socket::remoteAddress() {
     return getSocketAddress(mFD, true);
 }
 
-bool aio::net::dgram::Socket::bind(const std::string &ip, unsigned short port) {
-    sockaddr_in sa = {};
+bool aio::net::dgram::Socket::bind(const Address &address) {
+    std::optional<std::vector<std::byte>> socketAddress = socketAddressFrom(address);
 
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons(port);
-
-    if (evutil_inet_pton(sa.sin_family, ip.c_str(), &sa.sin_addr) != 1)
+    if (!socketAddress)
         return false;
 
-    return ::bind(mFD, (const sockaddr *) &sa, sizeof(sockaddr_in)) == 0;
+    return ::bind(mFD, (const sockaddr *) socketAddress->data(), sizeof(sockaddr_storage)) == 0;
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>>
-aio::net::dgram::Socket::connect(const std::string &host, unsigned short port) {
-    return std::shared_ptr<zero::async::promise::Promise<void>>();
+aio::net::dgram::Socket::connect(const Address &address) {
+    std::optional<std::vector<std::byte>> socketAddress = socketAddressFrom(address);
+
+    if (!socketAddress)
+        return zero::async::promise::reject<void>({IO_ERROR, "invalid socket address"});
+
+    if (::connect(mFD, (const sockaddr *) socketAddress->data(), sizeof(sockaddr_storage)) != 0)
+        return zero::async::promise::reject<void>({IO_ERROR, "connect failed"});
+
+    return zero::async::promise::resolve<void>();
 }
 
 zero::ptr::RefPtr<aio::net::dgram::Socket>
@@ -302,10 +326,36 @@ aio::net::dgram::bind(const std::shared_ptr<Context> &context, const std::string
     if (!socket)
         return nullptr;
 
-    if (!socket->bind(ip, port))
+    std::optional<Address> address = IPv4AddressFrom(ip, port);
+
+    if (!address)
+        return nullptr;
+
+    if (!socket->bind(*address))
         return nullptr;
 
     return socket;
+}
+
+std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::dgram::Socket>>>
+aio::net::dgram::connect(const std::shared_ptr<Context> &context, const std::string &host, short port) {
+    zero::ptr::RefPtr<aio::net::dgram::Socket> socket = newSocket(context, AF_INET);
+
+    if (!socket)
+        return zero::async::promise::reject<zero::ptr::RefPtr<aio::net::dgram::Socket>>(
+                {IO_ERROR, "failed to create socket"}
+        );
+
+    return dns::query(context, host)->then([=](nonstd::span<const std::array<std::byte, 4>> records) {
+        IPv4Address ipv4 = {};
+
+        ipv4.port = htons(port);
+        memcpy(ipv4.ip, records.front().data(), 4);
+
+        return socket->connect(ipv4);
+    })->then([=]() {
+        return socket;
+    });
 }
 
 zero::ptr::RefPtr<aio::net::dgram::Socket>

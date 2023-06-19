@@ -364,7 +364,7 @@ aio::net::ssl::stream::connect(
                 nullptr,
                 nullptr,
                 [](bufferevent *bev, short what, void *arg) {
-                    auto p = static_cast<std::shared_ptr<zero::async::promise::Promise<void>> *>(arg);
+                    auto p = (std::shared_ptr<zero::async::promise::Promise<void>> *) arg;
 
                     if ((what & BEV_EVENT_CONNECTED) == 0) {
                         std::list<std::string> errors;
@@ -399,7 +399,7 @@ aio::net::ssl::stream::connect(
                 ctx
         );
 
-        if (bufferevent_socket_connect_hostname(bev, context->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
+        if (bufferevent_socket_connect_hostname(bev, context->dnsBase(), AF_INET, host.c_str(), port) < 0) {
             delete ctx;
             p->reject({IO_ERROR, lastError()});
         }
