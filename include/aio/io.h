@@ -13,11 +13,17 @@ namespace aio {
     class IWriter : public virtual zero::ptr::RefCounter {
     public:
         virtual std::shared_ptr<zero::async::promise::Promise<void>> write(nonstd::span<const std::byte> buffer) = 0;
-        virtual nonstd::expected<void, Error> close() = 0;
     };
 
     class IStreamIO : public virtual IReader, public virtual IWriter {
+    public:
+        virtual nonstd::expected<void, Error> close() = 0;
+    };
 
+    class IDeadline : public zero::Interface {
+    public:
+        virtual void setTimeout(std::chrono::milliseconds timeout) = 0;
+        virtual void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) = 0;
     };
 
     template<typename T>

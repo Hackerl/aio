@@ -9,9 +9,8 @@
 constexpr auto READ_INDEX = 0;
 constexpr auto WRITE_INDEX = 1;
 
-aio::net::dgram::Socket::Socket(std::shared_ptr<Context> context, evutil_socket_t fd)
-        : mContext(std::move(context)), mFD(fd), mClosed(false),
-          mEvents{zero::ptr::makeRef<ev::Event>(mContext, mFD), zero::ptr::makeRef<ev::Event>(mContext, mFD)} {
+aio::net::dgram::Socket::Socket(evutil_socket_t fd, zero::ptr::RefPtr<ev::Event> events[2])
+        : mFD(fd), mClosed(false), mEvents{std::move(events[0]), std::move(events[1])} {
 
 }
 
@@ -45,7 +44,7 @@ aio::net::dgram::Socket::readFrom(size_t n) {
         int num = recvfrom(mFD, (char *) buffer.get(), (int) n, 0, (sockaddr *) &storage, &length);
 
         if (num == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
-            P_BREAK_E(loop, { IO_ERROR, "failed to receive data" });
+            P_BREAK_E(loop, { IO_ERROR, lastError() });
             return;
         }
 #else
@@ -74,9 +73,19 @@ aio::net::dgram::Socket::readFrom(size_t n) {
             return;
         }
 
-        mEvents[READ_INDEX]->on(ev::READ)->then([=](short) {
+        mEvents[READ_INDEX]->on(ev::READ, mTimeouts[READ_INDEX])->then([=](short what) {
+            if (what & ev::TIMEOUT) {
+                P_BREAK_E(loop, {IO_TIMEOUT, "reading timed out"});
+                return;
+            }
+
             P_CONTINUE(loop);
         }, [=](const zero::async::promise::Reason &reason) {
+            if (reason.code == IO_CANCEL) {
+                P_BREAK_E(loop, { IO_CLOSED, "socket will be closed" });
+                return;
+            }
+
             P_BREAK_E(loop, reason);
         });
     })->finally([=]() {
@@ -86,12 +95,12 @@ aio::net::dgram::Socket::readFrom(size_t n) {
 
 std::shared_ptr<zero::async::promise::Promise<void>>
 aio::net::dgram::Socket::writeTo(nonstd::span<const std::byte> buffer, const aio::net::Address &address) {
-    addRef();
-
     std::optional<std::vector<std::byte>> socketAddress = socketAddressFrom(address);
 
     if (!socketAddress)
         return zero::async::promise::reject<void>({IO_ERROR, "invalid socket address"});
+
+    addRef();
 
     return zero::async::promise::loop<void>(
             [
@@ -149,9 +158,19 @@ aio::net::dgram::Socket::writeTo(nonstd::span<const std::byte> buffer, const aio
                     return;
                 }
 
-                mEvents[WRITE_INDEX]->on(ev::WRITE)->then([=](short) {
+                mEvents[WRITE_INDEX]->on(ev::WRITE, mTimeouts[WRITE_INDEX])->then([=](short what) {
+                    if (what & ev::TIMEOUT) {
+                        P_BREAK_E(loop, {IO_TIMEOUT, "writing timed out"});
+                        return;
+                    }
+
                     P_CONTINUE(loop);
                 }, [=](const zero::async::promise::Reason &reason) {
+                    if (reason.code == IO_CANCEL) {
+                        P_BREAK_E(loop, { IO_CLOSED, "socket will be closed" });
+                        return;
+                    }
+
                     P_BREAK_E(loop, reason);
                 });
             }
@@ -202,9 +221,19 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::net:
             return;
         }
 
-        mEvents[READ_INDEX]->on(ev::READ)->then([=](short) {
+        mEvents[READ_INDEX]->on(ev::READ, mTimeouts[READ_INDEX])->then([=](short what) {
+            if (what & ev::TIMEOUT) {
+                P_BREAK_E(loop, {IO_TIMEOUT, "reading timed out"});
+                return;
+            }
+
             P_CONTINUE(loop);
         }, [=](const zero::async::promise::Reason &reason) {
+            if (reason.code == IO_CANCEL) {
+                P_BREAK_E(loop, { IO_CLOSED, "socket will be closed" });
+                return;
+            }
+
             P_BREAK_E(loop, reason);
         });
     })->finally([=]() {
@@ -254,9 +283,19 @@ aio::net::dgram::Socket::write(nonstd::span<const std::byte> buffer) {
                     return;
                 }
 
-                mEvents[WRITE_INDEX]->on(ev::WRITE)->then([=](short) {
+                mEvents[WRITE_INDEX]->on(ev::WRITE, mTimeouts[WRITE_INDEX])->then([=](short what) {
+                    if (what & ev::TIMEOUT) {
+                        P_BREAK_E(loop, {IO_TIMEOUT, "writing timed out"});
+                        return;
+                    }
+
                     P_CONTINUE(loop);
                 }, [=](const zero::async::promise::Reason &reason) {
+                    if (reason.code == IO_CANCEL) {
+                        P_BREAK_E(loop, { IO_CLOSED, "socket will be closed" });
+                        return;
+                    }
+
                     P_BREAK_E(loop, reason);
                 });
             }
@@ -297,6 +336,25 @@ std::optional<aio::net::Address> aio::net::dgram::Socket::remoteAddress() {
     return getSocketAddress(mFD, true);
 }
 
+void aio::net::dgram::Socket::setTimeout(std::chrono::milliseconds timeout) {
+    setTimeout(timeout, timeout);
+}
+
+void aio::net::dgram::Socket::setTimeout(
+        std::chrono::milliseconds readTimeout,
+        std::chrono::milliseconds writeTimeout
+) {
+    if (readTimeout != std::chrono::milliseconds::zero())
+        mTimeouts[READ_INDEX] = readTimeout;
+    else
+        mTimeouts[READ_INDEX].reset();
+
+    if (writeTimeout != std::chrono::milliseconds::zero())
+        mTimeouts[WRITE_INDEX] = writeTimeout;
+    else
+        mTimeouts[WRITE_INDEX].reset();
+}
+
 bool aio::net::dgram::Socket::bind(const Address &address) {
     std::optional<std::vector<std::byte>> socketAddress = socketAddressFrom(address);
 
@@ -314,7 +372,7 @@ aio::net::dgram::Socket::connect(const Address &address) {
         return zero::async::promise::reject<void>({IO_ERROR, "invalid socket address"});
 
     if (::connect(mFD, (const sockaddr *) socketAddress->data(), sizeof(sockaddr_storage)) != 0)
-        return zero::async::promise::reject<void>({IO_ERROR, "connect failed"});
+        return zero::async::promise::reject<void>({IO_ERROR, lastError()});
 
     return zero::async::promise::resolve<void>();
 }
@@ -342,17 +400,15 @@ aio::net::dgram::connect(const std::shared_ptr<Context> &context, const std::str
     zero::ptr::RefPtr<aio::net::dgram::Socket> socket = newSocket(context, AF_INET);
 
     if (!socket)
-        return zero::async::promise::reject<zero::ptr::RefPtr<aio::net::dgram::Socket>>(
-                {IO_ERROR, "failed to create socket"}
-        );
+        return zero::async::promise::reject<zero::ptr::RefPtr<aio::net::dgram::Socket>>({IO_ERROR, lastError()});
 
-    return dns::query(context, host)->then([=](nonstd::span<const std::array<std::byte, 4>> records) {
-        IPv4Address ipv4 = {};
+    evutil_addrinfo hints = {};
 
-        ipv4.port = htons(port);
-        memcpy(ipv4.ip, records.front().data(), 4);
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
 
-        return socket->connect(ipv4);
+    return dns::lookup(context, host, std::to_string(port), hints)->then([=](nonstd::span<const Address> records) {
+        return socket->connect(records.front());
     })->then([=]() {
         return socket;
     });
@@ -370,5 +426,15 @@ aio::net::dgram::newSocket(const std::shared_ptr<Context> &context, int family) 
         return nullptr;
     }
 
-    return zero::ptr::makeRef<Socket>(context, fd);
+    zero::ptr::RefPtr<ev::Event> events[2] = {
+            zero::ptr::makeRef<ev::Event>(context, fd),
+            zero::ptr::makeRef<ev::Event>(context, fd)
+    };
+
+    if (!events[0] || !events[1]) {
+        evutil_closesocket(fd);
+        return nullptr;
+    }
+
+    return zero::ptr::makeRef<Socket>(fd, events);
 }

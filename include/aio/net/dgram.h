@@ -6,7 +6,7 @@
 namespace aio::net::dgram {
     class Socket : public ISocket {
     private:
-        explicit Socket(std::shared_ptr<Context> context, evutil_socket_t fd);
+        explicit Socket(evutil_socket_t fd, zero::ptr::RefPtr<ev::Event> events[2]);
 
     public:
         Socket(const Socket &) = delete;
@@ -27,6 +27,10 @@ namespace aio::net::dgram {
         std::optional<Address> remoteAddress() override;
 
     public:
+        void setTimeout(std::chrono::milliseconds timeout) override;
+        void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
+
+    public:
         bool bind(const Address &address) override;
         std::shared_ptr<zero::async::promise::Promise<void>> connect(const Address &address) override;
 
@@ -40,8 +44,8 @@ namespace aio::net::dgram {
     private:
         bool mClosed;
         evutil_socket_t mFD;
-        std::shared_ptr<Context> mContext;
         zero::ptr::RefPtr<ev::Event> mEvents[2];
+        std::optional<std::chrono::milliseconds> mTimeouts[2];
 
         template<typename T, typename ...Args>
         friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);

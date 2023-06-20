@@ -260,6 +260,10 @@ evutil_socket_t aio::ev::Buffer::fd() {
     return bufferevent_getfd(mBev);
 }
 
+void aio::ev::Buffer::setTimeout(std::chrono::milliseconds timeout) {
+    setTimeout(timeout, timeout);
+}
+
 void aio::ev::Buffer::setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) {
     if (!mBev)
         return;

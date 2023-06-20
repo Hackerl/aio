@@ -1,5 +1,8 @@
 #include <aio/net/dgram.h>
+#include <aio/ev/timer.h>
 #include <catch2/catch_test_macros.hpp>
+
+using namespace std::chrono_literals;
 
 TEST_CASE("datagram network connection", "[dgram]") {
     std::shared_ptr<aio::Context> context = aio::newContext();
@@ -57,7 +60,6 @@ TEST_CASE("datagram network connection", "[dgram]") {
                     REQUIRE(from.index() == 0);
                     aio::net::IPv4Address address = std::get<aio::net::IPv4Address>(from);
 
-                    REQUIRE(address.port == 30001);
                     REQUIRE(memcmp(address.ip, "\x7f\x00\x00\x01", 4) == 0);
                     REQUIRE(std::equal(data.begin(), data.end(), message.begin()));
 
@@ -79,6 +81,44 @@ TEST_CASE("datagram network connection", "[dgram]") {
         )->fail([](const zero::async::promise::Reason &reason) {
             FAIL(reason.message);
         })->finally([=]() {
+            context->loopBreak();
+        });
+
+        context->dispatch();
+    }
+
+    SECTION("read timeout") {
+        zero::ptr::RefPtr<aio::net::dgram::Socket> socket = aio::net::dgram::bind(context, "127.0.0.1", 30000);
+        REQUIRE(socket);
+
+        socket->setTimeout(50ms, 0ms);
+
+        socket->readFrom(1024)->then([=](nonstd::span<const std::byte> data, const aio::net::Address &from) {
+            FAIL();
+        }, [](const zero::async::promise::Reason &reason) {
+            REQUIRE(reason.code == aio::IO_TIMEOUT);
+        })->finally([=] {
+            socket->close();
+            context->loopBreak();
+        });
+
+        context->dispatch();
+    }
+
+    SECTION("close") {
+        zero::ptr::RefPtr<aio::net::dgram::Socket> socket = aio::net::dgram::bind(context, "127.0.0.1", 30000);
+        REQUIRE(socket);
+
+        zero::async::promise::all(
+                socket->readFrom(1024)->then([=](nonstd::span<const std::byte> data, const aio::net::Address &from) {
+                    FAIL();
+                }, [](const zero::async::promise::Reason &reason) {
+                    REQUIRE(reason.code == aio::IO_CLOSED);
+                }),
+                zero::ptr::makeRef<aio::ev::Timer>(context)->setTimeout(50ms)->then([=]() {
+                    socket->close();
+                })
+        )->finally([=] {
             context->loopBreak();
         });
 

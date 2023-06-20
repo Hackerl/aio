@@ -22,13 +22,13 @@ namespace aio::net {
 
     using Address = std::variant<IPv4Address, IPv6Address, UnixAddress>;
 
-    class IEndpoint {
+    class IEndpoint : public zero::Interface {
     public:
         virtual std::optional<Address> localAddress() = 0;
         virtual std::optional<Address> remoteAddress() = 0;
     };
 
-    class ISocket : public virtual IStreamIO, public virtual IEndpoint {
+    class ISocket : public virtual IStreamIO, public virtual IEndpoint, public IDeadline {
     public:
         virtual bool bind(const Address &address) = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> connect(const Address &address) = 0;
