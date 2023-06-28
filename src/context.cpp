@@ -32,6 +32,20 @@ void aio::Context::loopBreak() {
     event_base_loopbreak(mBase);
 }
 
+void aio::Context::loopExit(std::optional<std::chrono::milliseconds> ms) {
+    if (!ms) {
+        event_base_loopexit(mBase, nullptr);
+        return;
+    }
+
+    timeval tv = {
+            (long) (ms->count() / 1000),
+            (long) ((ms->count() % 1000) * 1000)
+    };
+
+    event_base_loopexit(mBase, &tv);
+}
+
 std::shared_ptr<aio::Context> aio::newContext(size_t maxWorkers) {
 #ifdef _WIN32
     evthread_use_windows_threads();

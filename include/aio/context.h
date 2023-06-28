@@ -26,6 +26,7 @@ namespace aio {
     public:
         void dispatch();
         void loopBreak();
+        void loopExit(std::optional<std::chrono::milliseconds> ms = std::nullopt);
 
     public:
         template<typename F>
