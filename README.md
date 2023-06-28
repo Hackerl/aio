@@ -318,10 +318,10 @@ Export environment variables:
 * Basic
 
   ```cpp
-  aio::net::connect(context, "www.google.com", 80)->then([=](const zero::ptr::RefPtr<aio::ev::IBuffer> &buffer) {
+  aio::net::stream::connect(context, "www.google.com", 80)->then([=](const zero::ptr::RefPtr<aio::net::stream::IBuffer> &buffer) {
       buffer->writeLine("hello world");
       return buffer->drain()->then([=]() {
-          return buffer->read();
+          return buffer->read(1024);
       });
   })->then([](nonstd::span<const std::byte> data) {
 
@@ -331,10 +331,10 @@ Export environment variables:
 * TLS
 
   ```cpp
-  aio::net::ssl::connect(context, "www.google.com", 443)->then([=](const zero::ptr::RefPtr<aio::ev::IBuffer> &buffer) {
+  aio::net::ssl::stream::connect(context, "www.google.com", 443)->then([=](const zero::ptr::RefPtr<aio::net::stream::IBuffer> &buffer) {
       buffer->writeLine("hello world");
       return buffer->drain()->then([=]() {
-          return buffer->read();
+          return buffer->read(1024);
       });
   })->then([](nonstd::span<const std::byte> data) {
 
@@ -401,6 +401,11 @@ _For more examples, please refer to the [Documentation](https://github.com/Hacke
 
 <!-- ROADMAP -->
 ## Roadmap
+
+- [ ] Asynchronous Filesystem
+  - [ ] Linux AIO
+  - [ ] Windows IOCP
+  - [ ] POSIX AIO
 
 See the [open issues](https://github.com/Hackerl/aio/issues) for a full list of proposed features (and known issues).
 

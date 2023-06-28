@@ -6,7 +6,7 @@
 namespace aio::net::dgram {
     class Socket : public ISocket {
     private:
-        explicit Socket(evutil_socket_t fd, zero::ptr::RefPtr<ev::Event> events[2]);
+        Socket(evutil_socket_t fd, zero::ptr::RefPtr<ev::Event> events[2]);
 
     public:
         Socket(const Socket &) = delete;

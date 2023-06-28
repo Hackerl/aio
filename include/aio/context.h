@@ -10,7 +10,11 @@ namespace aio {
     class Context {
     public:
         Context(event_base *base, evdns_base *dnsBase, size_t maxWorkers);
+        Context(const Context &) = delete;
         ~Context();
+
+    public:
+        Context &operator=(const Context &) = delete;
 
     public:
         event_base *base();

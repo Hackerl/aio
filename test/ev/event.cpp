@@ -57,7 +57,7 @@ TEST_CASE("async event notification", "[event]") {
                     REQUIRE(what & aio::ev::READ);
 
                     char buffer[1024] = {};
-                    int n = recv(fds[0], buffer, sizeof(buffer), 0);
+                    ev_ssize_t n = recv(fds[0], buffer, sizeof(buffer), 0);
 
                     if (n == 0) {
                         evutil_closesocket(fds[0]);
