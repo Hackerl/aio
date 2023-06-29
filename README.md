@@ -382,9 +382,9 @@ Export environment variables:
           }),
           aio::toThread<void>(context, [=]() {
               while (true) {
-                  std::optional<int> element = channel->receiveSync();
+                  nonstd::expected<int, aio::Error> result = channel->receiveSync();
 
-                  if (!element)
+                  if (!result)
                       break;
 
                   // do something that takes a long time
