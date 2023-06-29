@@ -47,11 +47,19 @@ void aio::Context::loopExit(std::optional<std::chrono::milliseconds> ms) {
 }
 
 std::shared_ptr<aio::Context> aio::newContext(size_t maxWorkers) {
+    static std::once_flag flag;
+
+    std::call_once(flag, []() {
 #ifdef _WIN32
-    evthread_use_windows_threads();
+        evthread_use_windows_threads();
 #else
-    evthread_use_pthreads();
+        evthread_use_pthreads();
 #endif
+
+        std::atexit([]() {
+            libevent_global_shutdown();
+        });
+    });
 
     event_base *base = event_base_new();
 
