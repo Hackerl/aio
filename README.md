@@ -118,7 +118,7 @@ Create a `CMake` project and two configuration files, `vcpkg-configuration.json`
       {
         "kind": "git",
         "repository": "https://github.com/Hackerl/vcpkg-registry",
-        "baseline": "7cc1a197fc00fbc0637e20776187b256b4d2454c",
+        "baseline": "9d50641da0af89d919abeb955dca5c355599cb3e",
         "packages": [
           "aio",
           "zero"
