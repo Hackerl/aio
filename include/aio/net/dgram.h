@@ -51,12 +51,12 @@ namespace aio::net::dgram {
         friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
     };
 
-    zero::ptr::RefPtr<Socket> bind(const std::shared_ptr<Context> &context, const std::string &ip, short port);
+    zero::ptr::RefPtr<Socket> bind(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port);
 
     std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<Socket>>> connect(
             const std::shared_ptr<Context> &context,
             const std::string &host,
-            short port
+            unsigned short port
     );
 
     zero::ptr::RefPtr<Socket> newSocket(const std::shared_ptr<Context> &context, int family);

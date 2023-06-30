@@ -103,7 +103,7 @@ std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream
 }
 
 zero::ptr::RefPtr<aio::net::stream::Listener>
-aio::net::stream::listen(const std::shared_ptr<Context> &context, const std::string &ip, short port) {
+aio::net::stream::listen(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port) {
     sockaddr_in sa = {};
 
     sa.sin_family = AF_INET;
@@ -129,7 +129,7 @@ aio::net::stream::listen(const std::shared_ptr<Context> &context, const std::str
 }
 
 std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream::IBuffer>>>
-aio::net::stream::connect(const std::shared_ptr<Context> &context, const std::string &host, short port) {
+aio::net::stream::connect(const std::shared_ptr<Context> &context, const std::string &host, unsigned short port) {
     bufferevent *bev = bufferevent_socket_new(context->base(), -1, BEV_OPT_CLOSE_ON_FREE);
 
     if (!bev)

@@ -287,7 +287,7 @@ zero::ptr::RefPtr<aio::net::ssl::stream::Listener>
 aio::net::ssl::stream::listen(
         const std::shared_ptr<aio::Context> &context,
         const std::string &ip,
-        short port,
+        unsigned short port,
         const std::shared_ptr<Context> &ctx
 ) {
     sockaddr_in sa = {};
@@ -315,7 +315,11 @@ aio::net::ssl::stream::listen(
 }
 
 std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream::IBuffer>>>
-aio::net::ssl::stream::connect(const std::shared_ptr<aio::Context> &context, const std::string &host, short port) {
+aio::net::ssl::stream::connect(
+        const std::shared_ptr<aio::Context> &context,
+        const std::string &host,
+        unsigned short port
+) {
     static std::shared_ptr<Context> ctx = newContext({});
 
     if (!ctx)
@@ -329,7 +333,7 @@ std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream
 aio::net::ssl::stream::connect(
         const std::shared_ptr<aio::Context> &context,
         const std::string &host,
-        short port,
+        unsigned short port,
         const std::shared_ptr<Context> &ctx
 ) {
     SSL *ssl = SSL_new(ctx.get());

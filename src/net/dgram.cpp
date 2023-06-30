@@ -378,7 +378,7 @@ aio::net::dgram::Socket::connect(const Address &address) {
 }
 
 zero::ptr::RefPtr<aio::net::dgram::Socket>
-aio::net::dgram::bind(const std::shared_ptr<Context> &context, const std::string &ip, short port) {
+aio::net::dgram::bind(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port) {
     zero::ptr::RefPtr<aio::net::dgram::Socket> socket = newSocket(context, AF_INET);
 
     if (!socket)
@@ -396,7 +396,7 @@ aio::net::dgram::bind(const std::shared_ptr<Context> &context, const std::string
 }
 
 std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::dgram::Socket>>>
-aio::net::dgram::connect(const std::shared_ptr<Context> &context, const std::string &host, short port) {
+aio::net::dgram::connect(const std::shared_ptr<Context> &context, const std::string &host, unsigned short port) {
     zero::ptr::RefPtr<aio::net::dgram::Socket> socket = newSocket(context, AF_INET);
 
     if (!socket)

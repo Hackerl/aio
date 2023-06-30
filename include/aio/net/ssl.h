@@ -71,20 +71,20 @@ namespace aio::net::ssl {
         zero::ptr::RefPtr<Listener> listen(
                 const std::shared_ptr<aio::Context> &context,
                 const std::string &ip,
-                short port,
+                unsigned short port,
                 const std::shared_ptr<Context> &ctx
         );
 
         std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<net::stream::IBuffer>>> connect(
                 const std::shared_ptr<aio::Context> &context,
                 const std::string &host,
-                short port
+                unsigned short port
         );
 
         std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<net::stream::IBuffer>>> connect(
                 const std::shared_ptr<aio::Context> &context,
                 const std::string &host,
-                short port,
+                unsigned short port,
                 const std::shared_ptr<Context> &ctx
         );
     }
