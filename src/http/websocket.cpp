@@ -418,7 +418,7 @@ std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::http::ws::W
 aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &url) {
     std::optional<std::string> scheme = url.scheme();
     std::optional<std::string> host = url.host();
-    std::optional<short> port = url.port();
+    std::optional<unsigned short> port = url.port();
 
     if (!scheme || !host || !port)
         return zero::async::promise::reject<zero::ptr::RefPtr<WebSocket>>({WS_ERROR, "invalid url"});

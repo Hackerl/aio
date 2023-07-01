@@ -49,13 +49,9 @@ namespace aio::net {
     std::optional<Address> getSocketAddress(evutil_socket_t fd, bool peer);
 
     std::optional<Address> addressFrom(const sockaddr *storage);
+    std::optional<Address> IPAddressFrom(const std::string &ip, unsigned short port);
     std::optional<Address> IPv4AddressFrom(const std::string &ip, unsigned short port);
-
-    std::optional<Address> IPv6AddressFrom(
-            const std::string &ip,
-            unsigned short port,
-            const std::optional<std::string> &zone = std::nullopt
-    );
+    std::optional<Address> IPv6AddressFrom(const std::string &ip, unsigned short port);
 
     std::optional<std::vector<std::byte>> socketAddressFrom(const Address &address);
 }

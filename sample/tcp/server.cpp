@@ -10,12 +10,12 @@ int main(int argc, char **argv) {
     zero::Cmdline cmdline;
 
     cmdline.add<std::string>("host", "listen host");
-    cmdline.add<short>("port", "listen port");
+    cmdline.add<unsigned short>("port", "listen port");
 
     cmdline.parse(argc, argv);
 
     auto host = cmdline.get<std::string>("host");
-    auto port = cmdline.get<short>("port");
+    auto port = cmdline.get<unsigned short>("port");
 
     signal(SIGPIPE, SIG_IGN);
 

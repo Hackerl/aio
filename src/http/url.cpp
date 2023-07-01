@@ -120,13 +120,13 @@ std::optional<std::string> aio::http::URL::query() const {
     return std::unique_ptr<char, decltype(curl_free) *>(query, curl_free).get();
 }
 
-std::optional<short> aio::http::URL::port() const {
+std::optional<unsigned short> aio::http::URL::port() const {
     char *port;
 
     if (curl_url_get(mURL, CURLUPART_PORT, &port, CURLU_DEFAULT_PORT) != CURLUE_OK)
         return std::nullopt;
 
-    std::optional<short> n = zero::strings::toNumber<short>(
+    std::optional<unsigned short> n = zero::strings::toNumber<short>(
             std::unique_ptr<char, decltype(curl_free) *>(port, curl_free).get()
     );
 
@@ -166,7 +166,7 @@ aio::http::URL &aio::http::URL::query(const std::optional<std::string> &query) {
     return *this;
 }
 
-aio::http::URL &aio::http::URL::port(std::optional<short> port) {
+aio::http::URL &aio::http::URL::port(std::optional<unsigned short> port) {
     curl_url_set(mURL, CURLUPART_PORT, port ? std::to_string(*port).c_str() : nullptr, 0);
     return *this;
 }

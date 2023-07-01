@@ -6,7 +6,6 @@
 #elif __linux__
 #include <net/if.h>
 #include <netinet/in.h>
-#include <endian.h>
 #endif
 
 #ifdef __unix__
@@ -131,34 +130,40 @@ std::optional<aio::net::Address> aio::net::addressFrom(const sockaddr *socketAdd
     return address;
 }
 
-std::optional<aio::net::Address> aio::net::IPv4AddressFrom(const std::string &ip, unsigned short port) {
-    sockaddr_in sa = {};
+std::optional<aio::net::Address> aio::net::IPAddressFrom(const std::string &ip, unsigned short port) {
+    std::optional<aio::net::Address> address = IPv6AddressFrom(ip, port);
 
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons(port);
+    if (address)
+        return address;
 
-    if (evutil_inet_pton(sa.sin_family, ip.c_str(), &sa.sin_addr) != 1)
-        return std::nullopt;
-
-    return addressFrom((const sockaddr *) &sa);
+    return IPv4AddressFrom(ip, port);
 }
 
-std::optional<aio::net::Address>
-aio::net::IPv6AddressFrom(const std::string &ip, unsigned short port, const std::optional<std::string> &zone) {
-    sockaddr_in6 sa = {};
+std::optional<aio::net::Address> aio::net::IPv4AddressFrom(const std::string &ip, unsigned short port) {
+    std::array<std::byte, 4> ipv4 = {};
 
-    sa.sin6_family = AF_INET6;
-    sa.sin6_port = htons(port);
-
-    if (evutil_inet_pton(sa.sin6_family, ip.c_str(), &sa.sin6_addr) != 1)
+    if (evutil_inet_pton(AF_INET, ip.c_str(), ipv4.data()) != 1)
         return std::nullopt;
 
-    if (!zone)
-        return addressFrom((const sockaddr *) &sa);
+    return IPv4Address{port, ipv4};
+}
 
-    sa.sin6_scope_id = if_nametoindex(zone->c_str());
+std::optional<aio::net::Address> aio::net::IPv6AddressFrom(const std::string &ip, unsigned short port) {
+    unsigned int index = 0;
+    std::array<std::byte, 16> ipv6 = {};
 
-    return addressFrom((const sockaddr *) &sa);
+    if (evutil_inet_pton_scope(AF_INET6, ip.c_str(), ipv6.data(), &index) != 1)
+        return std::nullopt;
+
+    if (!index)
+        return IPv6Address{port, ipv6};
+
+    char name[IF_NAMESIZE];
+
+    if (!if_indextoname(index, name))
+        return std::nullopt;
+
+    return IPv6Address{port, ipv6, name};
 }
 
 std::optional<std::vector<std::byte>> aio::net::socketAddressFrom(const Address &address) {

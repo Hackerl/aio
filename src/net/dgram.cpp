@@ -379,14 +379,14 @@ aio::net::dgram::Socket::connect(const Address &address) {
 
 zero::ptr::RefPtr<aio::net::dgram::Socket>
 aio::net::dgram::bind(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port) {
-    zero::ptr::RefPtr<aio::net::dgram::Socket> socket = newSocket(context, AF_INET);
-
-    if (!socket)
-        return nullptr;
-
-    std::optional<Address> address = IPv4AddressFrom(ip, port);
+    std::optional<Address> address = IPAddressFrom(ip, port);
 
     if (!address)
+        return nullptr;
+
+    zero::ptr::RefPtr<aio::net::dgram::Socket> socket = newSocket(context, address->index() == 0 ? AF_INET : AF_INET6);
+
+    if (!socket)
         return nullptr;
 
     if (!socket->bind(*address))
@@ -397,20 +397,25 @@ aio::net::dgram::bind(const std::shared_ptr<Context> &context, const std::string
 
 std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::dgram::Socket>>>
 aio::net::dgram::connect(const std::shared_ptr<Context> &context, const std::string &host, unsigned short port) {
-    zero::ptr::RefPtr<aio::net::dgram::Socket> socket = newSocket(context, AF_INET);
-
-    if (!socket)
-        return zero::async::promise::reject<zero::ptr::RefPtr<aio::net::dgram::Socket>>({IO_ERROR, lastError()});
-
     evutil_addrinfo hints = {};
 
-    hints.ai_family = AF_INET;
+    hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_DGRAM;
 
     return dns::lookup(context, host, std::to_string(port), hints)->then([=](nonstd::span<const Address> records) {
-        return socket->connect(records.front());
-    })->then([=]() {
-        return socket;
+        const Address &address = records.front();
+
+        zero::ptr::RefPtr<aio::net::dgram::Socket> socket = newSocket(
+                context,
+                address.index() == 0 ? AF_INET : AF_INET6
+        );
+
+        if (!socket)
+            return zero::async::promise::reject<zero::ptr::RefPtr<aio::net::dgram::Socket>>({IO_ERROR, lastError()});
+
+        return socket->connect(records.front())->then([=]() {
+            return socket;
+        });
     });
 }
 

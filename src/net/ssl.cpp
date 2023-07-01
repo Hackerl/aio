@@ -290,12 +290,14 @@ aio::net::ssl::stream::listen(
         unsigned short port,
         const std::shared_ptr<Context> &ctx
 ) {
-    sockaddr_in sa = {};
+    std::optional<Address> address = IPAddressFrom(ip, port);
 
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons(port);
+    if (!address)
+        return nullptr;
 
-    if (evutil_inet_pton(sa.sin_family, ip.c_str(), &sa.sin_addr) != 1)
+    std::optional<std::vector<std::byte>> socketAddress = socketAddressFrom(*address);
+
+    if (!socketAddress)
         return nullptr;
 
     evconnlistener *listener = evconnlistener_new_bind(
@@ -304,8 +306,8 @@ aio::net::ssl::stream::listen(
             nullptr,
             LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE | LEV_OPT_DISABLED,
             -1,
-            (sockaddr *) &sa,
-            sizeof(sa)
+            (const sockaddr *) socketAddress->data(),
+            (int) socketAddress->size()
     );
 
     if (!listener)
@@ -403,7 +405,7 @@ aio::net::ssl::stream::connect(
                 ctx
         );
 
-        if (bufferevent_socket_connect_hostname(bev, context->dnsBase(), AF_INET, host.c_str(), port) < 0) {
+        if (bufferevent_socket_connect_hostname(bev, context->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
             delete ctx;
             p->reject({IO_ERROR, lastError()});
         }

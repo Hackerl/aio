@@ -104,12 +104,14 @@ std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream
 
 zero::ptr::RefPtr<aio::net::stream::Listener>
 aio::net::stream::listen(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port) {
-    sockaddr_in sa = {};
+    std::optional<Address> address = IPAddressFrom(ip, port);
 
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons(port);
+    if (!address)
+        return nullptr;
 
-    if (evutil_inet_pton(sa.sin_family, ip.c_str(), &sa.sin_addr) != 1)
+    std::optional<std::vector<std::byte>> socketAddress = socketAddressFrom(*address);
+
+    if (!socketAddress)
         return nullptr;
 
     evconnlistener *listener = evconnlistener_new_bind(
@@ -118,8 +120,8 @@ aio::net::stream::listen(const std::shared_ptr<Context> &context, const std::str
             nullptr,
             LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE | LEV_OPT_DISABLED,
             -1,
-            (const sockaddr *) &sa,
-            sizeof(sa)
+            (const sockaddr *) socketAddress->data(),
+            (int) socketAddress->size()
     );
 
     if (!listener)
@@ -157,7 +159,7 @@ aio::net::stream::connect(const std::shared_ptr<Context> &context, const std::st
                 ctx
         );
 
-        if (bufferevent_socket_connect_hostname(bev, context->dnsBase(), AF_INET, host.c_str(), port) < 0) {
+        if (bufferevent_socket_connect_hostname(bev, context->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
             delete ctx;
             p->reject({IO_ERROR, lastError()});
         }
@@ -182,7 +184,7 @@ zero::ptr::RefPtr<aio::net::stream::Listener> aio::net::stream::listen(const std
             nullptr,
             LEV_OPT_CLOSE_ON_FREE | LEV_OPT_DISABLED,
             -1,
-            (sockaddr *) &sa,
+            (const sockaddr *) &sa,
             sizeof(sa)
     );
 
@@ -226,7 +228,7 @@ aio::net::stream::connect(const std::shared_ptr<Context> &context, const std::st
                 ctx
         );
 
-        if (bufferevent_socket_connect(bev, (sockaddr *) &sa, sizeof(sa)) < 0) {
+        if (bufferevent_socket_connect(bev, (const sockaddr *) &sa, sizeof(sa)) < 0) {
             delete ctx;
             p->reject({IO_ERROR, lastError()});
         }

@@ -29,7 +29,7 @@ namespace aio::http {
         [[nodiscard]] std::optional<std::string> host() const;
         [[nodiscard]] std::optional<std::string> path() const;
         [[nodiscard]] std::optional<std::string> query() const;
-        [[nodiscard]] std::optional<short> port() const;
+        [[nodiscard]] std::optional<unsigned short> port() const;
 
     public:
         URL &scheme(const std::optional<std::string> &scheme);
@@ -38,7 +38,7 @@ namespace aio::http {
         URL &host(const std::optional<std::string> &host);
         URL &path(const std::optional<std::string> &path);
         URL &query(const std::optional<std::string> &query);
-        URL &port(std::optional<short> port);
+        URL &port(std::optional<unsigned short> port);
 
     public:
         URL &appendQuery(const std::string &query);
