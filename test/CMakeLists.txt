@@ -11,6 +11,7 @@ add_executable(
         ev/buffer.cpp
         http/url.cpp
         http/request.cpp
+        net/net.cpp
         net/stream.cpp
         net/dgram.cpp
         $<$<NOT:$<BOOL:${AIO_DISABLE_SSL}>>:net/ssl.cpp>

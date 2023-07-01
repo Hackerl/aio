@@ -13,6 +13,60 @@
 #include <sys/un.h>
 #endif
 
+bool aio::net::operator==(const aio::net::IPv4Address &lhs, const aio::net::IPv4Address &rhs) {
+    return lhs.port == rhs.port && lhs.ip == rhs.ip;
+}
+
+bool aio::net::operator!=(const aio::net::IPv4Address &lhs, const aio::net::IPv4Address &rhs) {
+    return !operator==(lhs, rhs);
+}
+
+bool aio::net::operator==(const aio::net::IPv6Address &lhs, const aio::net::IPv6Address &rhs) {
+    return lhs.port == rhs.port && lhs.ip == rhs.ip && lhs.zone == rhs.zone;
+}
+
+bool aio::net::operator!=(const aio::net::IPv6Address &lhs, const aio::net::IPv6Address &rhs) {
+    return !operator==(lhs, rhs);
+}
+
+bool aio::net::operator==(const aio::net::UnixAddress &lhs, const aio::net::UnixAddress &rhs) {
+    return lhs.path == rhs.path;
+}
+
+bool aio::net::operator!=(const aio::net::UnixAddress &lhs, const aio::net::UnixAddress &rhs) {
+    return !operator==(lhs, rhs);
+}
+
+bool aio::net::operator==(const aio::net::Address &lhs, const aio::net::Address &rhs) {
+    if (lhs.index() != rhs.index())
+        return false;
+
+    bool result = false;
+
+    switch (lhs.index()) {
+        case 0:
+            result = operator==(std::get<0>(lhs), std::get<0>(rhs));
+            break;
+
+        case 1:
+            result = operator==(std::get<1>(lhs), std::get<1>(rhs));
+            break;
+
+        case 2:
+            result = operator==(std::get<2>(lhs), std::get<2>(rhs));
+            break;
+
+        default:
+            break;
+    }
+
+    return result;
+}
+
+bool aio::net::operator!=(const aio::net::Address &lhs, const aio::net::Address &rhs) {
+    return !operator==(lhs, rhs);
+}
+
 std::optional<aio::net::Address> aio::net::getSocketAddress(evutil_socket_t fd, bool peer) {
     sockaddr_storage storage = {};
     socklen_t length = sizeof(sockaddr_storage);
@@ -33,7 +87,7 @@ std::optional<aio::net::Address> aio::net::addressFrom(const sockaddr *socketAdd
             IPv4Address ipv4 = {};
 
             ipv4.port = ntohs(addr->sin_port);
-            memcpy(ipv4.ip, &addr->sin_addr, sizeof(in_addr));
+            memcpy(ipv4.ip.data(), &addr->sin_addr, sizeof(in_addr));
 
             address = ipv4;
             break;
@@ -45,7 +99,7 @@ std::optional<aio::net::Address> aio::net::addressFrom(const sockaddr *socketAdd
             IPv6Address ipv6 = {};
 
             ipv6.port = ntohs(addr->sin6_port);
-            memcpy(ipv6.ip, &addr->sin6_addr, sizeof(in6_addr));
+            memcpy(ipv6.ip.data(), &addr->sin6_addr, sizeof(in6_addr));
 
             if (addr->sin6_scope_id == 0) {
                 address = ipv6;
@@ -117,7 +171,7 @@ std::optional<std::vector<std::byte>> aio::net::socketAddressFrom(const Address 
 
             addr.sin_family = AF_INET;
             addr.sin_port = htons(ipv4.port);
-            memcpy(&addr.sin_addr, ipv4.ip, sizeof(in_addr));
+            memcpy(&addr.sin_addr, ipv4.ip.data(), sizeof(in_addr));
 
             socketAddress = std::vector<std::byte>{
                     (const std::byte *) &addr,
@@ -133,8 +187,23 @@ std::optional<std::vector<std::byte>> aio::net::socketAddressFrom(const Address 
 
             addr.sin6_family = AF_INET6;
             addr.sin6_port = htons(ipv6.port);
-            memcpy(&addr.sin6_addr, ipv6.ip, sizeof(in6_addr));
+            memcpy(&addr.sin6_addr, ipv6.ip.data(), sizeof(in6_addr));
 
+            if (!ipv6.zone) {
+                socketAddress = std::vector<std::byte>{
+                        (const std::byte *) &addr,
+                        (const std::byte *) &addr + sizeof(sockaddr_in6)
+                };
+
+                break;
+            }
+
+            unsigned int index = if_nametoindex(ipv6.zone->c_str());
+
+            if (!index)
+                break;
+
+            addr.sin6_scope_id = index;
             socketAddress = std::vector<std::byte>{
                     (const std::byte *) &addr,
                     (const std::byte *) &addr + sizeof(sockaddr_in6)

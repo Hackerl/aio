@@ -23,7 +23,7 @@ TEST_CASE("datagram network connection", "[dgram]") {
                     aio::net::IPv4Address address = std::get<aio::net::IPv4Address>(from);
 
                     REQUIRE(address.port == 30001);
-                    REQUIRE(memcmp(address.ip, "\x7f\x00\x00\x01", 4) == 0);
+                    REQUIRE(memcmp(address.ip.data(), "\x7f\x00\x00\x01", 4) == 0);
                     REQUIRE(std::equal(data.begin(), data.end(), message.begin()));
 
                     return server->writeTo(data, from);
@@ -37,7 +37,7 @@ TEST_CASE("datagram network connection", "[dgram]") {
                     aio::net::IPv4Address address = std::get<aio::net::IPv4Address>(from);
 
                     REQUIRE(address.port == 30000);
-                    REQUIRE(memcmp(address.ip, "\x7f\x00\x00\x01", 4) == 0);
+                    REQUIRE(memcmp(address.ip.data(), "\x7f\x00\x00\x01", 4) == 0);
                     REQUIRE(std::equal(data.begin(), data.end(), message.begin()));
                 })->finally([=] {
                     client->close();
@@ -60,7 +60,7 @@ TEST_CASE("datagram network connection", "[dgram]") {
                     REQUIRE(from.index() == 0);
                     aio::net::IPv4Address address = std::get<aio::net::IPv4Address>(from);
 
-                    REQUIRE(memcmp(address.ip, "\x7f\x00\x00\x01", 4) == 0);
+                    REQUIRE(memcmp(address.ip.data(), "\x7f\x00\x00\x01", 4) == 0);
                     REQUIRE(std::equal(data.begin(), data.end(), message.begin()));
 
                     return server->writeTo(data, from);

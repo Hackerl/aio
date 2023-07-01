@@ -7,12 +7,12 @@
 namespace aio::net {
     struct IPv4Address {
         unsigned short port;
-        std::byte ip[4];
+        std::array<std::byte, 4> ip;
     };
 
     struct IPv6Address {
         unsigned short port;
-        std::byte ip[16];
+        std::array<std::byte, 16> ip;
         std::optional<std::string> zone;
     };
 
@@ -21,6 +21,18 @@ namespace aio::net {
     };
 
     using Address = std::variant<IPv4Address, IPv6Address, UnixAddress>;
+
+    bool operator==(const IPv4Address &lhs, const IPv4Address &rhs);
+    bool operator!=(const IPv4Address &lhs, const IPv4Address &rhs);
+
+    bool operator==(const IPv6Address &lhs, const IPv6Address &rhs);
+    bool operator!=(const IPv6Address &lhs, const IPv6Address &rhs);
+
+    bool operator==(const UnixAddress &lhs, const UnixAddress &rhs);
+    bool operator!=(const UnixAddress &lhs, const UnixAddress &rhs);
+
+    bool operator==(const Address &lhs, const Address &rhs);
+    bool operator!=(const Address &lhs, const Address &rhs);
 
     class IEndpoint : public zero::Interface {
     public:

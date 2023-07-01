@@ -17,14 +17,14 @@ TEST_CASE("stream network connection", "[stream]") {
 
                     aio::net::IPv4Address address = std::get<aio::net::IPv4Address>(*localAddress);
                     REQUIRE(address.port == 30000);
-                    REQUIRE(memcmp(address.ip, "\x7f\x00\x00\x01", 4) == 0);
+                    REQUIRE(memcmp(address.ip.data(), "\x7f\x00\x00\x01", 4) == 0);
 
                     std::optional<aio::net::Address> remoteAddress = buffer->remoteAddress();
                     REQUIRE(remoteAddress);
                     REQUIRE(remoteAddress->index() == 0);
 
                     address = std::get<aio::net::IPv4Address>(*remoteAddress);
-                    REQUIRE(memcmp(address.ip, "\x7f\x00\x00\x01", 4) == 0);
+                    REQUIRE(memcmp(address.ip.data(), "\x7f\x00\x00\x01", 4) == 0);
 
                     buffer->writeLine("hello world");
                     return buffer->drain()->then([=]() {
@@ -44,7 +44,7 @@ TEST_CASE("stream network connection", "[stream]") {
                             REQUIRE(localAddress->index() == 0);
 
                             aio::net::IPv4Address address = std::get<aio::net::IPv4Address>(*localAddress);
-                            REQUIRE(memcmp(address.ip, "\x7f\x00\x00\x01", 4) == 0);
+                            REQUIRE(memcmp(address.ip.data(), "\x7f\x00\x00\x01", 4) == 0);
 
                             std::optional<aio::net::Address> remoteAddress = buffer->remoteAddress();
 
@@ -54,7 +54,7 @@ TEST_CASE("stream network connection", "[stream]") {
                             address = std::get<aio::net::IPv4Address>(*remoteAddress);
 
                             REQUIRE(address.port == 30000);
-                            REQUIRE(memcmp(address.ip, "\x7f\x00\x00\x01", 4) == 0);
+                            REQUIRE(memcmp(address.ip.data(), "\x7f\x00\x00\x01", 4) == 0);
 
                             return buffer->readLine()->then([](std::string_view line) {
                                 REQUIRE(line == "hello world");
