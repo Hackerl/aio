@@ -25,7 +25,7 @@ TEST_CASE("network components", "[network]") {
         std::optional<std::vector<std::byte>> socketAddress = aio::net::socketAddressFrom(address);
         REQUIRE(socketAddress);
 
-        auto addr = (sockaddr_in *) socketAddress->data();
+        auto addr = (const sockaddr_in *) socketAddress->data();
 
         REQUIRE(addr->sin_family == AF_INET);
         REQUIRE(addr->sin_port == htons(80));
@@ -50,7 +50,7 @@ TEST_CASE("network components", "[network]") {
         std::optional<std::vector<std::byte>> socketAddress = aio::net::socketAddressFrom(address);
         REQUIRE(socketAddress);
 
-        auto addr = (sockaddr_in6 *) socketAddress->data();
+        auto addr = (const sockaddr_in6 *) socketAddress->data();
 
         REQUIRE(addr->sin6_family == AF_INET6);
         REQUIRE(addr->sin6_port == htons(80));

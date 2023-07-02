@@ -402,20 +402,40 @@ aio::net::dgram::connect(const std::shared_ptr<Context> &context, const std::str
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_DGRAM;
 
-    return dns::lookup(context, host, std::to_string(port), hints)->then([=](nonstd::span<const Address> records) {
-        const Address &address = records.front();
+    return dns::getAddressInfo(
+            context,
+            host,
+            std::to_string(port),
+            hints
+    )->then([=](const std::vector<Address> &addresses) {
+        std::shared_ptr<size_t> index = std::make_shared<size_t>();
 
-        zero::ptr::RefPtr<aio::net::dgram::Socket> socket = newSocket(
-                context,
-                address.index() == 0 ? AF_INET : AF_INET6
+        return zero::async::promise::loop<zero::ptr::RefPtr<aio::net::dgram::Socket>>(
+                [=, size = addresses.size()](const auto &loop) {
+                    const Address &address = addresses[(*index)++];
+
+                    zero::ptr::RefPtr<aio::net::dgram::Socket> socket = newSocket(
+                            context,
+                            address.index() == 0 ? AF_INET : AF_INET6
+                    );
+
+                    if (!socket) {
+                        P_BREAK_E(loop, {IO_ERROR, lastError()});
+                        return;
+                    }
+
+                    socket->connect(address)->then([=]() {
+                        P_BREAK_V(loop, socket);
+                    }, [=](const zero::async::promise::Reason &reason) {
+                        if (*index >= size) {
+                            P_BREAK_E(loop, reason);
+                            return;
+                        }
+
+                        P_CONTINUE(loop);
+                    });
+                }
         );
-
-        if (!socket)
-            return zero::async::promise::reject<zero::ptr::RefPtr<aio::net::dgram::Socket>>({IO_ERROR, lastError()});
-
-        return socket->connect(records.front())->then([=]() {
-            return socket;
-        });
     });
 }
 

@@ -11,6 +11,7 @@ add_executable(
         ev/buffer.cpp
         http/url.cpp
         http/request.cpp
+        net/dns.cpp
         net/net.cpp
         net/stream.cpp
         net/dgram.cpp

@@ -1,13 +1,8 @@
 #include <aio/net/dns.h>
 #include <event2/dns.h>
 #include <zero/strings/strings.h>
-#include <cstring>
 
-#ifdef __linux__
-#include <netinet/in.h>
-#endif
-
-std::shared_ptr<zero::async::promise::Promise<std::vector<aio::net::Address>>> aio::net::dns::lookup(
+std::shared_ptr<zero::async::promise::Promise<std::vector<aio::net::Address>>> aio::net::dns::getAddressInfo(
         const std::shared_ptr<Context> &context,
         const std::string &node,
         const std::optional<std::string> &service,
@@ -30,7 +25,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<aio::net::Address>>> a
                         return;
                     }
 
-                    std::vector<Address> records;
+                    std::vector<Address> addresses;
 
                     for (auto i = res; i; i = i->ai_next) {
                         std::optional<Address> address = addressFrom(i->ai_addr);
@@ -38,10 +33,16 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<aio::net::Address>>> a
                         if (!address)
                             continue;
 
-                        records.push_back(std::move(*address));
+                        addresses.push_back(std::move(*address));
                     }
 
-                    p->operator*().resolve(std::move(records));
+                    if (addresses.empty()) {
+                        p->operator*().reject({DNS_ERROR, "DNS records not found"});
+                        delete p;
+                        return;
+                    }
+
+                    p->operator*().resolve(std::move(addresses));
                     delete p;
                 },
                 ctx
@@ -49,42 +50,74 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<aio::net::Address>>> a
     });
 }
 
-std::shared_ptr<zero::async::promise::Promise<std::vector<std::array<std::byte, 4>>>>
-aio::net::dns::query(const std::shared_ptr<Context> &context, const std::string &host) {
-    return zero::async::promise::chain<std::vector<std::array<std::byte, 4>>>([=](const auto &p) {
-        auto ctx = new std::shared_ptr(p);
+std::shared_ptr<zero::async::promise::Promise<std::vector<std::variant<std::array<std::byte, 4>, std::array<std::byte, 16>>>>>
+aio::net::dns::lookupIP(const std::shared_ptr<Context> &context, const std::string &host) {
+    evutil_addrinfo hints = {};
 
-        evdns_request *request = evdns_base_resolve_ipv4(
-                context->dnsBase(),
-                host.c_str(),
-                0,
-                [](int result, char type, int count, int ttl, void *addresses, void *arg) {
-                    auto p = (std::shared_ptr<zero::async::promise::Promise<std::vector<std::array<std::byte, 4>>>> *) arg;
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
 
-                    if (result != DNS_ERR_NONE) {
-                        p->operator*().reject({DNS_ERROR, evdns_err_to_string(result)});
-                        delete p;
-                        return;
-                    }
+    return dns::getAddressInfo(context, host, std::nullopt, hints)->then([=](nonstd::span<const Address> addresses) {
+        std::vector<std::variant<std::array<std::byte, 4>, std::array<std::byte, 16>>> ips;
 
-                    std::vector<std::array<std::byte, 4>> records;
+        std::transform(
+                addresses.begin(),
+                addresses.end(),
+                std::back_inserter(ips),
+                [](const auto &address) -> std::variant<std::array<std::byte, 4>, std::array<std::byte, 16>> {
+                    if (address.index() == 0)
+                        return std::get<IPv4Address>(address).ip;
 
-                    for (int i = 0; i < count; i++) {
-                        std::array<std::byte, 4> ip = {};
-                        memcpy(ip.data(), (in_addr *) addresses + i, 4);
-                        records.push_back(ip);
-                    }
-
-                    p->operator*().resolve(std::move(records));
-                    delete p;
-                },
-                ctx
+                    return std::get<IPv6Address>(address).ip;
+                }
         );
 
-        if (!request) {
-            p->reject({DNS_ERROR, lastError()});
-            delete ctx;
-            return;
-        }
+        return ips;
+    });
+}
+
+std::shared_ptr<zero::async::promise::Promise<std::vector<std::array<std::byte, 4>>>>
+aio::net::dns::lookupIPv4(const std::shared_ptr<Context> &context, const std::string &host) {
+    evutil_addrinfo hints = {};
+
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    return dns::getAddressInfo(context, host, std::nullopt, hints)->then([=](nonstd::span<const Address> addresses) {
+        std::vector<std::array<std::byte, 4>> ips;
+
+        std::transform(
+                addresses.begin(),
+                addresses.end(),
+                std::back_inserter(ips),
+                [](const auto &address) {
+                    return std::get<IPv4Address>(address).ip;
+                }
+        );
+
+        return ips;
+    });
+}
+
+std::shared_ptr<zero::async::promise::Promise<std::vector<std::array<std::byte, 16>>>>
+aio::net::dns::lookupIPv6(const std::shared_ptr<Context> &context, const std::string &host) {
+    evutil_addrinfo hints = {};
+
+    hints.ai_family = AF_INET6;
+    hints.ai_socktype = SOCK_STREAM;
+
+    return dns::getAddressInfo(context, host, std::nullopt, hints)->then([=](nonstd::span<const Address> addresses) {
+        std::vector<std::array<std::byte, 16>> ips;
+
+        std::transform(
+                addresses.begin(),
+                addresses.end(),
+                std::back_inserter(ips),
+                [](const auto &address) {
+                    return std::get<IPv6Address>(address).ip;
+                }
+        );
+
+        return ips;
     });
 }
