@@ -54,10 +54,11 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::variant<std::arra
 aio::net::dns::lookupIP(const std::shared_ptr<Context> &context, const std::string &host) {
     evutil_addrinfo hints = {};
 
+    hints.ai_flags = EVUTIL_AI_ADDRCONFIG;
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
-    return dns::getAddressInfo(context, host, std::nullopt, hints)->then([=](nonstd::span<const Address> addresses) {
+    return getAddressInfo(context, host, std::nullopt, hints)->then([=](nonstd::span<const Address> addresses) {
         std::vector<std::variant<std::array<std::byte, 4>, std::array<std::byte, 16>>> ips;
 
         std::transform(
@@ -80,10 +81,11 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::array<std::byte, 
 aio::net::dns::lookupIPv4(const std::shared_ptr<Context> &context, const std::string &host) {
     evutil_addrinfo hints = {};
 
+    hints.ai_flags = EVUTIL_AI_ADDRCONFIG;
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
 
-    return dns::getAddressInfo(context, host, std::nullopt, hints)->then([=](nonstd::span<const Address> addresses) {
+    return getAddressInfo(context, host, std::nullopt, hints)->then([=](nonstd::span<const Address> addresses) {
         std::vector<std::array<std::byte, 4>> ips;
 
         std::transform(
@@ -103,10 +105,11 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::array<std::byte, 
 aio::net::dns::lookupIPv6(const std::shared_ptr<Context> &context, const std::string &host) {
     evutil_addrinfo hints = {};
 
+    hints.ai_flags = EVUTIL_AI_ADDRCONFIG;
     hints.ai_family = AF_INET6;
     hints.ai_socktype = SOCK_STREAM;
 
-    return dns::getAddressInfo(context, host, std::nullopt, hints)->then([=](nonstd::span<const Address> addresses) {
+    return getAddressInfo(context, host, std::nullopt, hints)->then([=](nonstd::span<const Address> addresses) {
         std::vector<std::array<std::byte, 16>> ips;
 
         std::transform(

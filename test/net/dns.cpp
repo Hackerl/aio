@@ -67,7 +67,6 @@ TEST_CASE("DNS query", "[dns]") {
         aio::net::dns::lookupIPv4(context, "localhost")->then([](nonstd::span<std::array<std::byte, 4>> ips) {
             REQUIRE(ips.size() == 1);
             REQUIRE(memcmp(ips.front().data(), "\x7f\x00\x00\x01", 4) == 0);
-
         })->finally([=]() {
             context->loopExit();
         });

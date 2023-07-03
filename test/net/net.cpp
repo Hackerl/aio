@@ -1,4 +1,5 @@
 #include <aio/net/net.h>
+#include <zero/os/net.h>
 #include <zero/strings/strings.h>
 #include <catch2/catch_test_macros.hpp>
 
@@ -15,7 +16,10 @@
 
 TEST_CASE("network components", "[network]") {
     SECTION("IPv4") {
-        aio::net::Address address = aio::net::IPv4Address{80, {std::byte{127}, std::byte{0}, std::byte{0}, std::byte{1}}};
+        aio::net::Address address = aio::net::IPv4Address{
+            80,
+            {std::byte{127}, std::byte{0}, std::byte{0}, std::byte{1}}
+        };
 
         REQUIRE(address == aio::net::IPv4Address{80, {std::byte{127}, std::byte{0}, std::byte{0}, std::byte{1}}});
         REQUIRE(address != aio::net::IPv4Address{80, {std::byte{127}, std::byte{0}, std::byte{0}, std::byte{0}}});
@@ -33,6 +37,14 @@ TEST_CASE("network components", "[network]") {
 
         REQUIRE(*aio::net::IPAddressFrom("127.0.0.1", 80) == address);
         REQUIRE(*aio::net::IPv4AddressFrom("127.0.0.1", 80) == address);
+    }
+
+    SECTION("mapped IPv6") {
+        auto ipv4Address = aio::net::IPv4Address{80, {std::byte{8}, std::byte{8}, std::byte{8}, std::byte{8}}};
+        auto ipv6Address = aio::net::IPv6AddressFromIPv4(ipv4Address);
+
+        REQUIRE(ipv6Address.port == 80);
+        REQUIRE(zero::os::net::stringify(ipv6Address.ip) == "::ffff:8.8.8.8");
     }
 
     SECTION("IPv6") {

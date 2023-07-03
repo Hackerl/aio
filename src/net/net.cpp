@@ -66,6 +66,18 @@ bool aio::net::operator!=(const aio::net::Address &lhs, const aio::net::Address 
     return !operator==(lhs, rhs);
 }
 
+aio::net::IPv6Address aio::net::IPv6AddressFromIPv4(const aio::net::IPv4Address &ipv4Address) {
+    IPv6Address ipv6Address = {};
+
+    ipv6Address.port = ipv4Address.port;
+    ipv6Address.ip[10] = std::byte{255};
+    ipv6Address.ip[11] = std::byte{255};
+
+    memcpy(ipv6Address.ip.data() + 12, ipv4Address.ip.data(), 4);
+
+    return ipv6Address;
+}
+
 std::optional<aio::net::Address> aio::net::getSocketAddress(evutil_socket_t fd, bool peer) {
     sockaddr_storage storage = {};
     socklen_t length = sizeof(sockaddr_storage);

@@ -46,6 +46,8 @@ namespace aio::net {
         virtual std::shared_ptr<zero::async::promise::Promise<void>> connect(const Address &address) = 0;
     };
 
+    IPv6Address IPv6AddressFromIPv4(const IPv4Address &ipv4Address);
+
     std::optional<Address> getSocketAddress(evutil_socket_t fd, bool peer);
 
     std::optional<Address> addressFrom(const sockaddr *storage);
