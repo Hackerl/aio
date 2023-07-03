@@ -60,8 +60,13 @@ namespace aio::net::stream {
         friend zero::ptr::RefPtr<T> zero::ptr::makeRef(Args &&... args);
     };
 
+    zero::ptr::RefPtr<Listener> listen(const std::shared_ptr<Context> &context, const Address &address);
+
     zero::ptr::RefPtr<Listener>
     listen(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port);
+
+    std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IBuffer>>>
+    connect(const std::shared_ptr<Context> &context, const Address &address);
 
     std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IBuffer>>>
     connect(const std::shared_ptr<Context> &context, const std::string &host, unsigned short port);

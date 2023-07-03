@@ -1,5 +1,6 @@
 #include <aio/net/ssl.h>
 #include <aio/error.h>
+#include <zero/os/net.h>
 #include <zero/strings/strings.h>
 #include <cstring>
 #include <openssl/err.h>
@@ -286,16 +287,10 @@ aio::net::ssl::stream::Listener::accept() {
 zero::ptr::RefPtr<aio::net::ssl::stream::Listener>
 aio::net::ssl::stream::listen(
         const std::shared_ptr<aio::Context> &context,
-        const std::string &ip,
-        unsigned short port,
+        const aio::net::Address &address,
         const std::shared_ptr<Context> &ctx
 ) {
-    std::optional<Address> address = IPAddressFrom(ip, port);
-
-    if (!address)
-        return nullptr;
-
-    std::optional<std::vector<std::byte>> socketAddress = socketAddressFrom(*address);
+    std::optional<std::vector<std::byte>> socketAddress = socketAddressFrom(address);
 
     if (!socketAddress)
         return nullptr;
@@ -316,6 +311,21 @@ aio::net::ssl::stream::listen(
     return zero::ptr::makeRef<Listener>(context, ctx, listener);
 }
 
+zero::ptr::RefPtr<aio::net::ssl::stream::Listener>
+aio::net::ssl::stream::listen(
+        const std::shared_ptr<aio::Context> &context,
+        const std::string &ip,
+        unsigned short port,
+        const std::shared_ptr<Context> &ctx
+) {
+    std::optional<Address> address = IPAddressFrom(ip, port);
+
+    if (!address)
+        return nullptr;
+
+    return listen(context, *address, ctx);
+}
+
 std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream::IBuffer>>>
 aio::net::ssl::stream::connect(
         const std::shared_ptr<aio::Context> &context,
@@ -329,6 +339,17 @@ aio::net::ssl::stream::connect(
                 {SSL_ERROR, "invalid default SSL context"});
 
     return connect(context, host, port, ctx);
+}
+
+std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream::IBuffer>>>
+aio::net::ssl::stream::connect(const std::shared_ptr<aio::Context> &context, const Address &address) {
+    if (address.index() == 0) {
+        IPv4Address ipv4Address = std::get<IPv4Address>(address);
+        return connect(context, zero::os::net::stringify(ipv4Address.ip), ipv4Address.port);
+    }
+
+    IPv6Address ipv6Address = std::get<IPv6Address>(address);
+    return connect(context, zero::os::net::stringify(ipv6Address.ip), ipv6Address.port);
 }
 
 std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream::IBuffer>>>
@@ -415,4 +436,19 @@ aio::net::ssl::stream::connect(
         bufferevent_free(bev);
         return zero::async::promise::reject<zero::ptr::RefPtr<net::stream::IBuffer>>(reason);
     });
+}
+
+std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream::IBuffer>>>
+aio::net::ssl::stream::connect(
+        const std::shared_ptr<aio::Context> &context,
+        const Address &address,
+        const std::shared_ptr<Context> &ctx
+) {
+    if (address.index() == 0) {
+        IPv4Address ipv4Address = std::get<IPv4Address>(address);
+        return connect(context, zero::os::net::stringify(ipv4Address.ip), ipv4Address.port, ctx);
+    }
+
+    IPv6Address ipv6Address = std::get<IPv6Address>(address);
+    return connect(context, zero::os::net::stringify(ipv6Address.ip), ipv6Address.port, ctx);
 }

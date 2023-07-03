@@ -1,4 +1,5 @@
 #include <aio/net/stream.h>
+#include <zero/os/net.h>
 
 #ifdef __linux__
 #include <netinet/in.h>
@@ -103,13 +104,8 @@ std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream
 }
 
 zero::ptr::RefPtr<aio::net::stream::Listener>
-aio::net::stream::listen(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port) {
-    std::optional<Address> address = IPAddressFrom(ip, port);
-
-    if (!address)
-        return nullptr;
-
-    std::optional<std::vector<std::byte>> socketAddress = socketAddressFrom(*address);
+aio::net::stream::listen(const std::shared_ptr<Context> &context, const Address &address) {
+    std::optional<std::vector<std::byte>> socketAddress = socketAddressFrom(address);
 
     if (!socketAddress)
         return nullptr;
@@ -128,6 +124,47 @@ aio::net::stream::listen(const std::shared_ptr<Context> &context, const std::str
         return nullptr;
 
     return zero::ptr::makeRef<Listener>(context, listener);
+}
+
+zero::ptr::RefPtr<aio::net::stream::Listener>
+aio::net::stream::listen(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port) {
+    std::optional<Address> address = IPAddressFrom(ip, port);
+
+    if (!address)
+        return nullptr;
+
+    return listen(context, *address);
+}
+
+std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream::IBuffer>>>
+aio::net::stream::connect(const std::shared_ptr<Context> &context, const Address &address) {
+    std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<IBuffer>>> promise;
+
+    switch (address.index()) {
+        case 0: {
+            IPv4Address ipv4Address = std::get<IPv4Address>(address);
+            promise = connect(context, zero::os::net::stringify(ipv4Address.ip), ipv4Address.port);
+            break;
+        }
+
+        case 1: {
+            IPv6Address ipv6Address = std::get<IPv6Address>(address);
+            promise = connect(context, zero::os::net::stringify(ipv6Address.ip), ipv6Address.port);
+            break;
+        }
+
+        case 2: {
+#ifdef __unix__
+            promise = connect(context, std::get<UnixAddress>(address).path);
+#else
+            promise = zero::async::promise::reject<zero::ptr::RefPtr<IBuffer>>(
+                    {IO_ERROR, "unsupported unix domain socket"}
+            );
+#endif
+        }
+    }
+
+    return promise;
 }
 
 std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream::IBuffer>>>
