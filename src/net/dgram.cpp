@@ -1,6 +1,5 @@
 #include <aio/net/dgram.h>
 #include <aio/net/dns.h>
-#include <cstring>
 
 #ifdef __linux__
 #include <netinet/in.h>
@@ -25,7 +24,7 @@ std::shared_ptr<zero::async::promise::Promise<std::pair<std::vector<std::byte>, 
 aio::net::dgram::Socket::readFrom(size_t n) {
     addRef();
 
-    return zero::async::promise::loop<std::pair<std::vector<std::byte>, aio::net::Address>>([=](const auto &loop) {
+    return zero::async::promise::loop<std::pair<std::vector<std::byte>, Address>>([=](const auto &loop) {
         if (mClosed) {
             P_BREAK_E(loop, { IO_CLOSED, "socket is closed" });
             return;
@@ -62,7 +61,7 @@ aio::net::dgram::Socket::readFrom(size_t n) {
         }
 
         if (num > 0) {
-            std::optional<aio::net::Address> address = addressFrom((const sockaddr *) &storage);
+            std::optional<Address> address = addressFrom((const sockaddr *) &storage);
 
             if (!address) {
                 P_BREAK_E(loop, { IO_ERROR, "failed to parse socket address" });
@@ -94,7 +93,7 @@ aio::net::dgram::Socket::readFrom(size_t n) {
 }
 
 std::shared_ptr<zero::async::promise::Promise<void>>
-aio::net::dgram::Socket::writeTo(nonstd::span<const std::byte> buffer, const aio::net::Address &address) {
+aio::net::dgram::Socket::writeTo(nonstd::span<const std::byte> buffer, const Address &address) {
     std::optional<std::vector<std::byte>> socketAddress = socketAddressFrom(address);
 
     if (!socketAddress)
@@ -378,21 +377,38 @@ aio::net::dgram::Socket::connect(const Address &address) {
 }
 
 zero::ptr::RefPtr<aio::net::dgram::Socket>
+aio::net::dgram::bind(const std::shared_ptr<Context> &context, const Address &address) {
+    zero::ptr::RefPtr<Socket> socket = newSocket(context, address.index() == 0 ? AF_INET : AF_INET6);
+
+    if (!socket)
+        return nullptr;
+
+    if (!socket->bind(address))
+        return nullptr;
+
+    return socket;
+}
+
+zero::ptr::RefPtr<aio::net::dgram::Socket>
 aio::net::dgram::bind(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port) {
     std::optional<Address> address = IPAddressFrom(ip, port);
 
     if (!address)
         return nullptr;
 
-    zero::ptr::RefPtr<aio::net::dgram::Socket> socket = newSocket(context, address->index() == 0 ? AF_INET : AF_INET6);
+    return dgram::bind(context, *address);
+}
+
+std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::dgram::Socket>>>
+aio::net::dgram::connect(const std::shared_ptr<Context> &context, const Address &address) {
+    zero::ptr::RefPtr<Socket> socket = newSocket(context, address.index() == 0 ? AF_INET : AF_INET6);
 
     if (!socket)
-        return nullptr;
+        return zero::async::promise::reject<zero::ptr::RefPtr<Socket>>({IO_ERROR, lastError()});
 
-    if (!socket->bind(*address))
-        return nullptr;
-
-    return socket;
+    return socket->connect(address)->then([=]() {
+        return socket;
+    });
 }
 
 std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::dgram::Socket>>>
@@ -410,32 +426,18 @@ aio::net::dgram::connect(const std::shared_ptr<Context> &context, const std::str
     )->then([=](const std::vector<Address> &addresses) {
         std::shared_ptr<size_t> index = std::make_shared<size_t>();
 
-        return zero::async::promise::loop<zero::ptr::RefPtr<aio::net::dgram::Socket>>(
-                [=, size = addresses.size()](const auto &loop) {
-                    const Address &address = addresses[(*index)++];
-
-                    zero::ptr::RefPtr<aio::net::dgram::Socket> socket = newSocket(
-                            context,
-                            address.index() == 0 ? AF_INET : AF_INET6
-                    );
-
-                    if (!socket) {
-                        P_BREAK_E(loop, {IO_ERROR, lastError()});
-                        return;
-                    }
-
-                    socket->connect(address)->then([=]() {
-                        P_BREAK_V(loop, socket);
-                    }, [=](const zero::async::promise::Reason &reason) {
-                        if (*index >= size) {
-                            P_BREAK_E(loop, reason);
-                            return;
-                        }
-
-                        P_CONTINUE(loop);
-                    });
+        return zero::async::promise::loop<zero::ptr::RefPtr<Socket>>([=, size = addresses.size()](const auto &loop) {
+            connect(context, addresses[(*index)++])->then([=](const zero::ptr::RefPtr<Socket> &socket) {
+                P_BREAK_V(loop, socket);
+            }, [=](const zero::async::promise::Reason &reason) {
+                if (*index >= size) {
+                    P_BREAK_E(loop, reason);
+                    return;
                 }
-        );
+
+                P_CONTINUE(loop);
+            });
+        });
     });
 }
 
