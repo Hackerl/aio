@@ -314,6 +314,24 @@ aio::net::ssl::stream::listen(
 zero::ptr::RefPtr<aio::net::ssl::stream::Listener>
 aio::net::ssl::stream::listen(
         const std::shared_ptr<aio::Context> &context,
+        nonstd::span<const Address> addresses,
+        const std::shared_ptr<Context> &ctx
+) {
+    zero::ptr::RefPtr<Listener> listener;
+
+    for (const auto &address: addresses) {
+        listener = listen(context, address, ctx);
+
+        if (listener)
+            break;
+    }
+
+    return listener;
+}
+
+zero::ptr::RefPtr<aio::net::ssl::stream::Listener>
+aio::net::ssl::stream::listen(
+        const std::shared_ptr<aio::Context> &context,
         const std::string &ip,
         unsigned short port,
         const std::shared_ptr<Context> &ctx
@@ -350,6 +368,17 @@ aio::net::ssl::stream::connect(const std::shared_ptr<aio::Context> &context, con
 
     IPv6Address ipv6Address = std::get<IPv6Address>(address);
     return connect(context, zero::os::net::stringify(ipv6Address.ip), ipv6Address.port);
+}
+
+std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream::IBuffer>>>
+aio::net::ssl::stream::connect(const std::shared_ptr<aio::Context> &context, nonstd::span<const Address> addresses) {
+    return tryAddress<zero::ptr::RefPtr<net::stream::IBuffer>>(
+            context,
+            addresses,
+            [](const std::shared_ptr<aio::Context> &context, const Address &address) {
+                return connect(context, address);
+            }
+    );
 }
 
 std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream::IBuffer>>>
@@ -451,4 +480,24 @@ aio::net::ssl::stream::connect(
 
     IPv6Address ipv6Address = std::get<IPv6Address>(address);
     return connect(context, zero::os::net::stringify(ipv6Address.ip), ipv6Address.port, ctx);
+}
+
+std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream::IBuffer>>>
+aio::net::ssl::stream::connect(
+        const std::shared_ptr<aio::Context> &context,
+        nonstd::span<const Address> addresses,
+        const std::shared_ptr<Context> &ctx
+) {
+    return tryAddress<zero::ptr::RefPtr<net::stream::IBuffer>>(
+            context,
+            addresses,
+            [](
+                    const std::shared_ptr<aio::Context> &context,
+                    const Address &address,
+                    const std::shared_ptr<Context> &ctx
+            ) {
+                return connect(context, address, ctx);
+            },
+            ctx
+    );
 }

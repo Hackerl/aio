@@ -56,6 +56,35 @@ namespace aio::net {
     std::optional<Address> IPv6AddressFrom(const std::string &ip, unsigned short port);
 
     std::optional<std::vector<std::byte>> socketAddressFrom(const Address &address);
+
+    template<typename T, typename F, typename ...Args>
+    std::shared_ptr<zero::async::promise::Promise<T>> tryAddress(
+            const std::shared_ptr<Context> &context,
+            nonstd::span<const Address> addresses,
+            F &&f,
+            Args ...args
+    ) {
+        return zero::async::promise::loop<T>(
+                [
+                        =,
+                        f = std::forward<F>(f),
+                        size = addresses.size(),
+                        index = std::make_shared<size_t>(),
+                        addresses = std::vector<Address>{addresses.begin(), addresses.end()}
+                ](const auto &loop) {
+                    f(context, addresses[(*index)++], args...)->then([=](const T &result) {
+                        P_BREAK_V(loop, result);
+                    }, [=](const zero::async::promise::Reason &reason) {
+                        if (*index >= size) {
+                            P_BREAK_E(loop, reason);
+                            return;
+                        }
+
+                        P_CONTINUE(loop);
+                    });
+                }
+        );
+    }
 }
 
 #endif //AIO_NET_H

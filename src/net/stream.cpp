@@ -1,5 +1,6 @@
 #include <aio/net/stream.h>
 #include <zero/os/net.h>
+#include <cstring>
 
 #ifdef __linux__
 #include <netinet/in.h>
@@ -127,6 +128,20 @@ aio::net::stream::listen(const std::shared_ptr<Context> &context, const Address 
 }
 
 zero::ptr::RefPtr<aio::net::stream::Listener>
+aio::net::stream::listen(const std::shared_ptr<Context> &context, nonstd::span<const Address> addresses) {
+    zero::ptr::RefPtr<Listener> listener;
+
+    for (const auto &address: addresses) {
+        listener = listen(context, address);
+
+        if (listener)
+            break;
+    }
+
+    return listener;
+}
+
+zero::ptr::RefPtr<aio::net::stream::Listener>
 aio::net::stream::listen(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port) {
     std::optional<Address> address = IPAddressFrom(ip, port);
 
@@ -165,6 +180,17 @@ aio::net::stream::connect(const std::shared_ptr<Context> &context, const Address
     }
 
     return promise;
+}
+
+std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream::IBuffer>>>
+aio::net::stream::connect(const std::shared_ptr<Context> &context, nonstd::span<const Address> addresses) {
+    return tryAddress<zero::ptr::RefPtr<IBuffer>>(
+            context,
+            addresses,
+            [](const std::shared_ptr<Context> &context, const Address &address) {
+                return connect(context, address);
+            }
+    );
 }
 
 std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<aio::net::stream::IBuffer>>>

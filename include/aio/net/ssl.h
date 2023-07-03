@@ -76,6 +76,12 @@ namespace aio::net::ssl {
 
         zero::ptr::RefPtr<Listener> listen(
                 const std::shared_ptr<aio::Context> &context,
+                nonstd::span<const Address> addresses,
+                const std::shared_ptr<Context> &ctx
+        );
+
+        zero::ptr::RefPtr<Listener> listen(
+                const std::shared_ptr<aio::Context> &context,
                 const std::string &ip,
                 unsigned short port,
                 const std::shared_ptr<Context> &ctx
@@ -94,6 +100,11 @@ namespace aio::net::ssl {
 
         std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<net::stream::IBuffer>>> connect(
                 const std::shared_ptr<aio::Context> &context,
+                nonstd::span<const Address> addresses
+        );
+
+        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<net::stream::IBuffer>>> connect(
+                const std::shared_ptr<aio::Context> &context,
                 const std::string &host,
                 unsigned short port,
                 const std::shared_ptr<Context> &ctx
@@ -102,6 +113,12 @@ namespace aio::net::ssl {
         std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<net::stream::IBuffer>>> connect(
                 const std::shared_ptr<aio::Context> &context,
                 const Address &address,
+                const std::shared_ptr<Context> &ctx
+        );
+
+        std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<net::stream::IBuffer>>> connect(
+                const std::shared_ptr<aio::Context> &context,
+                nonstd::span<const Address> addresses,
                 const std::shared_ptr<Context> &ctx
         );
     }
