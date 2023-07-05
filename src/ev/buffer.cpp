@@ -71,6 +71,13 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
     });
 }
 
+size_t aio::ev::Buffer::available() {
+    if (!mBev)
+        return -1;
+
+    return evbuffer_get_length(bufferevent_get_input(mBev));
+}
+
 std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::readLine() {
     return readLine(CRLF);
 }
@@ -112,6 +119,46 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
         }, [=](const zero::async::promise::Reason &reason) {
             P_BREAK_E(loop, reason);
         });
+    });
+}
+
+std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::Buffer::peek(size_t n) {
+    if (!mBev)
+        return zero::async::promise::reject<std::vector<std::byte>>({IO_ERROR, "buffer destroyed"});
+
+    if (mPromises[READ_INDEX])
+        return zero::async::promise::reject<std::vector<std::byte>>({IO_ERROR, "pending request not completed"});
+
+    evbuffer *input = bufferevent_get_input(mBev);
+
+    size_t length = evbuffer_get_length(input);
+
+    if (length >= n) {
+        std::vector<std::byte> buffer(n);
+        evbuffer_copyout(input, buffer.data(), n);
+
+        return zero::async::promise::resolve<std::vector<std::byte>>(buffer);
+    }
+
+    if (mClosed)
+        return zero::async::promise::reject<std::vector<std::byte>>({IO_CLOSED, "buffer is closed"});
+
+    return zero::async::promise::chain<void>([=](const auto &p) {
+        addRef();
+        mPromises[READ_INDEX] = p;
+
+        bufferevent_setwatermark(mBev, EV_READ, n, 0);
+        bufferevent_enable(mBev, EV_READ);
+    })->then([=]() {
+        evbuffer *input = bufferevent_get_input(mBev);
+        std::vector<std::byte> buffer(n);
+
+        evbuffer_copyout(input, buffer.data(), buffer.size());
+        return buffer;
+    })->finally([=]() {
+        bufferevent_disable(mBev, EV_READ);
+        bufferevent_setwatermark(mBev, EV_READ, 0, 0);
+        release();
     });
 }
 

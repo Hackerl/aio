@@ -42,8 +42,10 @@ namespace aio::http {
         std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> read(size_t n) override;
 
     public:
+        size_t available() override;
         std::shared_ptr<zero::async::promise::Promise<std::string>> readLine() override;
         std::shared_ptr<zero::async::promise::Promise<std::string>> readLine(ev::EOL eol) override;
+        std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> peek(size_t n) override;
         std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> readExactly(size_t n) override;
 
     public:

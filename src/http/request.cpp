@@ -60,12 +60,20 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::http
     return mBuffer->read(n);
 }
 
+size_t aio::http::Response::available() {
+    return mBuffer->available();
+}
+
 std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::readLine() {
     return mBuffer->readLine();
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::string>> aio::http::Response::readLine(ev::EOL eol) {
     return mBuffer->readLine(eol);
+}
+
+std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::http::Response::peek(size_t n) {
+    return mBuffer->peek(n);
 }
 
 std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::http::Response::readExactly(size_t n) {
