@@ -34,6 +34,11 @@ namespace aio::net {
     bool operator==(const Address &lhs, const Address &rhs);
     bool operator!=(const Address &lhs, const Address &rhs);
 
+    std::string stringify(const IPv4Address &ipv4Address);
+    std::string stringify(const IPv6Address &ipv6Address);
+    std::string stringify(const UnixAddress &unixAddress);
+    std::string stringify(const Address &address);
+
     class IEndpoint : public zero::Interface {
     public:
         virtual std::optional<Address> localAddress() = 0;

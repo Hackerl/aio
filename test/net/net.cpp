@@ -26,6 +26,11 @@ TEST_CASE("network components", "[network]") {
         REQUIRE(address != aio::net::IPv6Address{});
         REQUIRE(address != aio::net::UnixAddress{});
 
+        REQUIRE(aio::net::stringify(address) == "127.0.0.1:80");
+
+        REQUIRE(*aio::net::IPAddressFrom("127.0.0.1", 80) == address);
+        REQUIRE(*aio::net::IPv4AddressFrom("127.0.0.1", 80) == address);
+
         std::optional<std::vector<std::byte>> socketAddress = aio::net::socketAddressFrom(address);
         REQUIRE(socketAddress);
 
@@ -34,9 +39,6 @@ TEST_CASE("network components", "[network]") {
         REQUIRE(addr->sin_family == AF_INET);
         REQUIRE(addr->sin_port == htons(80));
         REQUIRE(memcmp(&addr->sin_addr, "\x7f\x00\x00\x01", 4) == 0);
-
-        REQUIRE(*aio::net::IPAddressFrom("127.0.0.1", 80) == address);
-        REQUIRE(*aio::net::IPv4AddressFrom("127.0.0.1", 80) == address);
     }
 
     SECTION("mapped IPv6") {
@@ -45,6 +47,7 @@ TEST_CASE("network components", "[network]") {
 
         REQUIRE(ipv6Address.port == 80);
         REQUIRE(zero::os::net::stringify(ipv6Address.ip) == "::ffff:8.8.8.8");
+        REQUIRE(aio::net::stringify(ipv6Address) == "[::ffff:8.8.8.8]:80");
     }
 
     SECTION("IPv6") {
@@ -58,6 +61,13 @@ TEST_CASE("network components", "[network]") {
         REQUIRE(address != aio::net::IPv6Address{80, {std::byte{127}}, name});
         REQUIRE(address != aio::net::IPv4Address{});
         REQUIRE(address != aio::net::UnixAddress{});
+
+        REQUIRE(aio::net::stringify(address) == "[::]:80");
+
+        REQUIRE(*aio::net::IPAddressFrom("::", 80) != address);
+        REQUIRE(*aio::net::IPv6AddressFrom("::", 80) != address);
+        REQUIRE(*aio::net::IPAddressFrom(zero::strings::format("::%%%s", name), 80) == address);
+        REQUIRE(*aio::net::IPv6AddressFrom(zero::strings::format("::%%%s", name), 80) == address);
 
         std::optional<std::vector<std::byte>> socketAddress = aio::net::socketAddressFrom(address);
         REQUIRE(socketAddress);
@@ -76,11 +86,6 @@ TEST_CASE("network components", "[network]") {
                         }
                 )
         );
-
-        REQUIRE(*aio::net::IPAddressFrom("::", 80) != address);
-        REQUIRE(*aio::net::IPv6AddressFrom("::", 80) != address);
-        REQUIRE(*aio::net::IPAddressFrom(zero::strings::format("::%%%s", name), 80) == address);
-        REQUIRE(*aio::net::IPv6AddressFrom(zero::strings::format("::%%%s", name), 80) == address);
     }
 
 #ifdef __unix__
@@ -91,6 +96,8 @@ TEST_CASE("network components", "[network]") {
         REQUIRE(address != aio::net::UnixAddress{"/root/test.sock"});
         REQUIRE(address != aio::net::IPv4Address{});
         REQUIRE(address != aio::net::IPv6Address{});
+
+        REQUIRE(aio::net::stringify(address) == "/tmp/test.sock");
 
         std::optional<std::vector<std::byte>> socketAddress = aio::net::socketAddressFrom(address);
         REQUIRE(socketAddress);
