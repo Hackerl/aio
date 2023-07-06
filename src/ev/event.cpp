@@ -20,6 +20,10 @@ aio::ev::Event::~Event() {
     event_free(mEvent);
 }
 
+evutil_socket_t aio::ev::Event::fd() {
+    return event_get_fd(mEvent);
+}
+
 bool aio::ev::Event::cancel() {
     if (!pending())
         return false;
@@ -27,7 +31,7 @@ bool aio::ev::Event::cancel() {
     event_del(mEvent);
 
     auto p = std::move(mPromise);
-    p->reject({IO_CANCEL, "promise canceled"});
+    p->reject({IO_CANCELED, "event waiting request was canceled"});
 
     return true;
 }
@@ -43,10 +47,10 @@ void aio::ev::Event::trigger(short events) {
 std::shared_ptr<zero::async::promise::Promise<short>>
 aio::ev::Event::on(short events, std::optional<std::chrono::milliseconds> timeout) {
     if (mPromise)
-        return zero::async::promise::reject<short>({IO_ERROR, "pending event has been set"});
+        return zero::async::promise::reject<short>({IO_BUSY, "event pending request not completed"});
 
     if (events & EV_PERSIST)
-        return zero::async::promise::reject<short>({IO_ERROR, "persistent flag should not be used"});
+        return zero::async::promise::reject<short>({INVALID_ARGUMENT, "event persist flag is not available"});
 
     return zero::async::promise::chain<short>([=](const auto &p) {
         addRef();

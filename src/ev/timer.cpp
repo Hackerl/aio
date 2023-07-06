@@ -25,7 +25,7 @@ bool aio::ev::Timer::cancel() {
     evtimer_del(mEvent);
 
     auto p = std::move(mPromise);
-    p->reject({IO_CANCEL, "promise canceled"});
+    p->reject({IO_CANCELED, "timer was canceled"});
 
     return true;
 }
@@ -36,7 +36,7 @@ bool aio::ev::Timer::pending() {
 
 std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Timer::setTimeout(std::chrono::milliseconds delay) {
     if (mPromise)
-        return zero::async::promise::reject<void>({IO_ERROR, "pending timer has been set"});
+        return zero::async::promise::reject<void>({IO_BUSY, "timer has been set"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         addRef();

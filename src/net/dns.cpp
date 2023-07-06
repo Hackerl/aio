@@ -20,7 +20,10 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<aio::net::Address>>> a
                     auto p = (std::shared_ptr<zero::async::promise::Promise<std::vector<Address>>> *) arg;
 
                     if (result != 0) {
-                        p->operator*().reject({DNS_ERROR, zero::strings::format("lookup DNS failed: %d", result)});
+                        p->operator*().reject(
+                                {DNS_RESOLVE_ERROR, zero::strings::format("DNS resolve failed[%d]", result)}
+                        );
+
                         delete p;
                         return;
                     }
@@ -37,7 +40,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<aio::net::Address>>> a
                     }
 
                     if (addresses.empty()) {
-                        p->operator*().reject({DNS_ERROR, "DNS records not found"});
+                        p->operator*().reject({DNS_NO_RECORD, "DNS record not found"});
                         delete p;
                         return;
                     }

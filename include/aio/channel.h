@@ -138,7 +138,7 @@ namespace aio {
             std::optional<size_t> index = mBuffer.reserve();
 
             if (!index)
-                return nonstd::make_unexpected(IO_AGAIN);
+                return nonstd::make_unexpected(IO_WOULD_BLOCK);
 
             mBuffer[*index] = std::move(element);
             mBuffer.commit(*index);
@@ -153,7 +153,7 @@ namespace aio {
             std::optional<size_t> index = mBuffer.acquire();
 
             if (!index)
-                return nonstd::make_unexpected(mClosed ? IO_CLOSED : IO_AGAIN);
+                return nonstd::make_unexpected(mClosed ? IO_CLOSED : IO_WOULD_BLOCK);
 
             T element = std::move(mBuffer[*index]);
             mBuffer.release(*index);
@@ -224,7 +224,7 @@ namespace aio {
         std::shared_ptr<zero::async::promise::Promise<void>>
         send(T &&element, std::optional<std::chrono::milliseconds> timeout) {
             if (mClosed)
-                return zero::async::promise::reject<void>({IO_CLOSED, "channel closed"});
+                return zero::async::promise::reject<void>({IO_CLOSED, "send on closed channel"});
 
             this->addRef();
 
@@ -236,7 +236,7 @@ namespace aio {
                             std::lock_guard<std::mutex> guard(mMutex);
 
                             if (mClosed) {
-                                P_BREAK_E(loop, { IO_CLOSED, "channel closed" });
+                                P_BREAK_E(loop, { IO_CLOSED, "channel closed on send" });
                                 return;
                             }
 
@@ -249,7 +249,7 @@ namespace aio {
 
                             event->on(ev::WRITE, timeout)->then([=](short what) {
                                 if (what & ev::CLOSED) {
-                                    P_BREAK_E(loop, { IO_EOF, "channel is closed" });
+                                    P_BREAK_E(loop, { IO_EOF, "channel closed while waiting to send" });
                                     return;
                                 } else if (what & ev::TIMEOUT) {
                                     P_BREAK_E(loop, { IO_TIMEOUT, "channel send timed out" });
@@ -342,7 +342,7 @@ namespace aio {
                     std::lock_guard<std::mutex> guard(mMutex);
 
                     if (mClosed) {
-                        P_BREAK_E(loop, { IO_CLOSED, "channel closed" });
+                        P_BREAK_E(loop, { IO_CLOSED, "channel closed on receive" });
                         return;
                     }
 
@@ -355,7 +355,7 @@ namespace aio {
 
                     event->on(ev::READ, timeout)->then([=](short what) {
                         if (what & ev::CLOSED) {
-                            P_BREAK_E(loop, { IO_EOF, "channel is closed" });
+                            P_BREAK_E(loop, { IO_EOF, "channel closed while waiting to receive" });
                             return;
                         } else if (what & ev::TIMEOUT) {
                             P_BREAK_E(loop, { IO_TIMEOUT, "channel receive timed out" });

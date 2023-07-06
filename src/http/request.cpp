@@ -84,14 +84,21 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::http::Response::output
     std::shared_ptr<std::ofstream> stream = std::make_shared<std::ofstream>(path, std::ios::binary);
 
     if (!stream->is_open())
-        return zero::async::promise::reject<void>({-1, "create file output stream failed"});
+        return zero::async::promise::reject<void>(
+                {IO_ERROR, zero::strings::format("open file failed[%d]", stream->rdstate())}
+        );
 
     return zero::async::promise::loop<void>([=](const auto &loop) {
         read(10240)->then([=](nonstd::span<const std::byte> data) -> nonstd::expected<void, zero::async::promise::Reason> {
             stream->write((const char *) data.data(), (std::streamsize) data.size());
 
             if (!stream->good())
-                return nonstd::make_unexpected(zero::async::promise::Reason{IO_ERROR, "write failed"});
+                return nonstd::make_unexpected(
+                        zero::async::promise::Reason{
+                                IO_ERROR,
+                                zero::strings::format("write file failed[%d]", stream->rdstate())
+                        }
+                );
 
             return {};
         })->then([=]() {
@@ -130,7 +137,12 @@ std::shared_ptr<zero::async::promise::Promise<nlohmann::json>> aio::http::Respon
                 try {
                     return nlohmann::json::parse(content);
                 } catch (const nlohmann::json::parse_error &e) {
-                    return nonstd::make_unexpected(zero::async::promise::Reason{JSON_ERROR, e.what()});
+                    return nonstd::make_unexpected(
+                            zero::async::promise::Reason{
+                                    JSON_PARSE_ERROR,
+                                    zero::strings::format("http response json parsing error[%s]", e.what())
+                            }
+                    );
                 }
             }
     );
@@ -258,10 +270,12 @@ void aio::http::Requests::recycle() {
         curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, &connection);
 
         if (msg->data.result != CURLE_OK) {
+            std::string message = zero::strings::format("http request error[%s]", connection->error);
+
             if (!connection->transferring) {
-                connection->promise->reject({HTTP_ERROR, connection->error});
+                connection->promise->reject({HTTP_REQUEST_ERROR, std::move(message)});
             } else {
-                connection->buffer->throws(connection->error);
+                connection->buffer->throws(std::move(message));
             }
         } else {
             connection->buffer->close();

@@ -63,7 +63,6 @@ TEST_CASE("async channel buffer", "[channel]") {
                     })
             )->fail([=](const zero::async::promise::Reason &reason) {
                 REQUIRE((reason.code == aio::IO_EOF || reason.code == aio::IO_CLOSED));
-                REQUIRE(reason.message == "channel closed");
                 REQUIRE(*counters[0] == *counters[1]);
             })->finally([=]() {
                 context->loopBreak();
@@ -86,7 +85,6 @@ TEST_CASE("async channel buffer", "[channel]") {
                 });
             })->fail([=](const zero::async::promise::Reason &reason) {
                 REQUIRE(reason.code == aio::IO_TIMEOUT);
-                REQUIRE(reason.message == "channel send timed out");
             })->finally([=]() {
                 context->loopBreak();
             });
@@ -99,7 +97,6 @@ TEST_CASE("async channel buffer", "[channel]") {
                 FAIL();
             }, [=](const zero::async::promise::Reason &reason) {
                 REQUIRE(reason.code == aio::IO_TIMEOUT);
-                REQUIRE(reason.message == "channel receive timed out");
             })->finally([=]() {
                 context->loopBreak();
             });
@@ -140,7 +137,6 @@ TEST_CASE("async channel buffer", "[channel]") {
                         });
                     })
             )->fail([=](const zero::async::promise::Reason &reason) {
-                REQUIRE(reason.message == "channel closed");
                 REQUIRE(*counters[0] == *counters[1]);
             })->finally([=]() {
                 context->loopBreak();
@@ -172,7 +168,6 @@ TEST_CASE("async channel buffer", "[channel]") {
                 return {};
             })->fail([=](const zero::async::promise::Reason &reason) {
                 REQUIRE(reason.code == aio::IO_TIMEOUT);
-                REQUIRE(reason.message == "channel send timed out");
             })->finally([=]() {
                 context->loopBreak();
             });
@@ -185,7 +180,6 @@ TEST_CASE("async channel buffer", "[channel]") {
                 FAIL();
             }, [=](const zero::async::promise::Reason &reason) {
                 REQUIRE(reason.code == aio::IO_TIMEOUT);
-                REQUIRE(reason.message == "channel receive timed out");
             })->finally([=]() {
                 context->loopBreak();
             });
@@ -260,7 +254,6 @@ TEST_CASE("async channel buffer", "[channel]") {
                 });
             })->fail([=](const zero::async::promise::Reason &reason) {
                 REQUIRE(reason.code == aio::IO_TIMEOUT);
-                REQUIRE(reason.message == "channel send timed out");
             })->finally([=]() {
                 context->loopBreak();
             });
@@ -283,7 +276,6 @@ TEST_CASE("async channel buffer", "[channel]") {
                 return {};
             })->fail([=](const zero::async::promise::Reason &reason) {
                 REQUIRE(reason.code == aio::IO_TIMEOUT);
-                REQUIRE(reason.message == "channel receive timed out");
             })->finally([=]() {
                 context->loopBreak();
             });

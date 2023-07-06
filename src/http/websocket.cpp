@@ -87,7 +87,7 @@ aio::http::ws::WebSocket::readFrame() {
 
         if (header.mask())
             return zero::async::promise::reject<std::tuple<Header, std::vector<std::byte>>>(
-                    {WS_ERROR, "masked server frame not supported"}
+                    {WS_NO_FEATURE, "websocket masked server frame not supported"}
             );
 
         if (header.length() >= TWO_BYTE_PAYLOAD_LENGTH) {
@@ -205,14 +205,14 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
 
     return zero::async::promise::loop<Message>([=](const auto &loop) {
         if (mState != CONNECTED) {
-            P_BREAK_E(loop, { WS_ERROR, "websocket not connected" });
+            P_BREAK_E(loop, { WS_UNCONNECTED, "read unconnected websocket" });
             return;
         }
 
         readMessage()->then([=](const InternalMessage &message) {
             switch (message.opcode) {
                 case CONTINUATION:
-                    P_BREAK_E(loop, { WS_ERROR, "unexpected continuation message" });
+                    P_BREAK_E(loop, { WS_UNEXPECTED_OPCODE, "websocket unexpected continuation message" });
                     break;
 
                 case TEXT:
@@ -223,6 +223,7 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
                                     std::string{(const char *) message.data.data(), message.data.size()}
                             }
                     );
+
                     break;
 
                 case PONG:
@@ -259,7 +260,7 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
                                 {
                                     IO_EOF,
                                     zero::strings::format(
-                                            "websocket is closed: %hu['%.*s']",
+                                            "websocket is closed[%hu(%.*s)]",
                                             ntohs(*(unsigned short *) message.data.data()),
                                             message.data.size() - sizeof(unsigned short),
                                             (const char *) message.data.data() + sizeof(unsigned short)
@@ -280,7 +281,15 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
                     break;
 
                 default:
-                    P_BREAK_E(loop, { WS_ERROR, "unknown opcode" });
+                    P_BREAK_E(
+                            loop,
+                            {
+                                WS_UNEXPECTED_OPCODE,
+                                zero::strings::format("websocket unexpected opcode[%d]", message.opcode)
+                            }
+                    );
+
+                    break;
             }
         })->fail([=](const zero::async::promise::Reason &reason) {
             if (reason.code == IO_TIMEOUT && !mHeartbeat) {
@@ -308,7 +317,7 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
 std::shared_ptr<zero::async::promise::Promise<void>>
 aio::http::ws::WebSocket::write(const aio::http::ws::Message &message) {
     if (mState != CONNECTED)
-        return zero::async::promise::reject<void>({WS_ERROR, "websocket not connected"});
+        return zero::async::promise::reject<void>({WS_UNCONNECTED, "write unconnected websocket"});
 
     mRef++;
     addRef();
@@ -325,7 +334,10 @@ aio::http::ws::WebSocket::write(const aio::http::ws::Message &message) {
         case CONTINUATION:
         case CLOSE:
             return zero::async::promise::reject<void>(
-                    {WS_ERROR, zero::strings::format("unexpected opcode: %d", message.opcode)}
+                    {
+                            WS_UNEXPECTED_OPCODE,
+                            zero::strings::format("websocket unexpected opcode[%d]", message.opcode)
+                    }
             );
 
         default:
@@ -352,7 +364,7 @@ aio::http::ws::WebSocket::sendBinary(nonstd::span<const std::byte> buffer) {
 std::shared_ptr<zero::async::promise::Promise<void>>
 aio::http::ws::WebSocket::close(CloseCode code, std::string_view reason) {
     if (mState != CONNECTED)
-        return zero::async::promise::reject<void>({WS_ERROR, "websocket not connected"});
+        return zero::async::promise::reject<void>({WS_UNCONNECTED, "close unconnected websocket"});
 
     mState = CLOSING;
 
@@ -421,7 +433,7 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
     std::optional<unsigned short> port = url.port();
 
     if (!scheme || !host || !port)
-        return zero::async::promise::reject<zero::ptr::RefPtr<WebSocket>>({WS_ERROR, "invalid url"});
+        return zero::async::promise::reject<zero::ptr::RefPtr<WebSocket>>({INVALID_ARGUMENT, "invalid websocket url"});
 
     std::shared_ptr<zero::async::promise::Promise<zero::ptr::RefPtr<net::stream::IBuffer>>> promise;
 
@@ -430,7 +442,9 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
     } else if (scheme == WS_SECURE_SCHEME) {
         promise = net::ssl::stream::connect(context, *host, *port);
     } else {
-        return zero::async::promise::reject<zero::ptr::RefPtr<WebSocket>>({WS_ERROR, "unsupported scheme"});
+        return zero::async::promise::reject<zero::ptr::RefPtr<WebSocket>>(
+                {INVALID_ARGUMENT, zero::strings::format("unsupported websocket scheme[%s]", scheme->c_str())}
+        );
     }
 
     return promise->then([=](const zero::ptr::RefPtr<net::stream::IBuffer> &buffer) {
@@ -464,8 +478,8 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
                 buffer->close();
                 return nonstd::make_unexpected(
                         zero::async::promise::Reason{
-                                WS_ERROR,
-                                zero::strings::format("bad response: %s", line.c_str())
+                                WS_HANDSHAKE_ERROR,
+                                zero::strings::format("bad websocket response[%s]", line.c_str())
                         }
                 );
             }
@@ -476,8 +490,8 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
                 buffer->close();
                 return nonstd::make_unexpected(
                         zero::async::promise::Reason{
-                                WS_ERROR,
-                                zero::strings::format("parse status code failed: %s", tokens[1].c_str())
+                                WS_HANDSHAKE_ERROR,
+                                zero::strings::format("invalid websocket response status code[%s]", tokens[1].c_str())
                         }
                 );
             }
@@ -486,8 +500,8 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
                 buffer->close();
                 return nonstd::make_unexpected(
                         zero::async::promise::Reason{
-                                WS_ERROR,
-                                zero::strings::format("bad response status code: %d", code)
+                                WS_HANDSHAKE_ERROR,
+                                zero::strings::format("bad websocket response status code[%d]", code)
                         }
                 );
             }
@@ -502,7 +516,10 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
                         std::vector<std::string> tokens = zero::strings::split(line, ":", 1);
 
                         if (tokens.size() < 2) {
-                            P_BREAK_E(loop, { WS_ERROR, zero::strings::format("bad header: %s", line.c_str()) });
+                            P_BREAK_E(
+                                    loop,
+                                    { WS_HANDSHAKE_ERROR, zero::strings::format("bad http header[%s]", line.c_str()) }
+                            );
                             return;
                         }
 
@@ -515,7 +532,7 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
                     auto it = headers->find("Sec-WebSocket-Accept");
 
                     if (it == headers->end()) {
-                        P_BREAK_E(loop, { WS_ERROR, "accept header not found" });
+                        P_BREAK_E(loop, { WS_HANDSHAKE_ERROR, "Sec-WebSocket-Accept header not found" });
                         return;
                     }
 
@@ -526,7 +543,14 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
                     std::string hash = zero::encoding::base64::encode(digest);
 
                     if (it->second != hash) {
-                        P_BREAK_E(loop, { WS_ERROR, "hash error" });
+                        P_BREAK_E(
+                                loop,
+                                {
+                                    WS_HANDSHAKE_ERROR,
+                                    zero::strings::format("mismatched hash[%s != %s]", it->second.c_str(), hash.c_str())
+                                }
+                        );
+
                         return;
                     }
 

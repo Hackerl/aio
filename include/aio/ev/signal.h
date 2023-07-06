@@ -18,6 +18,9 @@ namespace aio::ev {
         Signal &operator=(const Signal &) = delete;
 
     public:
+        int sig();
+
+    public:
         bool cancel();
         bool pending();
 

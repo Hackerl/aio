@@ -47,6 +47,7 @@ namespace aio::net {
 
     class ISocket : public virtual IStreamIO, public virtual IEndpoint, public IDeadline {
     public:
+        virtual evutil_socket_t fd() = 0;
         virtual bool bind(const Address &address) = 0;
         virtual std::shared_ptr<zero::async::promise::Promise<void>> connect(const Address &address) = 0;
     };

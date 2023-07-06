@@ -19,6 +19,10 @@ aio::ev::Signal::~Signal() {
     event_free(mEvent);
 }
 
+int aio::ev::Signal::sig() {
+    return event_get_signal(mEvent);
+}
+
 bool aio::ev::Signal::cancel() {
     if (!pending())
         return false;
@@ -26,7 +30,7 @@ bool aio::ev::Signal::cancel() {
     evsignal_del(mEvent);
 
     auto p = std::move(mPromise);
-    p->reject({IO_CANCEL, "promise canceled"});
+    p->reject({IO_CANCELED, "signal waiting request was canceled"});
 
     return true;
 }
@@ -37,7 +41,7 @@ bool aio::ev::Signal::pending() {
 
 std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Signal::on() {
     if (mPromise)
-        return zero::async::promise::reject<void>({IO_ERROR, "pending signal has been set"});
+        return zero::async::promise::reject<void>({IO_BUSY, "signal pending request not completed"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         addRef();

@@ -59,7 +59,12 @@ namespace aio::http {
                 try {
                     return j.get<T>();
                 } catch (const nlohmann::json::exception &e) {
-                    return nonstd::make_unexpected(zero::async::promise::Reason{JSON_ERROR, e.what()});
+                    return nonstd::make_unexpected(
+                            zero::async::promise::Reason{
+                                    JSON_DESERIALIZATION_ERROR,
+                                    zero::strings::format("http response json deserialization error[%s]", e.what())
+                            }
+                    );
                 }
             });
         }
@@ -122,12 +127,16 @@ namespace aio::http {
             std::optional<std::string> u = url.string();
 
             if (!u)
-                return zero::async::promise::reject<zero::ptr::RefPtr<Response>>({HTTP_ERROR, "invalid url"});
+                return zero::async::promise::reject<zero::ptr::RefPtr<Response>>(
+                        {INVALID_ARGUMENT, "invalid http request url"}
+                );
 
             CURL *easy = curl_easy_init();
 
             if (!easy)
-                return zero::async::promise::reject<zero::ptr::RefPtr<Response>>({HTTP_ERROR, "init easy handle failed"});
+                return zero::async::promise::reject<zero::ptr::RefPtr<Response>>(
+                        {HTTP_INIT_ERROR, "create http request failed"}
+                );
 
             std::array<zero::ptr::RefPtr<ev::IPairedBuffer>, 2> buffers = ev::pipe(mContext);
 
@@ -299,7 +308,15 @@ namespace aio::http {
                             curl_mime_free(form);
                             curl_slist_free_all(headers);
                             delete connection;
-                            return zero::async::promise::reject<zero::ptr::RefPtr<Response>>({HTTP_ERROR, curl_easy_strerror(c)});
+                            return zero::async::promise::reject<zero::ptr::RefPtr<Response>>(
+                                    {
+                                            HTTP_INIT_ERROR,
+                                            zero::strings::format(
+                                                    "set http request mime part data failed[%s]",
+                                                    curl_easy_strerror(c)
+                                            )
+                                    }
+                            );
                         }
                     }
 
@@ -325,7 +342,13 @@ namespace aio::http {
                                 curl_slist_free_all(headers);
                                 delete connection;
                                 return zero::async::promise::reject<zero::ptr::RefPtr<Response>>(
-                                        {HTTP_ERROR, curl_easy_strerror(c)}
+                                        {
+                                                HTTP_INIT_ERROR,
+                                                zero::strings::format(
+                                                        "set http request mime part data failed[%s]",
+                                                        curl_easy_strerror(c)
+                                                )
+                                        }
                                 );
                             }
                         }
@@ -348,7 +371,12 @@ namespace aio::http {
                     curl_easy_setopt(
                             easy,
                             CURLOPT_COPYPOSTFIELDS,
-                            nlohmann::json(payload).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str()
+                            nlohmann::json(payload).dump(
+                                    -1,
+                                    ' ',
+                                    false,
+                                    nlohmann::json::error_handler_t::replace
+                            ).c_str()
                     );
 
                     headers = curl_slist_append(headers, "Content-Type: application/json");
@@ -371,7 +399,12 @@ namespace aio::http {
 
                 if (c != CURLM_OK) {
                     delete connection;
-                    p->reject({HTTP_ERROR, "add easy handle failed"});
+                    p->reject(
+                            {
+                                    HTTP_INIT_ERROR,
+                                    zero::strings::format("add http request failed[%s]", curl_multi_strerror(c))
+                            }
+                    );
                 }
             });
         }

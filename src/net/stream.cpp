@@ -1,5 +1,6 @@
 #include <aio/net/stream.h>
 #include <zero/os/net.h>
+#include <zero/strings/strings.h>
 #include <cstring>
 
 #ifdef __linux__
@@ -51,7 +52,7 @@ aio::net::stream::ListenerBase::ListenerBase(std::shared_ptr<Context> context, e
                 zero::ptr::RefPtr<ListenerBase> ptr((ListenerBase *) arg);
 
                 auto p = std::move(ptr->mPromise);
-                p->reject({IO_ERROR, lastError()});
+                p->reject({IO_ERROR, zero::strings::format("listener error occurred[%s]", lastError().c_str())});
             }
     );
 }
@@ -65,10 +66,12 @@ aio::net::stream::ListenerBase::~ListenerBase() {
 
 std::shared_ptr<zero::async::promise::Promise<evutil_socket_t>> aio::net::stream::ListenerBase::fd() {
     if (!mListener)
-        return zero::async::promise::reject<evutil_socket_t>({IO_ERROR, "listener destroyed"});
+        return zero::async::promise::reject<evutil_socket_t>({IO_BAD_RESOURCE, "accept from destroyed listener"});
 
     if (mPromise)
-        return zero::async::promise::reject<evutil_socket_t>({IO_ERROR, "pending request not completed"});
+        return zero::async::promise::reject<evutil_socket_t>(
+                {IO_BUSY, "listener pending accept request not completed"}
+        );
 
     return zero::async::promise::chain<evutil_socket_t>([=](const auto &p) {
         addRef();
@@ -87,7 +90,7 @@ void aio::net::stream::ListenerBase::close() {
     auto p = std::move(mPromise);
 
     if (p)
-        p->reject({IO_EOF, "listener will be closed"});
+        p->reject({IO_CLOSED, "listener is being closed"});
 
     evconnlistener_free(mListener);
     mListener = nullptr;
@@ -173,7 +176,7 @@ aio::net::stream::connect(const std::shared_ptr<Context> &context, const Address
             promise = connect(context, std::get<UnixAddress>(address).path);
 #else
             promise = zero::async::promise::reject<zero::ptr::RefPtr<IBuffer>>(
-                    {IO_ERROR, "unsupported unix domain socket"}
+                    {INVALID_ARGUMENT, "unsupported unix domain socket"}
             );
 #endif
         }
@@ -198,7 +201,9 @@ aio::net::stream::connect(const std::shared_ptr<Context> &context, const std::st
     bufferevent *bev = bufferevent_socket_new(context->base(), -1, BEV_OPT_CLOSE_ON_FREE);
 
     if (!bev)
-        return zero::async::promise::reject<zero::ptr::RefPtr<IBuffer>>({IO_ERROR, "new buffer failed"});
+        return zero::async::promise::reject<zero::ptr::RefPtr<IBuffer>>(
+                {IO_ERROR, zero::strings::format("create buffer failed[%s]", lastError().c_str())}
+        );
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         auto ctx = new std::shared_ptr(p);
@@ -211,7 +216,15 @@ aio::net::stream::connect(const std::shared_ptr<Context> &context, const std::st
                     auto p = (std::shared_ptr<zero::async::promise::Promise<void>> *) arg;
 
                     if ((what & BEV_EVENT_CONNECTED) == 0) {
-                        p->operator*().reject({IO_ERROR, lastError()});
+                        p->operator*().reject(
+                                {
+                                        IO_ERROR,
+                                        zero::strings::format(
+                                                "buffer connect to remote failed[%s]",
+                                                lastError().c_str()
+                                        )
+                                }
+                        );
                         delete p;
                         return;
                     }
@@ -224,7 +237,7 @@ aio::net::stream::connect(const std::shared_ptr<Context> &context, const std::st
 
         if (bufferevent_socket_connect_hostname(bev, context->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
             delete ctx;
-            p->reject({IO_ERROR, lastError()});
+            p->reject({IO_ERROR, zero::strings::format("buffer connect to remote failed[%s]", lastError().c_str())});
         }
     })->then([=]() -> zero::ptr::RefPtr<IBuffer> {
         return zero::ptr::makeRef<Buffer>(bev);
@@ -267,7 +280,9 @@ aio::net::stream::connect(const std::shared_ptr<Context> &context, const std::st
     bufferevent *bev = bufferevent_socket_new(context->base(), -1, BEV_OPT_CLOSE_ON_FREE);
 
     if (!bev)
-        return zero::async::promise::reject<zero::ptr::RefPtr<IBuffer>>({IO_ERROR, "new buffer failed"});
+        return zero::async::promise::reject<zero::ptr::RefPtr<IBuffer>>(
+                {IO_ERROR, zero::strings::format("create buffer failed[%s]", lastError().c_str())}
+        );
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         auto ctx = new std::shared_ptr(p);
@@ -280,7 +295,15 @@ aio::net::stream::connect(const std::shared_ptr<Context> &context, const std::st
                     auto p = (std::shared_ptr<zero::async::promise::Promise<void>> *) arg;
 
                     if ((what & BEV_EVENT_CONNECTED) == 0) {
-                        p->operator*().reject({IO_ERROR, lastError()});
+                        p->operator*().reject(
+                                {
+                                        IO_ERROR,
+                                        zero::strings::format(
+                                                "buffer connect to remote failed[%s]",
+                                                lastError().c_str()
+                                        )
+                                }
+                        );
                         delete p;
                         return;
                     }
@@ -293,7 +316,7 @@ aio::net::stream::connect(const std::shared_ptr<Context> &context, const std::st
 
         if (bufferevent_socket_connect(bev, (const sockaddr *) &sa, sizeof(sa)) < 0) {
             delete ctx;
-            p->reject({IO_ERROR, lastError()});
+            p->reject({IO_ERROR, zero::strings::format("buffer connect to remote failed[%s]", lastError().c_str())});
         }
     })->then([=]() -> zero::ptr::RefPtr<IBuffer> {
         return zero::ptr::makeRef<Buffer>(bev);

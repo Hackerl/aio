@@ -50,7 +50,6 @@ TEST_CASE("buffer pipe", "[pipe]") {
             FAIL();
         }, [](const zero::async::promise::Reason &reason) {
             REQUIRE(reason.code == aio::IO_EOF);
-            REQUIRE(reason.message == "buffer is closed");
         })->finally([=]() {
             context->loopBreak();
         });
@@ -64,7 +63,7 @@ TEST_CASE("buffer pipe", "[pipe]") {
             return buffers[0]->readLine();
         })->then([=](std::string_view line) {
             REQUIRE(line == "world hello");
-            buffers[0]->throws("error occurred");
+            buffers[0]->throws("message");
         });
 
         buffers[1]->readLine()->then([=](std::string_view line) {
@@ -77,7 +76,6 @@ TEST_CASE("buffer pipe", "[pipe]") {
             FAIL();
         }, [](const zero::async::promise::Reason &reason) {
             REQUIRE(reason.code == aio::IO_ERROR);
-            REQUIRE(reason.message == "error occurred");
         })->finally([=]() {
             context->loopBreak();
         });

@@ -27,6 +27,9 @@ namespace aio::ev {
         Event &operator=(const Event &) = delete;
 
     public:
+        evutil_socket_t fd();
+
+    public:
         bool cancel();
         bool pending();
 

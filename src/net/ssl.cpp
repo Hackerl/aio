@@ -9,7 +9,6 @@
 
 #ifdef __linux__
 #include <netinet/in.h>
-#include <endian.h>
 #endif
 
 #ifdef AIO_EMBED_CA_CERT
@@ -235,7 +234,7 @@ nonstd::expected<void, aio::Error> aio::net::ssl::stream::Buffer::close() {
     SSL *ctx = bufferevent_openssl_get_ssl(mBev);
 
     if (!ctx)
-        return nonstd::make_unexpected(SSL_ERROR);
+        return nonstd::make_unexpected(IO_ERROR);
 
     SSL_set_shutdown(ctx, SSL_RECEIVED_SHUTDOWN);
     SSL_shutdown(ctx);
@@ -354,7 +353,8 @@ aio::net::ssl::stream::connect(
 
     if (!ctx)
         return zero::async::promise::reject<zero::ptr::RefPtr<net::stream::IBuffer>>(
-                {SSL_ERROR, "invalid default SSL context"});
+                {SSL_INIT_ERROR, zero::strings::format("create default SSL context failed[%s]", getError().c_str())}
+        );
 
     return connect(context, host, port, ctx);
 }
@@ -391,14 +391,18 @@ aio::net::ssl::stream::connect(
     SSL *ssl = SSL_new(ctx.get());
 
     if (!ssl)
-        return zero::async::promise::reject<zero::ptr::RefPtr<net::stream::IBuffer>>({SSL_ERROR, getError()});
+        return zero::async::promise::reject<zero::ptr::RefPtr<net::stream::IBuffer>>(
+                {SSL_INIT_ERROR, zero::strings::format("create SSL structure failed[%s]", getError().c_str())}
+        );
 
     SSL_set_tlsext_host_name(ssl, host.c_str());
     SSL_set_hostflags(ssl, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
 
     if (!SSL_set1_host(ssl, host.c_str())) {
         SSL_free(ssl);
-        return zero::async::promise::reject<zero::ptr::RefPtr<net::stream::IBuffer>>({SSL_ERROR, getError()});
+        return zero::async::promise::reject<zero::ptr::RefPtr<net::stream::IBuffer>>(
+                {SSL_INIT_ERROR, zero::strings::format("set SSL expected hostname failed[%s]", getError().c_str())}
+        );
     }
 
     bufferevent *bev = bufferevent_openssl_socket_new(
@@ -410,7 +414,9 @@ aio::net::ssl::stream::connect(
     );
 
     if (!bev)
-        return zero::async::promise::reject<zero::ptr::RefPtr<net::stream::IBuffer>>({SSL_ERROR, "new buffer failed"});
+        return zero::async::promise::reject<zero::ptr::RefPtr<net::stream::IBuffer>>(
+                {SSL_INIT_ERROR, zero::strings::format("create SSL stream buffer failed[%s]", lastError().c_str())}
+        );
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         auto ctx = new std::shared_ptr(p);
@@ -436,9 +442,9 @@ aio::net::ssl::stream::connect(
 
                         p->operator*().reject(
                                 {
-                                        SSL_ERROR,
+                                        IO_ERROR,
                                         zero::strings::format(
-                                                "socket[%s] ssl[%s]",
+                                                "buffer connect to remote failed[socket[%s] ssl[%s]]",
                                                 lastError().c_str(),
                                                 zero::strings::join(errors, "; ").c_str()
                                         )
@@ -457,7 +463,7 @@ aio::net::ssl::stream::connect(
 
         if (bufferevent_socket_connect_hostname(bev, context->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
             delete ctx;
-            p->reject({IO_ERROR, lastError()});
+            p->reject({IO_ERROR, zero::strings::format("buffer connect to remote failed[%s]", lastError().c_str())});
         }
     })->then([=]() -> zero::ptr::RefPtr<net::stream::IBuffer> {
         return zero::ptr::makeRef<Buffer>(bev);

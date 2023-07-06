@@ -31,6 +31,7 @@ namespace aio::net::dgram {
         void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
 
     public:
+        evutil_socket_t fd() override;
         bool bind(const Address &address) override;
         std::shared_ptr<zero::async::promise::Promise<void>> connect(const Address &address) override;
 

@@ -20,6 +20,8 @@ namespace aio::ev {
 
     public:
         nonstd::expected<void, Error> close() override;
+
+    private:
         std::string getError() override;
 
     public:
