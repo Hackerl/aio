@@ -70,6 +70,8 @@ namespace aio::net {
             F &&f,
             Args ...args
     ) {
+        std::shared_ptr<zero::async::promise::Reason> tail = std::make_shared<zero::async::promise::Reason>();
+
         return zero::async::promise::loop<T>(
                 [
                         =,
@@ -78,11 +80,18 @@ namespace aio::net {
                         index = std::make_shared<size_t>(),
                         addresses = std::vector<Address>{addresses.begin(), addresses.end()}
                 ](const auto &loop) {
-                    f(context, addresses[(*index)++], args...)->then([=](const T &result) {
+                    f(context, addresses[*index], args...)->then([=](const T &result) {
                         P_BREAK_V(loop, result);
                     }, [=](const zero::async::promise::Reason &reason) {
-                        if (*index >= size) {
-                            P_BREAK_E(loop, reason);
+                        zero::async::promise::Reason last = reason;
+
+                        if (*index > 0)
+                            last.previous = std::make_shared<zero::async::promise::Reason>(*tail);
+
+                        *tail = last;
+
+                        if ((*index)++ >= size - 1) {
+                            P_BREAK_E(loop, *tail);
                             return;
                         }
 

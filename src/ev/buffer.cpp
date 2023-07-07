@@ -53,7 +53,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
     }
 
     if (mClosed)
-        return zero::async::promise::reject<std::vector<std::byte>>({IO_CLOSED, "read closed buffer"});
+        return zero::async::promise::reject<std::vector<std::byte>>({IO_EOF, "read closed buffer"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         addRef();
@@ -97,7 +97,7 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
         return zero::async::promise::resolve<std::string>(std::unique_ptr<char>(ptr).get());
 
     if (mClosed)
-        return zero::async::promise::reject<std::string>({IO_CLOSED, "read closed buffer"});
+        return zero::async::promise::reject<std::string>({IO_EOF, "read closed buffer"});
 
     return zero::async::promise::loop<std::string>([=](const auto &loop) {
         zero::async::promise::chain<void>([=](const auto &p) {
@@ -118,9 +118,7 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
             }
 
             P_BREAK_V(loop, std::unique_ptr<char>(ptr).get());
-        }, [=](const zero::async::promise::Reason &reason) {
-            P_BREAK_E(loop, reason);
-        });
+        })->fail(PF_LOOP_THROW(loop));
     });
 }
 
@@ -145,7 +143,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
     }
 
     if (mClosed)
-        return zero::async::promise::reject<std::vector<std::byte>>({IO_CLOSED, "read closed buffer"});
+        return zero::async::promise::reject<std::vector<std::byte>>({IO_EOF, "read closed buffer"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         addRef();
@@ -187,7 +185,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
     }
 
     if (mClosed)
-        return zero::async::promise::reject<std::vector<std::byte>>({IO_CLOSED, "read closed buffer"});
+        return zero::async::promise::reject<std::vector<std::byte>>({IO_EOF, "read closed buffer"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         addRef();
@@ -248,7 +246,7 @@ nonstd::expected<void, aio::Error> aio::ev::Buffer::writeLine(std::string_view l
 
 nonstd::expected<void, aio::Error> aio::ev::Buffer::submit(nonstd::span<const std::byte> buffer) {
     if (mClosed)
-        return nonstd::make_unexpected(IO_CLOSED);
+        return nonstd::make_unexpected(IO_EOF);
 
     bufferevent_write(mBev, buffer.data(), buffer.size());
     return {};
@@ -262,7 +260,7 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::drain() {
         return zero::async::promise::reject<void>({IO_BUSY, "buffer pending drain request not completed"});
 
     if (mClosed)
-        return zero::async::promise::reject<void>({IO_CLOSED, "request closed buffer to drain"});
+        return zero::async::promise::reject<void>({IO_EOF, "request closed buffer to drain"});
 
     evbuffer *output = bufferevent_get_output(mBev);
 
@@ -289,10 +287,10 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::waitClosed
         return zero::async::promise::reject<void>({IO_BAD_RESOURCE, "wait for destroyed buffer to close"});
 
     if (mPromises[WAIT_CLOSED_INDEX])
-        return zero::async::promise::reject<void>({IO_CLOSED, "buffer pending wait closed request not completed"});
+        return zero::async::promise::reject<void>({IO_EOF, "buffer pending wait closed request not completed"});
 
     if (mClosed)
-        return zero::async::promise::reject<void>({IO_CLOSED, "wait for closed buffer to close"});
+        return zero::async::promise::reject<void>({IO_EOF, "wait for closed buffer to close"});
 
     return zero::async::promise::chain<void>([=](const auto &p) {
         addRef();
@@ -353,9 +351,9 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::write(nons
 
 nonstd::expected<void, aio::Error> aio::ev::Buffer::close() {
     if (mClosed)
-        return nonstd::make_unexpected(IO_CLOSED);
+        return nonstd::make_unexpected(IO_EOF);
 
-    onClose({IO_CLOSED, "buffer is being closed"});
+    onClose({IO_EOF, "buffer is being closed"});
 
     bufferevent_free(mBev);
     mBev = nullptr;

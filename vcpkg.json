@@ -11,7 +11,7 @@
     "nlohmann-json",
     {
       "name": "zero",
-      "version>=": "1.0.3"
+      "version>=": "1.0.4"
     }
   ],
   "default-features": [

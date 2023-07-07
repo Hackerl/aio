@@ -90,7 +90,7 @@ void aio::net::stream::ListenerBase::close() {
     auto p = std::move(mPromise);
 
     if (p)
-        p->reject({IO_CLOSED, "listener is being closed"});
+        p->reject({IO_EOF, "listener is being closed"});
 
     evconnlistener_free(mListener);
     mListener = nullptr;

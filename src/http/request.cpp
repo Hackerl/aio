@@ -89,28 +89,31 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::http::Response::output
         );
 
     return zero::async::promise::loop<void>([=](const auto &loop) {
-        read(10240)->then([=](nonstd::span<const std::byte> data) -> nonstd::expected<void, zero::async::promise::Reason> {
-            stream->write((const char *) data.data(), (std::streamsize) data.size());
+        read(10240)->then(
+                [=](nonstd::span<const std::byte> data) -> nonstd::expected<void, zero::async::promise::Reason> {
+                    stream->write((const char *) data.data(), (std::streamsize) data.size());
 
-            if (!stream->good())
-                return nonstd::make_unexpected(
-                        zero::async::promise::Reason{
-                                IO_ERROR,
-                                zero::strings::format("write file failed[%d]", stream->rdstate())
-                        }
-                );
+                    if (!stream->good())
+                        return nonstd::make_unexpected(
+                                zero::async::promise::Reason{
+                                        IO_ERROR,
+                                        zero::strings::format("write file failed[%d]", stream->rdstate())
+                                }
+                        );
 
-            return {};
-        })->then([=]() {
-            P_CONTINUE(loop);
-        }, [=](const zero::async::promise::Reason &reason) {
-            if (reason.code != IO_EOF) {
-                P_BREAK_E(loop, reason);
-                return;
-            }
+                    return {};
+                }
+        )->then(
+                PF_LOOP_CONTINUE(loop),
+                [=](const zero::async::promise::Reason &reason) {
+                    if (reason.code != IO_EOF) {
+                        P_BREAK_E(loop, reason);
+                        return;
+                    }
 
-            P_BREAK(loop);
-        });
+                    P_BREAK(loop);
+                }
+        );
     });
 }
 

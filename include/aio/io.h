@@ -33,11 +33,10 @@ namespace aio {
     ) {
         return zero::async::promise::loop<void>([=](const auto &loop) {
             src->receive()->then([=](const T &element) {
-                dst->send(element)->then([=]() {
-                    P_CONTINUE(loop);
-                }, [=](const zero::async::promise::Reason &reason) {
-                    P_BREAK_E(loop, reason);
-                });
+                dst->send(element)->then(
+                        PF_LOOP_CONTINUE(loop),
+                        PF_LOOP_THROW(loop)
+                );
             }, [=](const zero::async::promise::Reason &reason) {
                 if (reason.code != IO_EOF) {
                     P_BREAK_E(loop, reason);

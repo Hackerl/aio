@@ -5,11 +5,10 @@ std::shared_ptr<zero::async::promise::Promise<void>>
 aio::copy(const zero::ptr::RefPtr<IReader> &src, const zero::ptr::RefPtr<IWriter> &dst) {
     return zero::async::promise::loop<void>([=](const auto &loop) {
         src->read(10240)->then([=](nonstd::span<const std::byte> data) {
-            dst->write(data)->then([=]() {
-                P_CONTINUE(loop);
-            }, [=](const zero::async::promise::Reason &reason) {
-                P_BREAK_E(loop, reason);
-            });
+            dst->write(data)->then(
+                    PF_LOOP_CONTINUE(loop),
+                    PF_LOOP_THROW(loop)
+            );
         }, [=](const zero::async::promise::Reason &reason) {
             if (reason.code != IO_EOF) {
                 P_BREAK_E(loop, reason);

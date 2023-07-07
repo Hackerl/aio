@@ -28,8 +28,8 @@ int main(int argc, char **argv) {
         return -1;
 
     aio::http::ws::connect(context, url)->then([](const zero::ptr::RefPtr<aio::http::ws::WebSocket> &ws) {
-        return zero::async::promise::loop<void>([=](const auto &loop) {
-            ws->read()->then([=](const aio::http::ws::Message &message) {
+        return zero::async::promise::doWhile([=]() {
+            return ws->read()->then([=](const aio::http::ws::Message &message) {
                 switch (message.opcode) {
                     case aio::http::ws::TEXT:
                         LOG_INFO("receive text message: %s", std::get<std::string>(message.data).c_str());
@@ -49,10 +49,6 @@ int main(int argc, char **argv) {
                 }
 
                 return ws->write(message);
-            })->then([=]() {
-                P_CONTINUE(loop);
-            }, [=](const zero::async::promise::Reason &reason) {
-                P_BREAK_E(loop, reason);
             });
         });
     })->fail([](const zero::async::promise::Reason &reason) {

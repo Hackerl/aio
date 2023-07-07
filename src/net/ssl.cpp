@@ -229,7 +229,7 @@ aio::net::ssl::stream::Buffer::Buffer(bufferevent *bev) : net::stream::Buffer(be
 
 nonstd::expected<void, aio::Error> aio::net::ssl::stream::Buffer::close() {
     if (mClosed)
-        return nonstd::make_unexpected(IO_CLOSED);
+        return nonstd::make_unexpected(IO_EOF);
 
     SSL *ctx = bufferevent_openssl_get_ssl(mBev);
 

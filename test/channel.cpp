@@ -20,11 +20,10 @@ TEST_CASE("async channel buffer", "[channel]") {
                             return;
                         }
 
-                        channel->send((*counters[0])++)->then([=]() {
-                            P_CONTINUE(loop);
-                        }, [=](const zero::async::promise::Reason &reason) {
-                            P_BREAK_E(loop, reason);
-                        });
+                        channel->send((*counters[0])++)->then(
+                                PF_LOOP_CONTINUE(loop),
+                                PF_LOOP_THROW(loop)
+                        );
                     }),
                     zero::async::promise::loop<void>([=](const auto &loop) {
                         if (*counters[0] >= 100000) {
@@ -32,11 +31,10 @@ TEST_CASE("async channel buffer", "[channel]") {
                             return;
                         }
 
-                        channel->send((*counters[0])++)->then([=]() {
-                            P_CONTINUE(loop);
-                        }, [=](const zero::async::promise::Reason &reason) {
-                            P_BREAK_E(loop, reason);
-                        });
+                        channel->send((*counters[0])++)->then(
+                                PF_LOOP_CONTINUE(loop),
+                                PF_LOOP_THROW(loop)
+                        );
                     })
             )->then([=]() {
                 channel->close();
@@ -45,24 +43,18 @@ TEST_CASE("async channel buffer", "[channel]") {
             });
 
             zero::async::promise::any(
-                    zero::async::promise::loop<void>([=](const auto &loop) {
-                        channel->receive()->then([=](int element) {
+                    zero::async::promise::doWhile([=]() {
+                        return channel->receive()->then([=](int element) {
                             (*counters[1])++;
-                            P_CONTINUE(loop);
-                        }, [=](const zero::async::promise::Reason &reason) {
-                            P_BREAK_E(loop, reason);
                         });
                     }),
-                    zero::async::promise::loop<void>([=](const auto &loop) {
-                        channel->receive()->then([=](int element) {
+                    zero::async::promise::doWhile([=]() {
+                        return channel->receive()->then([=](int element) {
                             (*counters[1])++;
-                            P_CONTINUE(loop);
-                        }, [=](const zero::async::promise::Reason &reason) {
-                            P_BREAK_E(loop, reason);
                         });
                     })
             )->fail([=](const zero::async::promise::Reason &reason) {
-                REQUIRE((reason.code == aio::IO_EOF || reason.code == aio::IO_CLOSED));
+                REQUIRE(reason.code == aio::IO_EOF);
                 REQUIRE(*counters[0] == *counters[1]);
             })->finally([=]() {
                 context->loopBreak();
@@ -78,11 +70,10 @@ TEST_CASE("async channel buffer", "[channel]") {
                     return;
                 }
 
-                channel->send((*counters[0])++, 50ms)->then([=]() {
-                    P_CONTINUE(loop);
-                }, [=](const zero::async::promise::Reason &reason) {
-                    P_BREAK_E(loop, reason);
-                });
+                channel->send((*counters[0])++, 50ms)->then(
+                        PF_LOOP_CONTINUE(loop),
+                        PF_LOOP_THROW(loop)
+                );
             })->fail([=](const zero::async::promise::Reason &reason) {
                 REQUIRE(reason.code == aio::IO_TIMEOUT);
             })->finally([=]() {
@@ -120,20 +111,14 @@ TEST_CASE("async channel buffer", "[channel]") {
             });
 
             zero::async::promise::any(
-                    zero::async::promise::loop<void>([=](const auto &loop) {
-                        channel->receive()->then([=](int element) {
+                    zero::async::promise::doWhile([=]() {
+                        return channel->receive()->then([=](int element) {
                             (*counters[1])++;
-                            P_CONTINUE(loop);
-                        }, [=](const zero::async::promise::Reason &reason) {
-                            P_BREAK_E(loop, reason);
                         });
                     }),
-                    zero::async::promise::loop<void>([=](const auto &loop) {
-                        channel->receive()->then([=](int element) {
+                    zero::async::promise::doWhile([=]() {
+                        return channel->receive()->then([=](int element) {
                             (*counters[1])++;
-                            P_CONTINUE(loop);
-                        }, [=](const zero::async::promise::Reason &reason) {
-                            P_BREAK_E(loop, reason);
                         });
                     })
             )->fail([=](const zero::async::promise::Reason &reason) {
@@ -156,10 +141,7 @@ TEST_CASE("async channel buffer", "[channel]") {
                     if (!result) {
                         channel->close();
                         return nonstd::make_unexpected(
-                                zero::async::promise::Reason{
-                                        result.error(),
-                                        "channel send timed out"
-                                }
+                                zero::async::promise::Reason{result.error(), "channel send timed out"}
                         );
                     }
                 }
@@ -197,11 +179,10 @@ TEST_CASE("async channel buffer", "[channel]") {
                             return;
                         }
 
-                        channel->send((*counters[0])++)->then([=]() {
-                            P_CONTINUE(loop);
-                        }, [=](const zero::async::promise::Reason &reason) {
-                            P_BREAK_E(loop, reason);
-                        });
+                        channel->send((*counters[0])++)->then(
+                                PF_LOOP_CONTINUE(loop),
+                                PF_LOOP_THROW(loop)
+                        );
                     }),
                     zero::async::promise::loop<void>([=](const auto &loop) {
                         if (*counters[0] >= 100000) {
@@ -209,11 +190,10 @@ TEST_CASE("async channel buffer", "[channel]") {
                             return;
                         }
 
-                        channel->send((*counters[0])++)->then([=]() {
-                            P_CONTINUE(loop);
-                        }, [=](const zero::async::promise::Reason &reason) {
-                            P_BREAK_E(loop, reason);
-                        });
+                        channel->send((*counters[0])++)->then(
+                                PF_LOOP_CONTINUE(loop),
+                                PF_LOOP_THROW(loop)
+                        );
                     })
             )->then([=]() {
                 channel->close();
@@ -226,7 +206,7 @@ TEST_CASE("async channel buffer", "[channel]") {
                     nonstd::expected<int, aio::Error> result = channel->receiveSync();
 
                     if (!result) {
-                        REQUIRE((result.error() == aio::IO_EOF || result.error() == aio::IO_CLOSED));
+                        REQUIRE(result.error() == aio::IO_EOF);
                         REQUIRE(*counters[0] == *counters[1]);
                         break;
                     }
@@ -247,11 +227,10 @@ TEST_CASE("async channel buffer", "[channel]") {
                     return;
                 }
 
-                channel->send((*counters[0])++, 50ms)->then([=]() {
-                    P_CONTINUE(loop);
-                }, [=](const zero::async::promise::Reason &reason) {
-                    P_BREAK_E(loop, reason);
-                });
+                channel->send((*counters[0])++, 50ms)->then(
+                        PF_LOOP_CONTINUE(loop),
+                        PF_LOOP_THROW(loop)
+                );
             })->fail([=](const zero::async::promise::Reason &reason) {
                 REQUIRE(reason.code == aio::IO_TIMEOUT);
             })->finally([=]() {
@@ -267,10 +246,7 @@ TEST_CASE("async channel buffer", "[channel]") {
 
                 if (!result)
                     return nonstd::make_unexpected(
-                            zero::async::promise::Reason{
-                                    result.error(),
-                                    "channel receive timed out"
-                            }
+                            zero::async::promise::Reason{result.error(), "channel receive timed out"}
                     );
 
                 return {};

@@ -295,11 +295,10 @@ std::shared_ptr<zero::async::promise::Promise<aio::http::ws::Message>> aio::http
             if (reason.code == IO_TIMEOUT && !mHeartbeat) {
                 mHeartbeat = std::random_device{}();
 
-                ping({(const std::byte *) &*mHeartbeat, sizeof(unsigned int)})->then([=]() {
-                    P_CONTINUE(loop);
-                }, [=](const zero::async::promise::Reason &reason) {
-                    P_BREAK_E(loop, reason);
-                });
+                ping({(const std::byte *) &*mHeartbeat, sizeof(unsigned int)})->then(
+                        PF_LOOP_CONTINUE(loop),
+                        PF_LOOP_THROW(loop)
+                );
 
                 return;
             }
@@ -404,9 +403,7 @@ aio::http::ws::WebSocket::close(CloseCode code, std::string_view reason) {
                 }
 
                 P_BREAK(loop);
-            })->fail([=](const zero::async::promise::Reason &reason) {
-                P_BREAK_E(loop, reason);
-            });
+            })->fail(PF_LOOP_THROW(loop));
         });
     })->then([=]() {
         mBuffer->close();
@@ -555,9 +552,7 @@ aio::http::ws::connect(const std::shared_ptr<aio::Context> &context, const URL &
                     }
 
                     P_BREAK_V(loop, zero::ptr::makeRef<WebSocket>(context, buffer));
-                })->fail([=](const zero::async::promise::Reason &reason) {
-                    P_BREAK_E(loop, reason);
-                });
+                })->fail(PF_LOOP_THROW(loop));
             });
         });
     });

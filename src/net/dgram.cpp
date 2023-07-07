@@ -28,7 +28,7 @@ aio::net::dgram::Socket::readFrom(size_t n) {
 
     return zero::async::promise::loop<std::pair<std::vector<std::byte>, Address>>([=](const auto &loop) {
         if (mClosed) {
-            P_BREAK_E(loop, { IO_CLOSED, "read closed datagram socket" });
+            P_BREAK_E(loop, { IO_EOF, "read closed datagram socket" });
             return;
         }
 
@@ -101,7 +101,7 @@ aio::net::dgram::Socket::readFrom(size_t n) {
             P_CONTINUE(loop);
         }, [=](const zero::async::promise::Reason &reason) {
             if (reason.code == IO_CANCELED) {
-                P_BREAK_E(loop, { IO_CLOSED, "datagram socket is being closed" });
+                P_BREAK_E(loop, { IO_EOF, "datagram socket is being closed" });
                 return;
             }
 
@@ -128,7 +128,7 @@ aio::net::dgram::Socket::writeTo(nonstd::span<const std::byte> buffer, const Add
                     data = std::vector<std::byte>{buffer.begin(), buffer.end()}
             ](const auto &loop) {
                 if (mClosed) {
-                    P_BREAK_E(loop, { IO_CLOSED, "write closed datagram socket" });
+                    P_BREAK_E(loop, { IO_EOF, "write closed datagram socket" });
                     return;
                 }
 
@@ -206,7 +206,7 @@ aio::net::dgram::Socket::writeTo(nonstd::span<const std::byte> buffer, const Add
                     P_CONTINUE(loop);
                 }, [=](const zero::async::promise::Reason &reason) {
                     if (reason.code == IO_CANCELED) {
-                        P_BREAK_E(loop, { IO_CLOSED, "datagram socket is being closed" });
+                        P_BREAK_E(loop, { IO_EOF, "datagram socket is being closed" });
                         return;
                     }
 
@@ -223,7 +223,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::net:
 
     return zero::async::promise::loop<std::vector<std::byte>>([=](const auto &loop) {
         if (mClosed) {
-            P_BREAK_E(loop, { IO_CLOSED, "read closed datagram socket" });
+            P_BREAK_E(loop, { IO_EOF, "read closed datagram socket" });
             return;
         }
 
@@ -277,7 +277,7 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::net:
             P_CONTINUE(loop);
         }, [=](const zero::async::promise::Reason &reason) {
             if (reason.code == IO_CANCELED) {
-                P_BREAK_E(loop, { IO_CLOSED, "datagram socket is being closed" });
+                P_BREAK_E(loop, { IO_EOF, "datagram socket is being closed" });
                 return;
             }
 
@@ -295,7 +295,7 @@ aio::net::dgram::Socket::write(nonstd::span<const std::byte> buffer) {
     return zero::async::promise::loop<void>(
             [=, data = std::vector<std::byte>{buffer.begin(), buffer.end()}](const auto &loop) {
                 if (mClosed) {
-                    P_BREAK_E(loop, { IO_CLOSED, "write closed datagram socket" });
+                    P_BREAK_E(loop, { IO_EOF, "write closed datagram socket" });
                     return;
                 }
 
@@ -347,7 +347,7 @@ aio::net::dgram::Socket::write(nonstd::span<const std::byte> buffer) {
                     P_CONTINUE(loop);
                 }, [=](const zero::async::promise::Reason &reason) {
                     if (reason.code == IO_CANCELED) {
-                        P_BREAK_E(loop, { IO_CLOSED, "datagram socket is being closed" });
+                        P_BREAK_E(loop, { IO_EOF, "datagram socket is being closed" });
                         return;
                     }
 
@@ -361,7 +361,7 @@ aio::net::dgram::Socket::write(nonstd::span<const std::byte> buffer) {
 
 nonstd::expected<void, aio::Error> aio::net::dgram::Socket::close() {
     if (mClosed)
-        return nonstd::make_unexpected(IO_CLOSED);
+        return nonstd::make_unexpected(IO_EOF);
 
     mClosed = true;
 

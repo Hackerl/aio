@@ -133,7 +133,7 @@ namespace aio {
     public:
         nonstd::expected<void, Error> trySend(T &&element) override {
             if (mClosed)
-                return nonstd::make_unexpected(IO_CLOSED);
+                return nonstd::make_unexpected(IO_EOF);
 
             std::optional<size_t> index = mBuffer.reserve();
 
@@ -153,7 +153,7 @@ namespace aio {
             std::optional<size_t> index = mBuffer.acquire();
 
             if (!index)
-                return nonstd::make_unexpected(mClosed ? IO_CLOSED : IO_WOULD_BLOCK);
+                return nonstd::make_unexpected(mClosed ? IO_EOF : IO_WOULD_BLOCK);
 
             T element = std::move(mBuffer[*index]);
             mBuffer.release(*index);
@@ -167,7 +167,7 @@ namespace aio {
     private:
         nonstd::expected<void, Error> sendSync(T &&element, std::optional<std::chrono::milliseconds> timeout) {
             if (mClosed)
-                return nonstd::make_unexpected(IO_CLOSED);
+                return nonstd::make_unexpected(IO_EOF);
 
             while (true) {
                 std::optional<size_t> index = mBuffer.reserve();
@@ -177,7 +177,7 @@ namespace aio {
 
                     if (mClosed) {
                         mMutex.unlock();
-                        return nonstd::make_unexpected(IO_CLOSED);
+                        return nonstd::make_unexpected(IO_EOF);
                     }
 
                     if (!mBuffer.full()) {
@@ -224,7 +224,7 @@ namespace aio {
         std::shared_ptr<zero::async::promise::Promise<void>>
         send(T &&element, std::optional<std::chrono::milliseconds> timeout) {
             if (mClosed)
-                return zero::async::promise::reject<void>({IO_CLOSED, "send on closed channel"});
+                return zero::async::promise::reject<void>({IO_EOF, "send on closed channel"});
 
             this->addRef();
 
@@ -236,7 +236,7 @@ namespace aio {
                             std::lock_guard<std::mutex> guard(mMutex);
 
                             if (mClosed) {
-                                P_BREAK_E(loop, { IO_CLOSED, "channel closed on send" });
+                                P_BREAK_E(loop, { IO_EOF, "channel closed on send" });
                                 return;
                             }
 
@@ -288,7 +288,7 @@ namespace aio {
 
                     if (mClosed) {
                         mMutex.unlock();
-                        return nonstd::make_unexpected(IO_CLOSED);
+                        return nonstd::make_unexpected(IO_EOF);
                     }
 
                     if (!mBuffer.empty()) {
@@ -342,7 +342,7 @@ namespace aio {
                     std::lock_guard<std::mutex> guard(mMutex);
 
                     if (mClosed) {
-                        P_BREAK_E(loop, { IO_CLOSED, "channel closed on receive" });
+                        P_BREAK_E(loop, { IO_EOF, "channel closed on receive" });
                         return;
                     }
 

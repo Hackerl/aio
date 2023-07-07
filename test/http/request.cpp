@@ -28,9 +28,7 @@ TEST_CASE("http requests", "[request]") {
                                 }
 
                                 P_CONTINUE(loop);
-                            }, [=](const zero::async::promise::Reason &reason) {
-                                P_BREAK_E(loop, reason);
-                            });
+                            })->fail(PF_LOOP_THROW(loop));
                         });
                     })->then([=]() {
                         buffer->writeLine("HTTP/1.1 200 OK");
@@ -82,9 +80,7 @@ TEST_CASE("http requests", "[request]") {
                                 headers->operator[](tokens[0]) = zero::strings::trim(tokens[1]);
 
                                 P_CONTINUE(loop);
-                            }, [=](const zero::async::promise::Reason &reason) {
-                                P_BREAK_E(loop, reason);
-                            });
+                            })->fail(PF_LOOP_THROW(loop));
                         })->then([=]() {
                             auto it = headers->find("Content-Length");
                             REQUIRE(it != headers->end());

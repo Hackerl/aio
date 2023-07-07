@@ -113,7 +113,7 @@ TEST_CASE("datagram network connection", "[dgram]") {
                 socket->readFrom(1024)->then([=](nonstd::span<const std::byte> data, const aio::net::Address &from) {
                     FAIL();
                 }, [](const zero::async::promise::Reason &reason) {
-                    REQUIRE(reason.code == aio::IO_CLOSED);
+                    REQUIRE(reason.code == aio::IO_EOF);
                 }),
                 zero::ptr::makeRef<aio::ev::Timer>(context)->setTimeout(50ms)->then([=]() {
                     socket->close();
