@@ -21,7 +21,7 @@ aio::ev::Buffer::Buffer(bufferevent *bev) : mBev(bev), mClosed(false) {
             this
     );
 
-    bufferevent_enable(mBev, EV_WRITE);
+    bufferevent_enable(mBev, EV_READ | EV_WRITE);
     bufferevent_setwatermark(mBev, EV_READ | EV_WRITE, 0, 0);
 }
 
@@ -35,6 +35,9 @@ aio::ev::Buffer::~Buffer() {
 std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::Buffer::read(size_t n) {
     if (!mBev)
         return zero::async::promise::reject<std::vector<std::byte>>({IO_BAD_RESOURCE, "read destroyed buffer"});
+
+    if (mPromises[WAIT_CLOSED_INDEX])
+        return zero::async::promise::reject<std::vector<std::byte>>({IO_BUSY, "buffer is waiting to be closed"});
 
     if (mPromises[READ_INDEX])
         return zero::async::promise::reject<std::vector<std::byte>>(
@@ -88,6 +91,9 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
     if (!mBev)
         return zero::async::promise::reject<std::string>({IO_BAD_RESOURCE, "read destroyed buffer"});
 
+    if (mPromises[WAIT_CLOSED_INDEX])
+        return zero::async::promise::reject<std::string>({IO_BUSY, "buffer is waiting to be closed"});
+
     if (mPromises[READ_INDEX])
         return zero::async::promise::reject<std::string>({IO_BUSY, "buffer pending read request not completed"});
 
@@ -125,6 +131,9 @@ std::shared_ptr<zero::async::promise::Promise<std::string>> aio::ev::Buffer::rea
 std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::Buffer::peek(size_t n) {
     if (!mBev)
         return zero::async::promise::reject<std::vector<std::byte>>({IO_BAD_RESOURCE, "read destroyed buffer"});
+
+    if (mPromises[WAIT_CLOSED_INDEX])
+        return zero::async::promise::reject<std::vector<std::byte>>({IO_BUSY, "buffer is waiting to be closed"});
 
     if (mPromises[READ_INDEX])
         return zero::async::promise::reject<std::vector<std::byte>>(
@@ -167,6 +176,9 @@ std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::
 std::shared_ptr<zero::async::promise::Promise<std::vector<std::byte>>> aio::ev::Buffer::readExactly(size_t n) {
     if (!mBev)
         return zero::async::promise::reject<std::vector<std::byte>>({IO_BAD_RESOURCE, "read destroyed buffer"});
+
+    if (mPromises[WAIT_CLOSED_INDEX])
+        return zero::async::promise::reject<std::vector<std::byte>>({IO_BUSY, "buffer is waiting to be closed"});
 
     if (mPromises[READ_INDEX])
         return zero::async::promise::reject<std::vector<std::byte>>(
@@ -237,7 +249,7 @@ nonstd::expected<void, aio::Error> aio::ev::Buffer::writeLine(std::string_view l
         }
 
         default:
-            result = nonstd::make_unexpected(IO_ERROR);
+            result = nonstd::make_unexpected(INVALID_ARGUMENT);
             break;
     }
 
@@ -286,8 +298,11 @@ std::shared_ptr<zero::async::promise::Promise<void>> aio::ev::Buffer::waitClosed
     if (!mBev)
         return zero::async::promise::reject<void>({IO_BAD_RESOURCE, "wait for destroyed buffer to close"});
 
+    if (mPromises[READ_INDEX])
+        return zero::async::promise::reject<void>({IO_BUSY, "buffer pending read request not completed"});
+
     if (mPromises[WAIT_CLOSED_INDEX])
-        return zero::async::promise::reject<void>({IO_EOF, "buffer pending wait closed request not completed"});
+        return zero::async::promise::reject<void>({IO_BUSY, "buffer is waiting to be closed"});
 
     if (mClosed)
         return zero::async::promise::reject<void>({IO_EOF, "wait for closed buffer to close"});
@@ -386,8 +401,16 @@ void aio::ev::Buffer::onClose(const zero::async::promise::Reason &reason) {
 void aio::ev::Buffer::onBufferRead() {
     auto p = std::move(mPromises[READ_INDEX]);
 
-    if (!p)
+    if (!p) {
+        if (mPromises[WAIT_CLOSED_INDEX])
+            return;
+
+        if (available() < 1024 * 1024)
+            return;
+
+        bufferevent_disable(mBev, EV_READ);
         return;
+    }
 
     p->resolve();
 }
