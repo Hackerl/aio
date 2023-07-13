@@ -1,10 +1,10 @@
 #ifndef AIO_CONTEXT_H
 #define AIO_CONTEXT_H
 
-#include "worker.h"
 #include <queue>
 #include <event.h>
 #include <zero/async/promise.h>
+#include "worker.h"
 
 namespace aio {
     class Context {
